@@ -18,12 +18,19 @@ sealed interface AppResult<out T> {
  * Sprint 002.75 §8 (Error Writing Guide): every user-facing error must map
  * to one of these categories so copy can be written once per category
  * instead of per-exception-type.
+ *
+ * ScanSessionNotFound and InvalidScanConfiguration were added in Sprint
+ * 004A for the Security domain's Repository contract — see
+ * docs/adr/0013-security-domain-error-cases.md for why these were added
+ * here instead of as a separate, parallel error hierarchy.
  */
 sealed interface AppError {
     data object Network : AppError
     data object PermissionMissing : AppError
     data object StorageUnavailable : AppError
     data object EngineUnavailable : AppError
+    data class ScanSessionNotFound(val sessionId: String) : AppError
+    data class InvalidScanConfiguration(val reason: String) : AppError
     data class Unexpected(val cause: Throwable? = null) : AppError
 }
 
