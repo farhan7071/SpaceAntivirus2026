@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App name matches Sprint 001's app_name string exactly — brand
+         name is unchanged by the rebuild, only the product behind it. -->
+    <string name="app_name">Space Antivirus</string>
+</resources>

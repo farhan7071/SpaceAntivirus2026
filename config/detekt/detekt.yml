@@ -1,0 +1,30 @@
+# Detekt baseline config (Task 14). Starts from Detekt's default ruleset
+# (buildUponDefaultConfig = true in root build.gradle.kts) with a small
+# number of project-specific overrides below — deliberately minimal for
+# Sprint 003 so it doesn't flag the whole placeholder codebase; tighten
+# rule-by-rule as real feature code lands in Sprint 004+.
+
+complexity:
+  LongMethod:
+    threshold: 40
+  LongParameterList:
+    functionThreshold: 6
+    constructorThreshold: 7
+  TooManyFunctions:
+    thresholdInClasses: 15
+
+style:
+  MagicNumber:
+    active: false # revisit once real UI spacing/sizing values land — Sprint 002.5's 8dp grid is a deliberate set of "magic numbers"
+  MaxLineLength:
+    maxLineLength: 120
+
+naming:
+  FunctionNaming:
+    # Composables are PascalCase by convention (not lowerCamelCase) —
+    # excluded from Detekt's default function-naming rule.
+    excludes: ['**/ui/**', '**/*Screen.kt', '**/*Route.kt']
+
+comments:
+  UndocumentedPublicClass:
+    active: false # ADR-driven KDoc discipline (Sprint 002.75 §5) is enforced by review, not linting, for Sprint 003

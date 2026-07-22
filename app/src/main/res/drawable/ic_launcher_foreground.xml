@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Placeholder shield glyph — a real icon needs an actual design pass
+  (Sprint 002.5 §18), this is a structurally correct adaptive-icon
+  foreground so the app resource-links and installs, not a final asset.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,20 L78,30 L78,54 C78,72 66,84 54,90 C42,84 30,72 30,54 L30,30 Z" />
+</vector>

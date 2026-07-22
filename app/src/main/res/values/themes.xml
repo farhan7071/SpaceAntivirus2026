@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Minimal system theme — actual Material 3 theming (color/type/shape)
+      lives entirely in core:designsystem's Compose SpaceAntivirusTheme,
+      not here. This XML theme only covers what must exist before Compose
+      takes over: window background and the launch/splash theme.
+
+      BUGFIX (Sprint 003.5 recovery): the parent was previously
+      "Theme.Material3.DayNight.NoActionBar", which is defined by the
+      classic com.google.android.material:material library — a dependency
+      this project never actually declares (we use Compose Material3, a
+      different artifact entirely). That's an AAPT2 "style not found"
+      resource-linking failure, not a hypothetical risk. Parented on a
+      platform-only theme instead, which needs no extra library and is
+      correct for an edge-to-edge, Compose-only Activity.
+    -->
+    <style name="Theme.SpaceAntivirus" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+
+    <style name="Theme.SpaceAntivirus.Splash" parent="Theme.SpaceAntivirus" />
+</resources>

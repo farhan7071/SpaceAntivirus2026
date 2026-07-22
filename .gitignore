@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android Studio
+.idea/
+*.iml
+
+# Local SDK
+local.properties
+
+# Crash logs
+hs_err_pid*
+replay_pid*
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Signing
+*.jks
+*.keystore

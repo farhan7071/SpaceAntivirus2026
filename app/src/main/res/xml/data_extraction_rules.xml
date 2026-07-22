@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ data extraction rules. Deliberately excludes the encrypted
+  secure-prefs file from any backup/transfer — a subscription-entitlement
+  cache or other sensitive value should never leave the device via
+  Android's backup mechanism. See core:security/SecurePreferences.kt.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="secure_prefs.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="secure_prefs.xml" />
+    </device-transfer>
+</data-extraction-rules>

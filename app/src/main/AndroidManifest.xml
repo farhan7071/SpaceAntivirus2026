@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Only foundation-level permissions declared in Sprint 003. Every
+      permission here maps to a real, already-justified use per Sprint
+      002 §3 Feature Strategy and Sprint 002.75 §6 Permission Communication
+      Guide. Storage/location/etc. are added feature-by-feature in
+      Sprint 004+, each with its matching rationale copy — never
+      speculatively, per Sprint 001 Risk #4.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".SpaceAntivirusApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.SpaceAntivirus"
+        android:supportsRtl="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SpaceAntivirus.Splash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          NOTE for Sprint 004: real-time protection's foreground service
+          goes here with an explicit foregroundServiceType (resolving
+          Sprint 001 Risk #2 / Sprint 002 §9's specialUse decision) once
+          feature:realtime has real implementation. Declared here as a
+          comment, not a placeholder <service>, per the "no temporary
+          shortcuts that will need to be rewritten later" rule — an empty
+          service tag would itself be a shortcut needing rework.
+        -->
+
+    </application>
+</manifest>

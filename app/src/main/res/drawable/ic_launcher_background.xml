@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flat brand-color background per Sprint 002.5 §18 icon direction:
+     "simple, geometric shield/lock-adjacent mark ... flat/M3-flat style". -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#FF00696B" />
+</shape>

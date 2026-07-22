@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BUGFIX (Sprint 003.5 recovery): themes.xml previously referenced
+  @android:color/system_neutral1_50, an Android 12+ (API 31) framework-only
+  resource, with no fallback. That compiles fine (compileSdk 36 knows the
+  resource ID) but is a guaranteed resource-not-found crash on this app's
+  own declared minSdk 26-30 devices — a real "app doesn't launch" bug per
+  this sprint's own success criteria. Own our window-background color
+  instead, matching core:designsystem's brand palette so there's no visible
+  flash-of-wrong-color before Compose's SpaceAntivirusTheme takes over.
+-->
+<resources>
+    <color name="window_background">#FAFDFC</color>
+</resources>
