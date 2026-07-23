@@ -255,6 +255,20 @@ Fail-fast on the first `AppResult.Failure` from any step. This is the
 concrete, tested proof that three sprints' worth of independently-built
 contracts actually compose — not just an architectural claim.
 
+### Progress observability (Sprint 005 Feature Block 2)
+
+`RunScanRequestUseCase` now publishes a `ScanProgress` snapshot after
+starting the session, after enumeration resolves (`totalItems` becomes
+known), and after every target is analyzed — via
+`SecurityRepository.updateScanProgress()`, observable live through
+`ObserveScanProgressUseCase` / `SecurityRepository.observeScanProgress()`.
+
+This is the one place in the whole orchestration that deliberately breaks
+the fail-fast pattern: a failed progress-snapshot write does NOT abort
+the scan (ADR 0018). Every other `AppResult.Failure` in this UseCase
+still aborts immediately — this is a narrow, explicit exception, not a
+general softening of the fail-fast rule.
+
 **Current real-world behavior, stated plainly:** with no `ThreatAnalyzer`
 bound anywhere yet, every target today resolves to `Inconclusive`, so
 `RunScanRequestUseCase` currently produces `ScanResult`s where

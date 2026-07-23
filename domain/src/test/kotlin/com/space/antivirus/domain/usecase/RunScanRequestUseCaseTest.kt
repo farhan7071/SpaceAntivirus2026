@@ -60,6 +60,7 @@ class RunScanRequestUseCaseTest {
             buildThreat = BuildThreatUseCase(HighestSeverityRiskScorer(), FakeThreatDescriptionProvider()),
             startScanSession = StartScanSessionUseCase(securityRepository, dispatcher),
             completeScanSession = CompleteScanSessionUseCase(securityRepository, dispatcher),
+            securityRepository = securityRepository,
             dispatcher = dispatcher,
         )
     }
@@ -136,7 +137,51 @@ class RunScanRequestUseCaseTest {
     }
 
     @Test
-    fun `enumeration failure aborts the run without starting analysis`() = runTest {
+    fun `publishes progress from starting through every target to completion`() = runTest {
+        val securityRepository = FakeSecurityRepository()
+        val secondFile = ScanTarget.FileTarget(
+            FileMetadata(
+                path = "/downloads/second.apk",
+                name = "second.apk",
+                sizeBytes = 50L,
+                mimeType = "application/vnd.android.package-archive",
+                lastModifiedEpochMillis = 0L,
+                isDirectory = false,
+            ),
+        )
+        val enumerationRepository = FakeEnumerationRepository(fileTargets = listOf(fileTarget, secondFile))
+        val useCase = buildUseCase(enumerationRepository, analyzers = emptyList(), securityRepository = securityRepository)
+
+        useCase(request(listOf(ScanScope.DownloadsFolder)))
+
+        val progress = securityRepository.publishedProgress
+        assertThat(progress.first().totalItems).isEqualTo(0) // the initial "starting" snapshot
+        assertThat(progress[1].totalItems).isEqualTo(2) // right after enumeration resolves
+        assertThat(progress[1].itemsProcessed).isEqualTo(0)
+        assertThat(progress.last().itemsProcessed).isEqualTo(2)
+        assertThat(progress.last().isComplete).isTrue()
+    }
+
+    @Test
+    fun `a progress-update failure does not abort the scan`() = runTest {
+        val securityRepository = FakeSecurityRepository().apply {
+            forcedProgressUpdateFailure = AppError.Unexpected()
+        }
+        val enumerationRepository = FakeEnumerationRepository(fileTargets = listOf(fileTarget))
+        val cleanAnalyzer = FakeThreatAnalyzer(
+            id = AnalyzerId("clean-analyzer"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            result = AppResult.Success(AnalysisOutcome.Clean(fileTarget.identifier)),
+        )
+        val useCase = buildUseCase(enumerationRepository, listOf(cleanAnalyzer), securityRepository)
+
+        val result = useCase(request(listOf(ScanScope.DownloadsFolder)))
+
+        assertThat(result).isInstanceOf(AppResult.Success::class.java)
+        assertThat((result as AppResult.Success).data.isClean).isTrue()
+        assertThat(securityRepository.publishedProgress).isEmpty() // every publish attempt failed, none recorded
+    }
+
         val enumerationRepository = FakeEnumerationRepository(forcedFailure = AppError.StorageUnavailable)
         val useCase = buildUseCase(enumerationRepository, analyzers = emptyList())
 

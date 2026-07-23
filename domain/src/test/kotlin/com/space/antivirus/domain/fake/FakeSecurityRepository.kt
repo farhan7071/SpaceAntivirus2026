@@ -2,6 +2,7 @@ package com.space.antivirus.domain.fake
 
 import com.space.antivirus.core.common.AppError
 import com.space.antivirus.core.common.AppResult
+import com.space.antivirus.core.model.ScanProgress
 import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.ScanSession
 import com.space.antivirus.core.model.ScanSessionState
@@ -9,6 +10,7 @@ import com.space.antivirus.core.model.ScanStatistics
 import com.space.antivirus.core.model.ScanType
 import com.space.antivirus.core.model.Threat
 import com.space.antivirus.domain.repository.SecurityRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -25,8 +27,17 @@ class FakeSecurityRepository : SecurityRepository {
     private val sessions = mutableMapOf<String, ScanSession>()
     private val results = mutableMapOf<String, ScanResult>()
     private val historyFlow = MutableStateFlow<List<ScanResult>>(emptyList())
+    private val progressFlows = mutableMapOf<String, MutableStateFlow<ScanProgress>>()
+
+    /** Every progress snapshot ever published, in order — lets tests
+     *  assert on the full progression, not just the latest value. */
+    val publishedProgress = mutableListOf<ScanProgress>()
 
     var forcedFailure: AppError? = null
+    /** Separate from forcedFailure so tests can exercise
+     *  RunScanRequestUseCase's best-effort progress handling (ADR 0018)
+     *  without also failing the core scan pipeline. */
+    var forcedProgressUpdateFailure: AppError? = null
 
     override suspend fun createScanSession(scanType: ScanType): AppResult<ScanSession> {
         forcedFailure?.let { return AppResult.Failure(it) }
@@ -114,6 +125,16 @@ class FakeSecurityRepository : SecurityRepository {
         results.clear()
         sessions.clear()
         historyFlow.value = emptyList()
+        return AppResult.Success(Unit)
+    }
+
+    override fun observeScanProgress(sessionId: String): Flow<ScanProgress> =
+        progressFlows.getOrPut(sessionId) { MutableStateFlow(ScanProgress.starting(sessionId)) }.asStateFlow()
+
+    override suspend fun updateScanProgress(progress: ScanProgress): AppResult<Unit> {
+        forcedProgressUpdateFailure?.let { return AppResult.Failure(it) }
+        publishedProgress += progress
+        progressFlows.getOrPut(progress.sessionId) { MutableStateFlow(progress) }.value = progress
         return AppResult.Success(Unit)
     }
 }

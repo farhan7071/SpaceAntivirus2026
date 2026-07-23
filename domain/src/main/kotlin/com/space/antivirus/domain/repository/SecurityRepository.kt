@@ -1,6 +1,7 @@
 package com.space.antivirus.domain.repository
 
 import com.space.antivirus.core.common.AppResult
+import com.space.antivirus.core.model.ScanProgress
 import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.ScanSession
 import com.space.antivirus.core.model.ScanStatistics
@@ -73,4 +74,22 @@ interface SecurityRepository {
 
     /** Removes all scan history. */
     suspend fun clearScanHistory(): AppResult<Unit>
+
+    /**
+     * Live progress for a session that's currently RUNNING — what a
+     * future "scanning 47 of 200" UI would collect. No history is
+     * required beyond the latest snapshot; implementations are free to
+     * discard old snapshots once superseded.
+     */
+    fun observeScanProgress(sessionId: String): Flow<ScanProgress>
+
+    /**
+     * Publishes a new progress snapshot. Deliberately separate from
+     * completeScanSession — progress updates happen many times during a
+     * single scan and are best-effort observability, not part of the
+     * scan's correctness guarantee (see RunScanRequestUseCase and ADR
+     * 0018 for why a failed progress update doesn't abort the scan
+     * itself).
+     */
+    suspend fun updateScanProgress(progress: ScanProgress): AppResult<Unit>
 }
