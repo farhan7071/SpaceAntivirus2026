@@ -11,19 +11,24 @@ import com.space.antivirus.core.model.FileMetadata
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanRequest
 import com.space.antivirus.core.model.ScanScope
+import com.space.antivirus.core.model.ScanSessionState
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ScanType
 import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.domain.analyzer.AnalysisOutcomeAggregator
+import com.space.antivirus.domain.analyzer.AnalyzerExecutor
 import com.space.antivirus.domain.analyzer.identifier
+import com.space.antivirus.domain.fake.DelayingThreatAnalyzer
 import com.space.antivirus.domain.fake.FakeEnumerationRepository
 import com.space.antivirus.domain.fake.FakeSecurityRepository
 import com.space.antivirus.domain.fake.FakeThreatAnalyzer
 import com.space.antivirus.domain.fake.FakeThreatAnalyzerRegistry
 import com.space.antivirus.domain.fake.FakeThreatDescriptionProvider
 import com.space.antivirus.domain.scoring.HighestSeverityRiskScorer
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -56,7 +61,7 @@ class RunScanRequestUseCaseTest {
         val registry = FakeThreatAnalyzerRegistry(analyzers)
         return RunScanRequestUseCase(
             resolveScanTargets = ResolveScanTargetsUseCase(enumerationRepository, dispatcher),
-            analyzeScanTarget = AnalyzeScanTargetUseCase(registry, AnalysisOutcomeAggregator(), dispatcher),
+            analyzeScanTarget = AnalyzeScanTargetUseCase(registry, AnalyzerExecutor(), AnalysisOutcomeAggregator(), dispatcher),
             buildThreat = BuildThreatUseCase(HighestSeverityRiskScorer(), FakeThreatDescriptionProvider()),
             startScanSession = StartScanSessionUseCase(securityRepository, dispatcher),
             completeScanSession = CompleteScanSessionUseCase(securityRepository, dispatcher),
@@ -182,6 +187,44 @@ class RunScanRequestUseCaseTest {
         assertThat(securityRepository.publishedProgress).isEmpty() // every publish attempt failed, none recorded
     }
 
+    @Test
+    fun `cancelling the scan transitions the session to CANCELLED, not left stuck RUNNING`() = runTest {
+        val securityRepository = FakeSecurityRepository()
+        val secondFile = ScanTarget.FileTarget(
+            FileMetadata(
+                path = "/downloads/second.apk",
+                name = "second.apk",
+                sizeBytes = 50L,
+                mimeType = "application/vnd.android.package-archive",
+                lastModifiedEpochMillis = 0L,
+                isDirectory = false,
+            ),
+        )
+        val enumerationRepository = FakeEnumerationRepository(fileTargets = listOf(fileTarget, secondFile))
+        // A real, unbounded suspension point is required — with no delay
+        // anywhere, the whole scan runs to completion inside a single
+        // runCurrent() call, leaving no window to cancel mid-flight.
+        val slowAnalyzer = DelayingThreatAnalyzer(
+            id = AnalyzerId("slow"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            delayMillis = 10_000,
+            result = AppResult.Success(AnalysisOutcome.Clean(fileTarget.identifier)),
+        )
+        val useCase = buildUseCase(enumerationRepository, listOf(slowAnalyzer), securityRepository)
+
+        val job = launch { useCase(request(listOf(ScanScope.DownloadsFolder))) }
+        runCurrent() // let it start the session, resolve targets, and reach the analyzer's delay()
+        job.cancel()
+        job.join()
+
+        val sessionId = securityRepository.publishedProgress.first().sessionId
+        val session = securityRepository.getScanSession(sessionId)
+        assertThat(session).isInstanceOf(AppResult.Success::class.java)
+        assertThat((session as AppResult.Success).data.state).isEqualTo(ScanSessionState.CANCELLED)
+    }
+
+    @Test
+    fun `enumeration failure aborts the run without starting analysis`() = runTest {
         val enumerationRepository = FakeEnumerationRepository(forcedFailure = AppError.StorageUnavailable)
         val useCase = buildUseCase(enumerationRepository, analyzers = emptyList())
 

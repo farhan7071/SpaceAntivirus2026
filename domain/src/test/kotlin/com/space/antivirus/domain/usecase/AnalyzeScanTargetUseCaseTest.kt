@@ -12,10 +12,14 @@ import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.domain.analyzer.AnalysisOutcomeAggregator
+import com.space.antivirus.domain.analyzer.AnalyzerExecutor
+import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import com.space.antivirus.domain.analyzer.identifier
 import com.space.antivirus.domain.fake.FakeThreatAnalyzer
 import com.space.antivirus.domain.fake.FakeThreatAnalyzerRegistry
+import com.space.antivirus.domain.fake.ThrowingThreatAnalyzer
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -32,14 +36,17 @@ class AnalyzeScanTargetUseCaseTest {
         ),
     )
 
-    @Test
-    fun `no registered analyzers yields an honest Inconclusive, not a false Clean`() = runTest {
-        val registry = FakeThreatAnalyzerRegistry(analyzers = emptyList())
-        val useCase = AnalyzeScanTargetUseCase(
-            registry,
+    private fun useCaseFor(analyzers: List<ThreatAnalyzer>, testScheduler: TestCoroutineScheduler) =
+        AnalyzeScanTargetUseCase(
+            FakeThreatAnalyzerRegistry(analyzers),
+            AnalyzerExecutor(),
             AnalysisOutcomeAggregator(),
             StandardTestDispatcher(testScheduler),
         )
+
+    @Test
+    fun `no registered analyzers yields an honest Inconclusive, not a false Clean`() = runTest {
+        val useCase = useCaseFor(emptyList(), testScheduler)
 
         val result = useCase(target)
 
@@ -55,12 +62,7 @@ class AnalyzeScanTargetUseCaseTest {
             capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
             result = AppResult.Success(AnalysisOutcome.Clean(target.identifier)),
         )
-        val registry = FakeThreatAnalyzerRegistry(listOf(analyzer))
-        val useCase = AnalyzeScanTargetUseCase(
-            registry,
-            AnalysisOutcomeAggregator(),
-            StandardTestDispatcher(testScheduler),
-        )
+        val useCase = useCaseFor(listOf(analyzer), testScheduler)
 
         val result = useCase(target)
 
@@ -68,18 +70,13 @@ class AnalyzeScanTargetUseCaseTest {
     }
 
     @Test
-    fun `an analyzer failure propagates directly, not silently swallowed`() = runTest {
+    fun `when it is the only analyzer, its failure propagates directly`() = runTest {
         val analyzer = FakeThreatAnalyzer(
             id = AnalyzerId("test-1"),
             capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
             result = AppResult.Failure(AppError.EngineUnavailable),
         )
-        val registry = FakeThreatAnalyzerRegistry(listOf(analyzer))
-        val useCase = AnalyzeScanTargetUseCase(
-            registry,
-            AnalysisOutcomeAggregator(),
-            StandardTestDispatcher(testScheduler),
-        )
+        val useCase = useCaseFor(listOf(analyzer), testScheduler)
 
         val result = useCase(target)
 
@@ -87,7 +84,7 @@ class AnalyzeScanTargetUseCaseTest {
     }
 
     @Test
-    fun `multiple analyzers are combined through the aggregator`() = runTest {
+    fun `multiple successful analyzers are combined through the aggregator`() = runTest {
         val flaggingAnalyzer = FakeThreatAnalyzer(
             id = AnalyzerId("flagging"),
             capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
@@ -111,12 +108,7 @@ class AnalyzeScanTargetUseCaseTest {
             capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
             result = AppResult.Success(AnalysisOutcome.Clean(target.identifier)),
         )
-        val registry = FakeThreatAnalyzerRegistry(listOf(flaggingAnalyzer, cleanAnalyzer))
-        val useCase = AnalyzeScanTargetUseCase(
-            registry,
-            AnalysisOutcomeAggregator(),
-            StandardTestDispatcher(testScheduler),
-        )
+        val useCase = useCaseFor(listOf(flaggingAnalyzer, cleanAnalyzer), testScheduler)
 
         val result = useCase(target)
 
@@ -124,5 +116,61 @@ class AnalyzeScanTargetUseCaseTest {
         val outcome = (result as AppResult.Success).data
         assertThat(outcome).isInstanceOf(AnalysisOutcome.Flagged::class.java)
         assertThat((outcome as AnalysisOutcome.Flagged).detections).hasSize(1)
+    }
+
+    @Test
+    fun `fault isolation - one analyzer failing does not prevent another from contributing`() = runTest {
+        val brokenAnalyzer = FakeThreatAnalyzer(
+            id = AnalyzerId("broken"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            result = AppResult.Failure(AppError.EngineUnavailable),
+        )
+        val workingAnalyzer = FakeThreatAnalyzer(
+            id = AnalyzerId("working"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            result = AppResult.Success(AnalysisOutcome.Clean(target.identifier)),
+        )
+        val useCase = useCaseFor(listOf(brokenAnalyzer, workingAnalyzer), testScheduler)
+
+        val result = useCase(target)
+
+        assertThat(result).isEqualTo(AppResult.Success(AnalysisOutcome.Clean(target.identifier)))
+    }
+
+    @Test
+    fun `fault isolation - an analyzer that throws does not crash the whole target's analysis`() = runTest {
+        val throwingAnalyzer = ThrowingThreatAnalyzer(
+            id = AnalyzerId("throws"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+        )
+        val workingAnalyzer = FakeThreatAnalyzer(
+            id = AnalyzerId("working"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            result = AppResult.Success(AnalysisOutcome.Clean(target.identifier)),
+        )
+        val useCase = useCaseFor(listOf(throwingAnalyzer, workingAnalyzer), testScheduler)
+
+        val result = useCase(target)
+
+        assertThat(result).isEqualTo(AppResult.Success(AnalysisOutcome.Clean(target.identifier)))
+    }
+
+    @Test
+    fun `when every analyzer fails, the first failure is surfaced rather than a false Inconclusive`() = runTest {
+        val firstBroken = FakeThreatAnalyzer(
+            id = AnalyzerId("broken-1"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            result = AppResult.Failure(AppError.EngineUnavailable),
+        )
+        val secondBroken = FakeThreatAnalyzer(
+            id = AnalyzerId("broken-2"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            result = AppResult.Failure(AppError.Unexpected()),
+        )
+        val useCase = useCaseFor(listOf(firstBroken, secondBroken), testScheduler)
+
+        val result = useCase(target)
+
+        assertThat(result).isInstanceOf(AppResult.Failure::class.java)
     }
 }

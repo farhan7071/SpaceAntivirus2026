@@ -269,6 +269,56 @@ the scan (ADR 0018). Every other `AppResult.Failure` in this UseCase
 still aborts immediately — this is a narrow, explicit exception, not a
 general softening of the fail-fast rule.
 
+### Detection Engine Infrastructure (Sprint 006)
+
+Three real behavior changes, all documented in ADR 0019:
+
+**Concurrent analyzer execution.** `AnalyzeScanTargetUseCase` now runs
+every applicable analyzer for a target concurrently (`async`/`awaitAll`)
+via `AnalyzerExecutor`, instead of sequentially.
+
+**Fault isolation — a breaking change from Sprint 004C's original
+semantics.** Previously, any single analyzer's `AppResult.Failure`
+aborted analysis for the whole target. Now, one broken/crashing analyzer
+(caught by `AnalyzerExecutor`, including genuine thrown exceptions, not
+just well-behaved `Failure` results) doesn't prevent other, working
+analyzers from still contributing. Only if every applicable analyzer
+fails does the method surface a `Failure` — visibly distinct from both
+`Clean` and `Inconclusive`, since a total-analyzer-failure is a real
+operational problem.
+
+**Cooperative cancellation.** `RunScanRequestUseCase` checks
+`coroutineContext.ensureActive()` between targets; a caller cancels a
+running scan through ordinary structured concurrency (cancelling the Job
+it's running in), not a bespoke API. On cancellation, the session is
+transitioned to `CANCELLED` via a `NonCancellable`-wrapped cleanup write
+before the `CancellationException` is rethrown — without that wrapper,
+the cleanup write would itself be cancelled before running, leaving the
+session stuck in `RUNNING` forever.
+
+```
+DefaultThreatAnalyzerRegistry(Set<ThreatAnalyzer>)   — real registration,
+                                                        Hilt multibinding
+                                                        wiring deferred
+                                                        (ADR 0019 §1)
+   │
+   ▼
+AnalyzeScanTargetUseCase(target)
+   │ registry.analyzersFor(target) → applicable analyzers
+   │
+   ├─▶ AnalyzerExecutor.execute(analyzer1, target) ─┐  (concurrent,
+   ├─▶ AnalyzerExecutor.execute(analyzer2, target) ─┼─  fault-isolated —
+   └─▶ AnalyzerExecutor.execute(analyzerN, target) ─┘   each wrapped)
+         │
+         ▼
+   AnalyzerExecutionOutcome(result, AnalyzerExecutionMetrics)
+         │
+         ▼
+   successes aggregated via AnalysisOutcomeAggregator (004C);
+   only if ALL fail does the use case surface a Failure
+```
+
+
 **Current real-world behavior, stated plainly:** with no `ThreatAnalyzer`
 bound anywhere yet, every target today resolves to `Inconclusive`, so
 `RunScanRequestUseCase` currently produces `ScanResult`s where

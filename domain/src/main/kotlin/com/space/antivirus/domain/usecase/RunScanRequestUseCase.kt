@@ -11,7 +11,12 @@ import com.space.antivirus.core.model.Threat
 import com.space.antivirus.domain.UseCase
 import com.space.antivirus.domain.repository.SecurityRepository
 import javax.inject.Inject
+import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 
 /**
  * The top-level orchestration UseCase — the concrete proof that Sprints
@@ -28,6 +33,17 @@ import kotlinx.coroutines.CoroutineDispatcher
  * starting the session, resolving targets, or analyzing a target aborts
  * the whole run. Progress publishing is deliberately NOT fail-fast — see
  * publishProgressBestEffort's KDoc and ADR 0018.
+ *
+ * CANCELLATION (Sprint 006, ADR 0019): a caller cancels a running scan
+ * through ordinary structured concurrency — cancelling the coroutine/Job
+ * this UseCase is running in — not through a separate stop() method.
+ * `coroutineContext.ensureActive()` is checked between targets so a
+ * cancelled scan actually stops promptly instead of running to
+ * completion regardless. On cancellation, the session is transitioned to
+ * CANCELLED (via a NonCancellable cleanup write — see the catch block's
+ * comment for why that wrapper is required) before the
+ * CancellationException is rethrown, so the persisted session never gets
+ * stuck in RUNNING forever.
  */
 class RunScanRequestUseCase @Inject constructor(
     private val resolveScanTargets: ResolveScanTargetsUseCase,
@@ -47,56 +63,72 @@ class RunScanRequestUseCase @Inject constructor(
             is AppResult.Failure -> return sessionResult
             AppResult.Loading -> return AppResult.Loading
         }
-        publishProgressBestEffort(ScanProgress.starting(session.id))
 
-        val targets = when (val targetsResult = resolveScanTargets(params)) {
-            is AppResult.Success -> targetsResult.data
-            is AppResult.Failure -> return targetsResult
-            AppResult.Loading -> return AppResult.Loading
-        }
-        publishProgressBestEffort(
-            ScanProgress(session.id, itemsProcessed = 0, totalItems = targets.size, threatsFoundSoFar = 0),
-        )
+        try {
+            publishProgressBestEffort(ScanProgress.starting(session.id))
 
-        val threats = mutableListOf<Threat>()
-        var inconclusiveCount = 0
-
-        targets.forEachIndexed { index, target ->
-            when (val outcomeResult = analyzeScanTarget(target)) {
-                is AppResult.Success -> {
-                    when (val outcome = outcomeResult.data) {
-                        is AnalysisOutcome.Flagged -> threats += buildThreat(outcome)
-                        is AnalysisOutcome.Inconclusive -> inconclusiveCount++
-                        is AnalysisOutcome.Clean -> Unit
-                    }
-                }
-                is AppResult.Failure -> return outcomeResult
+            val targets = when (val targetsResult = resolveScanTargets(params)) {
+                is AppResult.Success -> targetsResult.data
+                is AppResult.Failure -> return targetsResult
                 AppResult.Loading -> return AppResult.Loading
             }
             publishProgressBestEffort(
-                ScanProgress(
+                ScanProgress(session.id, itemsProcessed = 0, totalItems = targets.size, threatsFoundSoFar = 0),
+            )
+
+            val threats = mutableListOf<Threat>()
+            var inconclusiveCount = 0
+
+            targets.forEachIndexed { index, target ->
+                coroutineContext.ensureActive()
+
+                when (val outcomeResult = analyzeScanTarget(target)) {
+                    is AppResult.Success -> {
+                        when (val outcome = outcomeResult.data) {
+                            is AnalysisOutcome.Flagged -> threats += buildThreat(outcome)
+                            is AnalysisOutcome.Inconclusive -> inconclusiveCount++
+                            is AnalysisOutcome.Clean -> Unit
+                        }
+                    }
+                    is AppResult.Failure -> return outcomeResult
+                    AppResult.Loading -> return AppResult.Loading
+                }
+                publishProgressBestEffort(
+                    ScanProgress(
+                        sessionId = session.id,
+                        itemsProcessed = index + 1,
+                        totalItems = targets.size,
+                        threatsFoundSoFar = threats.size,
+                    ),
+                )
+            }
+
+            val statistics = ScanStatistics(
+                itemsScanned = targets.size,
+                threatsFound = threats.size,
+                itemsInconclusive = inconclusiveCount,
+                durationMillis = System.currentTimeMillis() - startedAtMillis,
+            )
+
+            return completeScanSession(
+                CompleteScanSessionParams(
                     sessionId = session.id,
-                    itemsProcessed = index + 1,
-                    totalItems = targets.size,
-                    threatsFoundSoFar = threats.size,
+                    statistics = statistics,
+                    threats = threats,
                 ),
             )
+        } catch (cancellation: CancellationException) {
+            // We're already inside a cancelling coroutine at this point —
+            // a plain suspend call here would itself be cancelled
+            // immediately without running, a well-known structured-
+            // concurrency pitfall. NonCancellable makes this one cleanup
+            // write run to completion regardless, so the session doesn't
+            // end up orphaned in RUNNING state forever.
+            withContext(NonCancellable) {
+                securityRepository.cancelScanSession(session.id)
+            }
+            throw cancellation
         }
-
-        val statistics = ScanStatistics(
-            itemsScanned = targets.size,
-            threatsFound = threats.size,
-            itemsInconclusive = inconclusiveCount,
-            durationMillis = System.currentTimeMillis() - startedAtMillis,
-        )
-
-        return completeScanSession(
-            CompleteScanSessionParams(
-                sessionId = session.id,
-                statistics = statistics,
-                threats = threats,
-            ),
-        )
     }
 
     /**
