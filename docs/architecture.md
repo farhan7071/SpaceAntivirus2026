@@ -174,12 +174,46 @@ domain/scoring (pure Kotlin — severity summarization, not detection)
                                only summarizes already-found evidence.
 ```
 
-What's explicitly NOT in this sprint, per its own scope: no orchestration
-UseCase running multiple analyzers against enumeration's ScanTargets
-(Sprint 004B) and feeding results into Sprint 004A's `CompleteScanSessionUseCase`
-— that coordination is real, non-trivial logic that deserves its own
-focused patch once the contracts above are confirmed working, not bundled
-into the same patch as the contracts themselves.
+**Orchestration (Sprint 004C Patch 2):**
+
+```
+AnalyzeScanTargetUseCase(target: ScanTarget)
+   │ calls
+   ▼
+ThreatAnalyzerRegistry.analyzersFor(target)   — routes by AnalyzerCapability
+   │
+   ├─▶ analyzer 1.analyze(target) ─┐
+   ├─▶ analyzer 2.analyze(target) ─┼─▶ AnalysisOutcomeAggregator.aggregate(outcomes)
+   └─▶ analyzer N.analyze(target) ─┘        │
+                                             ▼
+                                   AppResult<AnalysisOutcome>
+```
+
+`AnalysisOutcomeAggregator`'s combining rule, in precedence order: any
+`Flagged` outcome wins (with every Flagged outcome's Detections
+concatenated, never dropped); failing that, any `Inconclusive` wins over
+`Clean` (the app can't honestly claim "no threats found" if part of the
+analysis couldn't reach a conclusion); only if every analyzer says
+`Clean` does the aggregate say `Clean`. Zero registered analyzers for a
+target's capability is reported as `Inconclusive` with an honest reason,
+never silently treated as `Clean` — "nothing is looking at this" and
+"this was checked and found clean" must never be indistinguishable to a
+future caller.
+
+This is the concrete proof that the plug-in architecture works:
+`AnalyzeScanTargetUseCase` never references a specific analyzer
+implementation, only the `ThreatAnalyzer`/`ThreatAnalyzerRegistry`
+contracts from Patch 1.
+
+**Still explicitly deferred:** converting an `AnalysisOutcome.Flagged`
+into a persistable `Threat` (Sprint 004A's model) needs a `title`/
+`description` for the user-facing record — real content, not placeholder
+text. Generating that inside `domain` without going through Sprint
+002.75's approved Vocabulary Dictionary and review process would be
+exactly the kind of ad-hoc, unreviewed copy that content governance
+(Sprint 002.75 §20) exists to prevent. That mapping is real, separate
+work for a later patch/sprint, once it's clear whether that copy is
+generated (and by what rule) or supplied by each analyzer itself.
 
 ## Navigation
 
