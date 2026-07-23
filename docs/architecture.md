@@ -215,6 +215,36 @@ exactly the kind of ad-hoc, unreviewed copy that content governance
 work for a later patch/sprint, once it's clear whether that copy is
 generated (and by what rule) or supplied by each analyzer itself.
 
+**Patch 3 resolves this without inventing copy:**
+
+```
+AnalysisOutcome.Flagged
+   │
+   ▼
+BuildThreatUseCase(outcome)
+   │  riskLevel    ← RiskScorer.score(detections)          (Patch 1's plug-in point)
+   │  threatType   ← detections.maxBy { it.riskLevel }.threatType
+   │  title/desc   ← ThreatDescriptionProvider (Patch 3 — CONTRACT ONLY,
+   │                  no implementation; see ADR 0016 for why)
+   ▼
+Threat   — ready for CompleteScanSessionUseCase (Sprint 004A) to persist
+```
+
+### Sprint 004C is complete at the foundation level
+
+`ScanTarget` (004B) → `AnalyzeScanTargetUseCase` → `AnalysisOutcome` →
+`BuildThreatUseCase` → `Threat`, ready for Sprint 004A's
+`CompleteScanSessionUseCase`. Every step is real, tested, pure Kotlin, and
+analyzer-agnostic — no step references a specific detection technique.
+
+What's still missing before any of this does something a user can see
+(deliberately, not oversights — see ADR 0016's consequences for the full
+reasoning): a real `ThreatAnalyzer` implementation, a
+`ThreatAnalyzerRegistry` implementation, a real `ThreatDescriptionProvider`,
+and the higher-level orchestration that runs this chain across every
+target in a `ScanRequest` and calls `CompleteScanSessionUseCase` with the
+results. Each is real future-sprint work, not leftover 004C scope.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
