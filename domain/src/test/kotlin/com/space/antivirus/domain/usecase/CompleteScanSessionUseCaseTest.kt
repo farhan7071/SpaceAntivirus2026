@@ -44,7 +44,7 @@ class CompleteScanSessionUseCaseTest {
         val result = CompleteScanSessionUseCase(repository, dispatcher)(
             CompleteScanSessionParams(
                 sessionId = session.id,
-                statistics = ScanStatistics(itemsScanned = 500, threatsFound = 0, durationMillis = 1200),
+                statistics = ScanStatistics(itemsScanned = 500, threatsFound = 0, itemsInconclusive = 0, durationMillis = 1200),
                 threats = emptyList(),
             ),
         )
@@ -83,7 +83,7 @@ class CompleteScanSessionUseCaseTest {
         val result = CompleteScanSessionUseCase(repository, dispatcher)(
             CompleteScanSessionParams(
                 sessionId = session.id,
-                statistics = ScanStatistics(itemsScanned = 200, threatsFound = 1, durationMillis = 800),
+                statistics = ScanStatistics(itemsScanned = 200, threatsFound = 1, itemsInconclusive = 0, durationMillis = 800),
                 threats = listOf(threat),
             ),
         )

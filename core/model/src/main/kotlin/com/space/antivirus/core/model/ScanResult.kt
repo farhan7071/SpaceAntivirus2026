@@ -24,9 +24,15 @@ data class ScanResult(
         }
     }
 
-    /** True when the scan completed cleanly with no findings — the
-     *  positive, reassuring "no threats found" state (Sprint 002.5 §15 /
-     *  Sprint 002.75 §10), not merely the absence of a result. */
+    /** True when the scan completed cleanly with no findings AND nothing
+     *  was inconclusive — the positive, reassuring "no threats found"
+     *  state (Sprint 002.5 §15 / Sprint 002.75 §10), not merely the
+     *  absence of a Threat. A scan where every target came back
+     *  Inconclusive must not report isClean=true — that would be exactly
+     *  the false reassurance ScanStatistics.itemsInconclusive exists to
+     *  prevent (see that field's KDoc). */
     val isClean: Boolean
-        get() = session.state == ScanSessionState.COMPLETED && threats.isEmpty()
+        get() = session.state == ScanSessionState.COMPLETED &&
+            threats.isEmpty() &&
+            statistics.itemsInconclusive == 0
 }

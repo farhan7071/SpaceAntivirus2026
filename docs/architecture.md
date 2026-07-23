@@ -230,20 +230,37 @@ BuildThreatUseCase(outcome)
 Threat   — ready for CompleteScanSessionUseCase (Sprint 004A) to persist
 ```
 
-### Sprint 004C is complete at the foundation level
+### Sprint 005: the full pipeline is now real, end to end
 
-`ScanTarget` (004B) → `AnalyzeScanTargetUseCase` → `AnalysisOutcome` →
-`BuildThreatUseCase` → `Threat`, ready for Sprint 004A's
-`CompleteScanSessionUseCase`. Every step is real, tested, pure Kotlin, and
-analyzer-agnostic — no step references a specific detection technique.
+`RunScanRequestUseCase` composes every UseCase from 004A/004B/004C into
+one working flow:
 
-What's still missing before any of this does something a user can see
-(deliberately, not oversights — see ADR 0016's consequences for the full
-reasoning): a real `ThreatAnalyzer` implementation, a
-`ThreatAnalyzerRegistry` implementation, a real `ThreatDescriptionProvider`,
-and the higher-level orchestration that runs this chain across every
-target in a `ScanRequest` and calls `CompleteScanSessionUseCase` with the
-results. Each is real future-sprint work, not leftover 004C scope.
+```
+RunScanRequestUseCase(ScanRequest)
+   │
+   ├─▶ StartScanSessionUseCase(scanType)                          (004A)
+   │
+   ├─▶ ResolveScanTargetsUseCase(request) → List<ScanTarget>       (004B)
+   │
+   ├─▶ for each target: AnalyzeScanTargetUseCase(target)           (004C)
+   │        → Flagged  → BuildThreatUseCase(outcome) → Threat      (004C)
+   │        → Inconclusive → counted honestly (ADR 0017)
+   │        → Clean     → no action
+   │
+   └─▶ CompleteScanSessionUseCase(sessionId, statistics, threats)  (004A)
+          → AppResult<ScanResult>
+```
+
+Fail-fast on the first `AppResult.Failure` from any step. This is the
+concrete, tested proof that three sprints' worth of independently-built
+contracts actually compose — not just an architectural claim.
+
+**Current real-world behavior, stated plainly:** with no `ThreatAnalyzer`
+bound anywhere yet, every target today resolves to `Inconclusive`, so
+`RunScanRequestUseCase` currently produces `ScanResult`s where
+`itemsInconclusive == itemsScanned` and `isClean == false` — an honest
+"nothing is actually checking yet" result. That's correct behavior for
+where the project actually is, not a bug to paper over.
 
 ## Navigation
 

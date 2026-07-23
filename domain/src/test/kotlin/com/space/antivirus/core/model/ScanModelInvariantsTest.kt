@@ -31,7 +31,7 @@ class ScanModelInvariantsTest {
     @Test
     fun `ScanStatistics rejects threatsFound greater than itemsScanned`() {
         val exception = runCatching {
-            ScanStatistics(itemsScanned = 5, threatsFound = 10, durationMillis = 100)
+            ScanStatistics(itemsScanned = 5, threatsFound = 10, itemsInconclusive = 0, durationMillis = 100)
         }.exceptionOrNull()
         assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
     }
@@ -40,6 +40,40 @@ class ScanModelInvariantsTest {
     fun `ScanStatistics EMPTY is valid and zeroed`() {
         assertThat(ScanStatistics.EMPTY.itemsScanned).isEqualTo(0)
         assertThat(ScanStatistics.EMPTY.threatsFound).isEqualTo(0)
+        assertThat(ScanStatistics.EMPTY.itemsInconclusive).isEqualTo(0)
+    }
+
+    @Test
+    fun `ScanStatistics rejects negative itemsInconclusive`() {
+        val exception = runCatching {
+            ScanStatistics(itemsScanned = 5, threatsFound = 0, itemsInconclusive = -1, durationMillis = 100)
+        }.exceptionOrNull()
+        assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `ScanStatistics rejects threatsFound plus itemsInconclusive exceeding itemsScanned`() {
+        val exception = runCatching {
+            ScanStatistics(itemsScanned = 5, threatsFound = 3, itemsInconclusive = 3, durationMillis = 100)
+        }.exceptionOrNull()
+        assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `ScanResult isClean is false when everything was inconclusive, even with zero threats`() {
+        val session = ScanSession(
+            id = "s1",
+            scanType = ScanType.QUICK,
+            state = ScanSessionState.COMPLETED,
+            startedAtEpochMillis = 0L,
+            completedAtEpochMillis = 100L,
+        )
+        val result = ScanResult(
+            session = session,
+            statistics = ScanStatistics(itemsScanned = 10, threatsFound = 0, itemsInconclusive = 10, durationMillis = 100),
+            threats = emptyList(),
+        )
+        assertThat(result.isClean).isFalse()
     }
 
     @Test
@@ -82,7 +116,7 @@ class ScanModelInvariantsTest {
         val exception = runCatching {
             ScanResult(
                 session = session,
-                statistics = ScanStatistics(itemsScanned = 10, threatsFound = 2, durationMillis = 100),
+                statistics = ScanStatistics(itemsScanned = 10, threatsFound = 2, itemsInconclusive = 0, durationMillis = 100),
                 threats = emptyList(),
             )
         }.exceptionOrNull()
@@ -100,7 +134,7 @@ class ScanModelInvariantsTest {
         )
         val result = ScanResult(
             session = session,
-            statistics = ScanStatistics(itemsScanned = 10, threatsFound = 0, durationMillis = 100),
+            statistics = ScanStatistics(itemsScanned = 10, threatsFound = 0, itemsInconclusive = 0, durationMillis = 100),
             threats = emptyList(),
         )
         assertThat(result.isClean).isTrue()
