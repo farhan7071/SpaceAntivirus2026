@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
       Only foundation-level permissions declared in Sprint 003. Every
@@ -12,6 +13,21 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+      Added in Sprint 004B for InstalledApplicationEnumerator
+      (core:enumeration). Without this, Android 11+'s package-visibility
+      filtering means PackageManager.getInstalledPackages() silently
+      returns a reduced subset rather than failing loudly — for a
+      security app, silently missing installed apps is worse than an
+      explicit error, so this is a deliberate, justified addition, not a
+      speculative one. Sprint 001 already found this permission in the
+      original app with the same justification (a scanner needs to see
+      what's installed); Sprint 002's Data Safety re-audit note applies
+      here too — this must be declared in the Play Console Data Safety
+      form when this feature ships.
+    -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <application
         android:name=".SpaceAntivirusApp"
