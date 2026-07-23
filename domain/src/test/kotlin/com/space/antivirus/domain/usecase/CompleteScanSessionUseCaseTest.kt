@@ -3,6 +3,7 @@ package com.space.antivirus.domain.usecase
 import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.common.AppError
 import com.space.antivirus.core.common.AppResult
+import com.space.antivirus.core.model.AnalyzerId
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanStatistics
@@ -70,6 +71,7 @@ class CompleteScanSessionUseCaseTest {
             detections = listOf(
                 Detection(
                     id = "d1",
+                    analyzerId = AnalyzerId("permission-heuristic-test"),
                     threatType = ThreatType.SUSPICIOUS_PERMISSION_USAGE,
                     evidenceDescription = "Requests READ_SMS without a messaging feature.",
                     riskLevel = RiskLevel.ATTENTION,

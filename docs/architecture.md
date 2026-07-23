@@ -140,6 +140,47 @@ Robolectric, no emulator. `ScanScopePathResolver` and
 that touch `Context`/`PackageManager` directly, keeping the
 Android-dependent surface as small as possible.
 
+## Threat Analysis Foundation (Sprint 004C — contracts and value objects only, no engine)
+
+The plug-in seam every future detection engine implements against,
+without `domain` ever needing to change:
+
+```
+core:model (pure Kotlin — the shared vocabulary)
+   AnalyzerId          — value object, identifies which analyzer produced
+                          a Detection (provenance — see ADR 0015)
+   AnalyzerCapability   — FILE_ANALYSIS | APPLICATION_ANALYSIS
+   AnalysisOutcome      — sealed: Clean | Flagged | Inconclusive
+   Detection            — now carries analyzerId (breaking change from
+                           Sprint 004A's shape, documented in ADR 0015)
+
+domain/analyzer (pure Kotlin — the plug-in contracts)
+   ThreatAnalyzer         — interface: id, capabilities, suspend fun
+                            analyze(target: ScanTarget): AppResult<AnalysisOutcome>
+                            ← ANY future engine (signature/heuristic/AI/
+                              cloud-reputation/behavioral) implements this,
+                              in its own module, added in a later sprint
+   ThreatAnalyzerRegistry — interface: allAnalyzers(), analyzersFor(target)
+                            ← no implementation yet; a later sprint likely
+                              uses Hilt @IntoSet multibindings
+   ScanTargetCapability.kt — pure mapping: ScanTarget -> AnalyzerCapability
+
+domain/scoring (pure Kotlin — severity summarization, not detection)
+   RiskScorer                — interface: score(detections) -> RiskLevel
+   HighestSeverityRiskScorer — the one concrete implementation this sprint
+                               ships: max severity among the Detections
+                               given. Deliberately not detection logic —
+                               it never decides IF something is a threat,
+                               only summarizes already-found evidence.
+```
+
+What's explicitly NOT in this sprint, per its own scope: no orchestration
+UseCase running multiple analyzers against enumeration's ScanTargets
+(Sprint 004B) and feeding results into Sprint 004A's `CompleteScanSessionUseCase`
+— that coordination is real, non-trivial logic that deserves its own
+focused patch once the contracts above are confirmed working, not bundled
+into the same patch as the contracts themselves.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

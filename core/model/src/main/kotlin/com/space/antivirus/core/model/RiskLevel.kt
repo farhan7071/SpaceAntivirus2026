@@ -8,6 +8,12 @@ package com.space.antivirus.core.model
  * duplicating it. Deliberately not a numeric score — Sprint 002.75 §4 is
  * explicit that inflated/numeric risk scores invite alarm-fatigue and
  * aren't something this engine can defensibly back up.
+ *
+ * Declaration order is meaningful: it's ascending severity
+ * (INFO < ATTENTION < ACTION_NEEDED). Sprint 004C's RiskScorer relies on
+ * this via `.ordinal` comparison — if this enum is ever reordered, that
+ * comparison silently breaks, so don't reorder these without checking
+ * every `.ordinal`/`compareTo` usage first.
  */
 enum class RiskLevel {
     INFO,
