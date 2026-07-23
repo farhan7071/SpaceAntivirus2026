@@ -17,6 +17,7 @@ import com.space.antivirus.core.model.ScanType
 import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.domain.analyzer.AnalysisOutcomeAggregator
 import com.space.antivirus.domain.analyzer.AnalyzerExecutor
+import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import com.space.antivirus.domain.analyzer.identifier
 import com.space.antivirus.domain.fake.DelayingThreatAnalyzer
 import com.space.antivirus.domain.fake.FakeEnumerationRepository
@@ -54,7 +55,17 @@ class RunScanRequestUseCaseTest {
      */
     private fun TestScope.buildUseCase(
         enumerationRepository: FakeEnumerationRepository,
-        analyzers: List<FakeThreatAnalyzer>,
+        // Widened from List<FakeThreatAnalyzer> to List<ThreatAnalyzer>:
+        // the cancellation test needs to pass a DelayingThreatAnalyzer
+        // alongside FakeThreatAnalyzer elsewhere in this file. Both are
+        // sibling ThreatAnalyzer implementations, not one a subtype of
+        // the other, and Kotlin generics are invariant by default —
+        // List<FakeThreatAnalyzer> could never accept a
+        // List<DelayingThreatAnalyzer> regardless of a shared supertype.
+        // FakeThreatAnalyzerRegistry already expects List<ThreatAnalyzer>
+        // (see its own constructor), so this also removes a redundant,
+        // overly-narrow type this helper never needed to declare.
+        analyzers: List<ThreatAnalyzer>,
         securityRepository: FakeSecurityRepository = FakeSecurityRepository(),
     ): RunScanRequestUseCase {
         val dispatcher = StandardTestDispatcher(testScheduler)
