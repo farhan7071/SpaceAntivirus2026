@@ -23,6 +23,8 @@ sealed interface AppResult<out T> {
  * 004A for the Security domain's Repository contract — see
  * docs/adr/0013-security-domain-error-cases.md. ScanAlreadyInProgress was
  * added in Sprint 007 — see docs/adr/0020-concurrent-scan-guarding.md.
+ * TrustedItemNotFound was added in Sprint 008 — see
+ * docs/adr/0021-trusted-item-management.md.
  */
 sealed interface AppError {
     data object Network : AppError
@@ -32,6 +34,7 @@ sealed interface AppError {
     data class ScanSessionNotFound(val sessionId: String) : AppError
     data class InvalidScanConfiguration(val reason: String) : AppError
     data class ScanAlreadyInProgress(val activeSessionId: String) : AppError
+    data class TrustedItemNotFound(val itemId: String) : AppError
     data class Unexpected(val cause: Throwable? = null) : AppError
 }
 

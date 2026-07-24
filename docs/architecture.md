@@ -336,6 +336,21 @@ called, so a rejected second call creates no new session and leaves
 nothing to clean up. This is a rejection policy, not a queueing one; see
 ADR 0020 for why queueing wasn't implemented speculatively.
 
+### Trusted Item Management (Sprint 008)
+
+Real domain backing for the "Trusted List" screen named in Sprint 002.5's
+UX spec: `TrustedItemRepository` (contract only — `AddTrustedItemUseCase`,
+`RemoveTrustedItemUseCase`, `IsTrustedUseCase`, `ObserveTrustedItemsUseCase`),
+backing `TrustedItem`/`TrustedItemType` models in `core:model`.
+
+`addTrustedItem` is idempotent by `(identifier, type)` — re-adding an
+already-trusted item returns the existing entry rather than creating a
+duplicate. **Not yet wired into the scan pipeline** — `IsTrustedUseCase`
+exists for a future sprint to call, but `RunScanRequestUseCase` doesn't
+skip trusted targets yet. See ADR 0021 for why that integration (and the
+`ScanStatistics` question it raises) is deliberately its own future step,
+not folded in here.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
