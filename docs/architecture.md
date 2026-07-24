@@ -608,6 +608,35 @@ identical placeholder evidence text across detections would have been
 silently collapsed by the new dedup logic, breaking a load-bearing
 existing test if left unfixed.
 
+### Production ThreatDescriptionProvider — and a governance document that never existed (Sprint 016)
+
+Before writing any copy, a check for Sprint 002.75's source document
+(cited by section number — §4 through §21 — across 30+ files in this
+codebase) found it was never committed to this repository at all. Fixed,
+not just flagged: `docs/content-style-guide.md` consolidates every
+consistently-applied rule those citations imply into a real, checkable
+artifact — the first time "follow Sprint 002.75's guidance" has meant
+something verifiable rather than an unrecoverable external reference.
+Its own provenance note says plainly it's a reconstruction, to be
+superseded if the real document is ever located.
+
+`ProductionThreatDescriptionProvider` (`core:analysisengine`) is written
+against it: short static titles that never claim the verdict; a
+description that always shows every `Detection`'s evidence (not just
+ones matching the "driving" `threatType` `BuildThreatUseCase` passes in
+— a `Threat` combining two analyzers' findings must show both, not just
+whichever one determined the headline category); a suggested action
+phrased as something to consider, never a demand, matching
+`RiskLevel.ATTENTION`'s own epistemic humility. Covers all four
+`ThreatType` values, including two (`MALWARE`, `UNKNOWN`) no analyzer
+currently produces.
+
+Bound in `AnalysisEngineBindingModule` — the last binding ADR 0026 left
+open. `RunScanRequestUseCase` is fully Hilt-constructible for the first
+time in this project's history; `AnalysisEngineBindingModuleTest` now
+injects it directly to prove that, where every earlier version of that
+test deliberately avoided the attempt because it would have failed.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

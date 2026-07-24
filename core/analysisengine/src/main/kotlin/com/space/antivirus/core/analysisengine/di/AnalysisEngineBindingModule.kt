@@ -2,9 +2,11 @@ package com.space.antivirus.core.analysisengine.di
 
 import com.space.antivirus.core.analysisengine.analyzer.AppIdentityImpersonationAnalyzer
 import com.space.antivirus.core.analysisengine.analyzer.SuspiciousPermissionPatternAnalyzer
+import com.space.antivirus.core.analysisengine.reporting.ProductionThreatDescriptionProvider
 import com.space.antivirus.domain.analyzer.DefaultThreatAnalyzerRegistry
 import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import com.space.antivirus.domain.analyzer.ThreatAnalyzerRegistry
+import com.space.antivirus.domain.reporting.ThreatDescriptionProvider
 import com.space.antivirus.domain.scoring.HighestSeverityRiskScorer
 import com.space.antivirus.domain.scoring.RiskScorer
 import dagger.Binds
@@ -39,6 +41,12 @@ import dagger.multibindings.Multibinds
  * as designed — adding the second analyzer required zero changes to
  * ThreatAnalyzerRegistry, AnalyzeScanTargetUseCase, or AnalyzerExecutor,
  * only one new @Binds + @IntoSet line here.
+ *
+ * As of Sprint 016, ThreatDescriptionProvider is also bound here — the
+ * LAST binding ADR 0026 explicitly left open, deliberately deferred past
+ * Sprints 013/014/015 pending real, governed copy (ADR 0016, ADR 0029).
+ * With this binding, BuildThreatUseCase and therefore RunScanRequestUseCase
+ * are, for the first time, fully Hilt-constructible.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -52,6 +60,9 @@ abstract class AnalysisEngineBindingModule {
 
     @Binds
     abstract fun bindRiskScorer(impl: HighestSeverityRiskScorer): RiskScorer
+
+    @Binds
+    abstract fun bindThreatDescriptionProvider(impl: ProductionThreatDescriptionProvider): ThreatDescriptionProvider
 
     @Binds
     @IntoSet

@@ -10,7 +10,9 @@ import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.domain.analyzer.ThreatAnalyzerRegistry
+import com.space.antivirus.domain.reporting.ThreatDescriptionProvider
 import com.space.antivirus.domain.scoring.RiskScorer
+import com.space.antivirus.domain.usecase.RunScanRequestUseCase
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
@@ -30,9 +32,13 @@ import org.junit.runner.RunWith
  * own update to this file, catching a stale assertion before it could
  * ship as a silent regression.
  *
- * Deliberately does NOT attempt to inject RunScanRequestUseCase or
- * BuildThreatUseCase — those still can't be constructed, since
- * ThreatDescriptionProvider has no binding yet (Phase B, ADR 0016).
+ * Updated again in Sprint 016: now also injects ThreatDescriptionProvider
+ * directly AND RunScanRequestUseCase itself — the real, concrete proof
+ * that closing the last binding ADR 0026 left open makes the entire scan
+ * pipeline Hilt-constructible for the first time in this project's
+ * history. Every previous version of this test deliberately avoided
+ * attempting that injection because it would have failed; now it's the
+ * whole point of this update.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -46,6 +52,12 @@ class AnalysisEngineBindingModuleTest {
 
     @Inject
     lateinit var riskScorer: RiskScorer
+
+    @Inject
+    lateinit var threatDescriptionProvider: ThreatDescriptionProvider
+
+    @Inject
+    lateinit var runScanRequestUseCase: RunScanRequestUseCase
 
     @Before
     fun setUp() {
@@ -110,5 +122,34 @@ class AnalysisEngineBindingModuleTest {
         )
 
         assertThat(riskScorer.score(detections)).isEqualTo(RiskLevel.ATTENTION)
+    }
+
+    @Test
+    fun threatDescriptionProvider_injectsSuccessfully_andProducesRealCopy() {
+        val detections = listOf(
+            Detection(
+                id = "d1",
+                analyzerId = AnalyzerId("test-analyzer"),
+                threatType = ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+                evidenceDescription = "test evidence",
+                riskLevel = RiskLevel.ATTENTION,
+            ),
+        )
+
+        val title = threatDescriptionProvider.titleFor(ThreatType.SUSPICIOUS_PERMISSION_USAGE, detections)
+
+        assertThat(title).isNotEmpty()
+    }
+
+    @Test
+    fun runScanRequestUseCase_isFullyHiltConstructible_forTheFirstTimeInThisProject() {
+        // The real point of this test: successful injection into this
+        // field (no exception during hiltRule.inject() in setUp()) IS the
+        // verification. Every dependency this UseCase transitively needs —
+        // SecurityRepository (Sprint 011), both real analyzers and the
+        // registry (013/014/015), RiskScorer, and now
+        // ThreatDescriptionProvider — must have resolved for this object
+        // to exist at all.
+        assertThat(runScanRequestUseCase).isNotNull()
     }
 }
