@@ -680,6 +680,45 @@ explicit note that `OnboardingNavigationRoute` — itself still Sprint
 003's placeholder — remains the app's actual navigation start
 destination; that wasn't in this sprint's scope to change.
 
+### Production onboarding, and closing a gap in Sprint 017's reported fixes (Sprint 018)
+
+Before starting this sprint, a check of the actual pushed `main` branch
+found that Sprint 017's two reported "compile-only compatibility
+corrections" (a missing `getValue` import, `ErrorOutline` → `Warning`)
+had not actually landed in the file that needed them — `HomeScreen.kt`.
+The `getValue` import instead landed in `SpaceAntivirusNavHost.kt`, a
+file Sprint 017 never touched. Both fixes since landed in a separate
+main commit ahead of this sprint's own patch. See ADR 0031 for the full
+account.
+
+`OnboardingScreen` (`feature:onboarding`) replaces Sprint 003's
+placeholder, following ADR 0030's stateful/stateless split exactly.
+Given what just happened with `ErrorOutline`, this screen deliberately
+uses **zero** Material icons anywhere — the safest way to guarantee no
+repeat of that exact mistake with no real compiler available to verify
+against. Static page content (`OnboardingContent.kt`) is its own file,
+owned by neither the ViewModel nor the Screen, so a future page is one
+list entry, no other file touched.
+
+```
+OnboardingContent.kt (OnboardingPages: List<OnboardingPage>)
+        │                                    │
+        ▼                                    ▼
+OnboardingViewModel                   OnboardingScreen
+  (bounds-checked page index)           (renders current page,
+                                          Next/Back/Get Started)
+```
+
+Wired into `SpaceAntivirusNavHost`: completing onboarding navigates to
+Home with `popUpTo(OnboardingNavigationRoute) { inclusive = true }` — no
+back-navigation into onboarding once past it.
+
+Onboarding copy is deliberately scoped to what the app actually does
+today (installed-application permission and identity checks, Sprints
+014/015) and explicitly states what it doesn't do yet (file/message/photo
+scanning, real-time monitoring) — no overpromising relative to the real
+pipeline.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

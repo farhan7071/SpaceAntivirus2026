@@ -41,10 +41,12 @@ import com.space.antivirus.feature.settings.SettingsRoute
  * Notifications, and Real-Time — every destination from Sprint 002.5's
  * screen inventory that isn't itself a sub-state of another screen.
  *
- * Every route below renders only a placeholder (Sprint 003 Task 4:
- * "No feature logic"). Deep-link handling for notification tap-through
- * (Sprint 002.75 §12) is a Sprint 004+ addition once real notifications
- * exist.
+ * Every route below rendered only a placeholder as of Sprint 003 Task 4
+ * ("No feature logic"). Onboarding and Home became real screens in
+ * Sprints 018 and 017 respectively (ADR 0030); the rest remain
+ * placeholders pending their own Phase C sprints. Deep-link handling for
+ * notification tap-through (Sprint 002.75 §12) is a later addition once
+ * real notifications exist.
  */
 @Composable
 fun SpaceAntivirusNavHost(
@@ -66,7 +68,15 @@ fun SpaceAntivirusNavHost(
             startDestination = OnboardingNavigationRoute,
             modifier = androidx.compose.ui.Modifier.padding(innerPadding),
         ) {
-            composable(OnboardingNavigationRoute) { OnboardingRoute() }
+            composable(OnboardingNavigationRoute) {
+                OnboardingRoute(
+                    onOnboardingComplete = {
+                        navController.navigate(HomeNavigationRoute) {
+                            popUpTo(OnboardingNavigationRoute) { inclusive = true }
+                        }
+                    },
+                )
+            }
             composable(HomeNavigationRoute) { HomeRoute() }
             composable(SecurityCenterNavigationRoute) { SecurityCenterRoute() }
             composable(CleanNavigationRoute) { CleanRoute() }
