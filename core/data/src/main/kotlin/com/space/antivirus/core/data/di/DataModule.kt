@@ -6,6 +6,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.space.antivirus.core.database.AppDatabase
+import com.space.antivirus.core.database.dao.DetectionDao
+import com.space.antivirus.core.database.dao.ScanSessionDao
+import com.space.antivirus.core.database.dao.ScanStatisticsDao
+import com.space.antivirus.core.database.dao.ThreatDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -39,4 +43,26 @@ object DataModule {
             // change.
             .fallbackToDestructiveMigration()
             .build()
+
+    // Sprint 011: DAOs are provided here (not re-declared in
+    // core:securitydata) so SecurityRepositoryImpl can @Inject them
+    // directly without needing to know how AppDatabase itself is
+    // constructed — the same separation FakeSecurityRepository's tests
+    // already enjoy, just for the real implementation.
+
+    @Provides
+    @Singleton
+    fun provideScanSessionDao(appDatabase: AppDatabase): ScanSessionDao = appDatabase.scanSessionDao()
+
+    @Provides
+    @Singleton
+    fun provideScanStatisticsDao(appDatabase: AppDatabase): ScanStatisticsDao = appDatabase.scanStatisticsDao()
+
+    @Provides
+    @Singleton
+    fun provideThreatDao(appDatabase: AppDatabase): ThreatDao = appDatabase.threatDao()
+
+    @Provides
+    @Singleton
+    fun provideDetectionDao(appDatabase: AppDatabase): DetectionDao = appDatabase.detectionDao()
 }

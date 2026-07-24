@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":core:security"))
     implementation(project(":core:permissions"))
     implementation(project(":core:enumeration"))
+    implementation(project(":core:securitydata"))
     implementation(project(":domain"))
 
     implementation(project(":feature:onboarding"))

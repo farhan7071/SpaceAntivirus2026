@@ -395,6 +395,49 @@ multi-table joins. Assembling a full `ScanResult` from these tables is
 Sprint 011's job, done in Kotlin code over several simple DAO calls
 rather than one complex relational query.
 
+### SecurityRepositoryImpl — closing ADR 0014's long-deferred item (Sprint 011)
+
+`core:securitydata` (new module — not `core:security`, which is Sprint
+003's encryption/Keystore module) provides `SecurityRepositoryImpl`, the
+first production implementation `SecurityRepository` has ever had. Wired
+via `@Binds`, following the exact pattern `core:enumeration` established
+in Sprint 004B, per ADR 0014's own prediction three sprints ahead of it
+happening.
+
+```
+domain's SecurityRepository (contract, since Sprint 004A)
+   ▲
+   │ @Binds
+   │
+SecurityRepositoryImpl (core:securitydata, Sprint 011)
+   │
+   ├─▶ SecurityEntityMappers.kt   — entity <-> domain, enums via .name/valueOf
+   │
+   ├─▶ ScanSessionDao / ScanStatisticsDao / ThreatDao / DetectionDao
+   │      (core:database, Sprint 010 — provided via core:data's DataModule)
+   │
+   └─▶ ConcurrentHashMap<sessionId, MutableStateFlow<ScanProgress>>
+          (in-memory only, per ADR 0023 — never touches Room)
+```
+
+Two things worth knowing if you're touching this code later:
+- **`completeScanSession` is the only method wrapped in
+  `AppDatabase.withTransaction`** — it's the only one writing to more than
+  one table. Every other multi-row effect (history deletion) relies on
+  SQLite's own CASCADE foreign keys instead, already atomic as a single
+  statement.
+- **`observeScanHistory()`'s correctness depends on an invariant**: it
+  only re-emits because `completeScanSession` always writes
+  `scan_sessions` in the same transaction as any statistics/threats
+  change. Writing those independently in a future change would make this
+  Flow silently go stale. See ADR 0024 and the method's own KDoc.
+
+Tests are instrumented (`androidTest`), not JVM unit tests — same
+reasoning as Sprint 010: no Robolectric, and reliably mocking
+`AppDatabase.withTransaction` (a Kotlin extension function) would be
+fragile in a way that looks like coverage without actually verifying
+transaction behavior. A real in-memory database is used instead.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
