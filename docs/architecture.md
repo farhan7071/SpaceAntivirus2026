@@ -326,6 +326,16 @@ bound anywhere yet, every target today resolves to `Inconclusive`, so
 "nothing is actually checking yet" result. That's correct behavior for
 where the project actually is, not a bug to paper over.
 
+### Concurrent Scan Guarding (Sprint 007)
+
+`RunScanRequestUseCase` now checks
+`SecurityRepository.getActiveScanSession()` as its very first step. If a
+scan is already `PENDING` or `RUNNING`, the call is rejected immediately
+with `AppError.ScanAlreadyInProgress` — before `startScanSession` is ever
+called, so a rejected second call creates no new session and leaves
+nothing to clean up. This is a rejection policy, not a queueing one; see
+ADR 0020 for why queueing wasn't implemented speculatively.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

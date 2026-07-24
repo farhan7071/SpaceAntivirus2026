@@ -243,4 +243,32 @@ class RunScanRequestUseCaseTest {
 
         assertThat(result).isEqualTo(AppResult.Failure(AppError.StorageUnavailable))
     }
+
+    @Test
+    fun `a second scan is rejected while one is already running, and starts nothing new`() = runTest {
+        val securityRepository = FakeSecurityRepository()
+        val enumerationRepository = FakeEnumerationRepository(fileTargets = listOf(fileTarget))
+        val slowAnalyzer = DelayingThreatAnalyzer(
+            id = AnalyzerId("slow"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            delayMillis = 10_000,
+            result = AppResult.Success(AnalysisOutcome.Clean(fileTarget.identifier)),
+        )
+        val useCase = buildUseCase(enumerationRepository, listOf(slowAnalyzer), securityRepository)
+
+        val firstScan = launch { useCase(request(listOf(ScanScope.DownloadsFolder))) }
+        runCurrent() // let the first scan reach RUNNING and start analyzing
+
+        val secondResult = useCase(request(listOf(ScanScope.DownloadsFolder)))
+
+        assertThat(secondResult).isInstanceOf(AppResult.Failure::class.java)
+        val error = (secondResult as AppResult.Failure).error
+        assertThat(error).isInstanceOf(AppError.ScanAlreadyInProgress::class.java)
+        // Only one session was ever created — the rejected second call
+        // never called startScanSession at all.
+        assertThat(securityRepository.publishedProgress.map { it.sessionId }.distinct()).hasSize(1)
+
+        firstScan.cancel()
+        firstScan.join()
+    }
 }

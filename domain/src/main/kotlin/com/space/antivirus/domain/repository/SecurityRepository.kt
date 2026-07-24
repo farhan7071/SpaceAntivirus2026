@@ -92,4 +92,13 @@ interface SecurityRepository {
      * itself).
      */
     suspend fun updateScanProgress(progress: ScanProgress): AppResult<Unit>
+
+    /**
+     * The session currently in PENDING or RUNNING state, if any, else
+     * Success(null). Added in Sprint 007 so a caller can check "is a
+     * scan already happening" before starting another — see
+     * RunScanRequestUseCase and ADR 0020. Success(null) is the normal
+     * "nothing running" case, not a failure.
+     */
+    suspend fun getActiveScanSession(): AppResult<ScanSession?>
 }

@@ -1,5 +1,6 @@
 package com.space.antivirus.domain.usecase
 
+import com.space.antivirus.core.common.AppError
 import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.common.IoDispatcher
 import com.space.antivirus.core.model.AnalysisOutcome
@@ -23,16 +24,25 @@ import kotlinx.coroutines.withContext
  * 004A (persistence), 004B (enumeration), and 004C (analysis), each built
  * and tested independently, actually compose into one working pipeline.
  *
- * Flow: resolve the request's ScanScopes into ScanTargets (004B) -> start
- * a ScanSession (004A) -> analyze each target (004C), publishing
- * ScanProgress after every one -> build a Threat for every Flagged
- * outcome, count every Inconclusive one honestly (see ADR 0017 for why
- * that counting exists) -> persist the completed ScanResult (004A).
+ * Flow: check no scan is already running (Sprint 007, ADR 0020) -> resolve
+ * the request's ScanScopes into ScanTargets (004B) -> start a ScanSession
+ * (004A) -> analyze each target (004C), publishing ScanProgress after
+ * every one -> build a Threat for every Flagged outcome, count every
+ * Inconclusive one honestly (see ADR 0017 for why that counting exists)
+ * -> persist the completed ScanResult (004A).
  *
  * Fail-fast on the CORE scan pipeline: the first AppResult.Failure from
- * starting the session, resolving targets, or analyzing a target aborts
- * the whole run. Progress publishing is deliberately NOT fail-fast — see
+ * checking for an active session, starting the session, resolving
+ * targets, or analyzing a target aborts the whole run. Progress
+ * publishing is deliberately NOT fail-fast — see
  * publishProgressBestEffort's KDoc and ADR 0018.
+ *
+ * CONCURRENT SCAN GUARDING (Sprint 007, ADR 0020): before anything else,
+ * checks SecurityRepository.getActiveScanSession() — if a scan is already
+ * PENDING or RUNNING, this call fails immediately with
+ * AppError.ScanAlreadyInProgress rather than starting a second, competing
+ * ScanSession. This check happens before startScanSession is ever called,
+ * so there's nothing to clean up if it fails.
  *
  * CANCELLATION (Sprint 006, ADR 0019): a caller cancels a running scan
  * through ordinary structured concurrency — cancelling the coroutine/Job
@@ -56,6 +66,17 @@ class RunScanRequestUseCase @Inject constructor(
 ) : UseCase<ScanRequest, ScanResult>(dispatcher) {
 
     override suspend fun execute(params: ScanRequest): AppResult<ScanResult> {
+        when (val activeResult = securityRepository.getActiveScanSession()) {
+            is AppResult.Success -> {
+                val activeSession = activeResult.data
+                if (activeSession != null) {
+                    return AppResult.Failure(AppError.ScanAlreadyInProgress(activeSession.id))
+                }
+            }
+            is AppResult.Failure -> return activeResult
+            AppResult.Loading -> return AppResult.Loading
+        }
+
         val startedAtMillis = System.currentTimeMillis()
 
         val session = when (val sessionResult = startScanSession(params.scanType)) {

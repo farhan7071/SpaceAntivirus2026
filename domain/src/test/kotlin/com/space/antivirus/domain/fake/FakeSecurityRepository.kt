@@ -137,4 +137,12 @@ class FakeSecurityRepository : SecurityRepository {
         progressFlows.getOrPut(progress.sessionId) { MutableStateFlow(progress) }.value = progress
         return AppResult.Success(Unit)
     }
+
+    override suspend fun getActiveScanSession(): AppResult<ScanSession?> {
+        forcedFailure?.let { return AppResult.Failure(it) }
+        val active = sessions.values.firstOrNull {
+            it.state == ScanSessionState.PENDING || it.state == ScanSessionState.RUNNING
+        }
+        return AppResult.Success(active)
+    }
 }
