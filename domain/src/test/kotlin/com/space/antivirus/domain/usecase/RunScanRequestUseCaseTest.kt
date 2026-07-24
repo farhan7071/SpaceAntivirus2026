@@ -15,6 +15,7 @@ import com.space.antivirus.core.model.ScanSessionState
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ScanType
 import com.space.antivirus.core.model.ThreatType
+import com.space.antivirus.core.model.TrustedItemType
 import com.space.antivirus.domain.analyzer.AnalysisOutcomeAggregator
 import com.space.antivirus.domain.analyzer.AnalyzerExecutor
 import com.space.antivirus.domain.analyzer.ThreatAnalyzer
@@ -25,6 +26,7 @@ import com.space.antivirus.domain.fake.FakeSecurityRepository
 import com.space.antivirus.domain.fake.FakeThreatAnalyzer
 import com.space.antivirus.domain.fake.FakeThreatAnalyzerRegistry
 import com.space.antivirus.domain.fake.FakeThreatDescriptionProvider
+import com.space.antivirus.domain.fake.FakeTrustedItemRepository
 import com.space.antivirus.domain.scoring.HighestSeverityRiskScorer
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -67,6 +69,7 @@ class RunScanRequestUseCaseTest {
         // overly-narrow type this helper never needed to declare.
         analyzers: List<ThreatAnalyzer>,
         securityRepository: FakeSecurityRepository = FakeSecurityRepository(),
+        trustedItemRepository: FakeTrustedItemRepository = FakeTrustedItemRepository(),
     ): RunScanRequestUseCase {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val registry = FakeThreatAnalyzerRegistry(analyzers)
@@ -74,6 +77,7 @@ class RunScanRequestUseCaseTest {
             resolveScanTargets = ResolveScanTargetsUseCase(enumerationRepository, dispatcher),
             analyzeScanTarget = AnalyzeScanTargetUseCase(registry, AnalyzerExecutor(), AnalysisOutcomeAggregator(), dispatcher),
             buildThreat = BuildThreatUseCase(HighestSeverityRiskScorer(), FakeThreatDescriptionProvider()),
+            isTrusted = IsTrustedUseCase(trustedItemRepository, dispatcher),
             startScanSession = StartScanSessionUseCase(securityRepository, dispatcher),
             completeScanSession = CompleteScanSessionUseCase(securityRepository, dispatcher),
             securityRepository = securityRepository,
@@ -270,5 +274,74 @@ class RunScanRequestUseCaseTest {
 
         firstScan.cancel()
         firstScan.join()
+    }
+
+    @Test
+    fun `a trusted target is skipped entirely - the analyzer never runs against it`() = runTest {
+        val trustedItemRepository = FakeTrustedItemRepository()
+        trustedItemRepository.addTrustedItem(fileTarget.identifier, TrustedItemType.FILE)
+        val enumerationRepository = FakeEnumerationRepository(fileTargets = listOf(fileTarget))
+        // This analyzer WOULD flag the target as malware if it ever ran —
+        // proving the skip is real, not just an assertion that happens to
+        // pass. If the trust check is broken and the target gets analyzed
+        // anyway, this test fails by showing a threat that shouldn't exist.
+        val alwaysFlagsAnalyzer = FakeThreatAnalyzer(
+            id = AnalyzerId("always-flags"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            result = AppResult.Success(
+                AnalysisOutcome.Flagged(
+                    targetIdentifier = fileTarget.identifier,
+                    detections = listOf(
+                        Detection(
+                            id = "d1",
+                            analyzerId = AnalyzerId("always-flags"),
+                            threatType = ThreatType.MALWARE,
+                            evidenceDescription = "would have matched, if this analyzer ran",
+                            riskLevel = RiskLevel.ACTION_NEEDED,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val useCase = buildUseCase(
+            enumerationRepository,
+            listOf(alwaysFlagsAnalyzer),
+            trustedItemRepository = trustedItemRepository,
+        )
+
+        val result = useCase(request(listOf(ScanScope.DownloadsFolder)))
+
+        val scanResult = (result as AppResult.Success).data
+        assertThat(scanResult.threats).isEmpty()
+        assertThat(scanResult.statistics.itemsTrusted).isEqualTo(1)
+        assertThat(scanResult.statistics.itemsScanned).isEqualTo(0)
+        assertThat(scanResult.isClean).isTrue()
+    }
+
+    @Test
+    fun `a trust-check failure fails safe by scanning the target, not by skipping it`() = runTest {
+        val trustedItemRepository = FakeTrustedItemRepository().apply {
+            forcedFailure = AppError.StorageUnavailable
+        }
+        val enumerationRepository = FakeEnumerationRepository(fileTargets = listOf(fileTarget))
+        val cleanAnalyzer = FakeThreatAnalyzer(
+            id = AnalyzerId("clean-analyzer"),
+            capabilities = setOf(AnalyzerCapability.FILE_ANALYSIS),
+            result = AppResult.Success(AnalysisOutcome.Clean(fileTarget.identifier)),
+        )
+        val useCase = buildUseCase(
+            enumerationRepository,
+            listOf(cleanAnalyzer),
+            trustedItemRepository = trustedItemRepository,
+        )
+
+        val result = useCase(request(listOf(ScanScope.DownloadsFolder)))
+
+        // The scan still completes normally — the trust-check failure
+        // didn't abort it — and the target was actually analyzed (counted
+        // in itemsScanned, not itemsTrusted), the safe default.
+        val scanResult = (result as AppResult.Success).data
+        assertThat(scanResult.statistics.itemsScanned).isEqualTo(1)
+        assertThat(scanResult.statistics.itemsTrusted).isEqualTo(0)
     }
 }

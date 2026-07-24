@@ -345,11 +345,26 @@ backing `TrustedItem`/`TrustedItemType` models in `core:model`.
 
 `addTrustedItem` is idempotent by `(identifier, type)` — re-adding an
 already-trusted item returns the existing entry rather than creating a
-duplicate. **Not yet wired into the scan pipeline** — `IsTrustedUseCase`
-exists for a future sprint to call, but `RunScanRequestUseCase` doesn't
-skip trusted targets yet. See ADR 0021 for why that integration (and the
-`ScanStatistics` question it raises) is deliberately its own future step,
-not folded in here.
+duplicate. Wired into the scan pipeline in Sprint 009 (below).
+
+### Trusted Item Scan-Pipeline Wiring (Sprint 009)
+
+`RunScanRequestUseCase` now checks `IsTrustedUseCase` before analyzing
+each target. A trusted target is skipped entirely — no analyzer ever runs
+against it — and counted in `ScanStatistics.itemsTrusted`, a third
+counter orthogonal to `itemsScanned`/`threatsFound`/`itemsInconclusive`
+(ADR 0022, same breaking-change category as ADR 0015/0017).
+
+Two deliberate asymmetries worth knowing:
+- **`ScanResult.isClean` ignores `itemsTrusted`** but NOT
+  `itemsInconclusive` — trusting an item is user consent, not a coverage
+  gap, so it shouldn't make an otherwise-clean scan look less clean.
+- **Trust-check failures fail SAFE, not just fail-open.** Unlike progress
+  publishing (ADR 0018, where losing an update is harmless), a failed
+  trust check defaults to `false` (not trusted → scan it anyway) rather
+  than `true` — the two possible defaults aren't equally safe for a
+  security product, so the failure is tolerated by picking the safer
+  outcome, not by shrugging at it.
 
 ## Navigation
 

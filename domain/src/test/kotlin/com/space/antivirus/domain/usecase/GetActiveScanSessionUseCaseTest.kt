@@ -45,6 +45,7 @@ class GetActiveScanSessionUseCaseTest {
                     itemsScanned = 1,
                     threatsFound = 0,
                     itemsInconclusive = 0,
+                    itemsTrusted = 0,
                     durationMillis = 10,
                 ),
                 threats = emptyList(),

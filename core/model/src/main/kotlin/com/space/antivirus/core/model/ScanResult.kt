@@ -30,7 +30,12 @@ data class ScanResult(
      *  absence of a Threat. A scan where every target came back
      *  Inconclusive must not report isClean=true — that would be exactly
      *  the false reassurance ScanStatistics.itemsInconclusive exists to
-     *  prevent (see that field's KDoc). */
+     *  prevent (see that field's KDoc).
+     *
+     *  Deliberately does NOT check statistics.itemsTrusted (Sprint 009) —
+     *  a trusted item was deliberately excluded by the user's own choice,
+     *  not a coverage gap the analysis failed to close, so it shouldn't
+     *  make an otherwise-clean scan read as less than clean. See ADR 0022. */
     val isClean: Boolean
         get() = session.state == ScanSessionState.COMPLETED &&
             threats.isEmpty() &&

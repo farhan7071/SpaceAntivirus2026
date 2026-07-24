@@ -27,7 +27,7 @@ class ObserveScanHistoryUseCaseTest {
             CompleteScanSessionUseCase(repository, dispatcher)(
                 CompleteScanSessionParams(
                     sessionId = session.id,
-                    statistics = ScanStatistics(itemsScanned = 100, threatsFound = 0, itemsInconclusive = 0, durationMillis = 500),
+                    statistics = ScanStatistics(itemsScanned = 100, threatsFound = 0, itemsInconclusive = 0, itemsTrusted = 0, durationMillis = 500),
                     threats = emptyList(),
                 ),
             )

@@ -16,17 +16,29 @@ package com.space.antivirus.core.model
  * precedence rule (Sprint 004C) was designed to prevent. Losing that
  * distinction at the statistics layer would have quietly undone that
  * design one level up.
+ *
+ * `itemsTrusted` was added in Sprint 009 — a third breaking change to
+ * this model, same category. `itemsScanned` counts only targets actually
+ * analyzed; a target the user has explicitly trusted (Sprint 008) is
+ * skipped entirely and counted here instead, orthogonal to
+ * itemsScanned/threatsFound/itemsInconclusive. See ADR 0022 for why
+ * trusted items do NOT affect ScanResult.isClean the way
+ * itemsInconclusive does — trusting something is a deliberate user
+ * decision, not a coverage gap, and conflating the two would misrepresent
+ * what "trusted" means (see TrustedItem's own KDoc).
  */
 data class ScanStatistics(
     val itemsScanned: Int,
     val threatsFound: Int,
     val itemsInconclusive: Int,
+    val itemsTrusted: Int,
     val durationMillis: Long,
 ) {
     init {
         require(itemsScanned >= 0) { "itemsScanned cannot be negative" }
         require(threatsFound >= 0) { "threatsFound cannot be negative" }
         require(itemsInconclusive >= 0) { "itemsInconclusive cannot be negative" }
+        require(itemsTrusted >= 0) { "itemsTrusted cannot be negative" }
         require(threatsFound + itemsInconclusive <= itemsScanned || itemsScanned == 0) {
             "threatsFound ($threatsFound) + itemsInconclusive ($itemsInconclusive) cannot " +
                 "exceed itemsScanned ($itemsScanned)"
@@ -37,6 +49,12 @@ data class ScanStatistics(
     companion object {
         /** For a session that hasn't produced any statistics yet
          *  (PENDING/RUNNING states). */
-        val EMPTY = ScanStatistics(itemsScanned = 0, threatsFound = 0, itemsInconclusive = 0, durationMillis = 0)
+        val EMPTY = ScanStatistics(
+            itemsScanned = 0,
+            threatsFound = 0,
+            itemsInconclusive = 0,
+            itemsTrusted = 0,
+            durationMillis = 0,
+        )
     }
 }

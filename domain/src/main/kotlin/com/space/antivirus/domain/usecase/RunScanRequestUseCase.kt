@@ -10,6 +10,7 @@ import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.ScanStatistics
 import com.space.antivirus.core.model.Threat
 import com.space.antivirus.domain.UseCase
+import com.space.antivirus.domain.analyzer.identifier
 import com.space.antivirus.domain.repository.SecurityRepository
 import javax.inject.Inject
 import kotlin.coroutines.coroutineContext
@@ -26,16 +27,17 @@ import kotlinx.coroutines.withContext
  *
  * Flow: check no scan is already running (Sprint 007, ADR 0020) -> resolve
  * the request's ScanScopes into ScanTargets (004B) -> start a ScanSession
- * (004A) -> analyze each target (004C), publishing ScanProgress after
- * every one -> build a Threat for every Flagged outcome, count every
- * Inconclusive one honestly (see ADR 0017 for why that counting exists)
- * -> persist the completed ScanResult (004A).
+ * (004A) -> for each target, check the Trusted List (Sprint 008/009, ADR
+ * 0022) and skip analysis if trusted, otherwise analyze it (004C) ->
+ * publish ScanProgress after every target -> build a Threat for every
+ * Flagged outcome, count every Inconclusive one honestly (see ADR 0017
+ * for why that counting exists) -> persist the completed ScanResult (004A).
  *
  * Fail-fast on the CORE scan pipeline: the first AppResult.Failure from
  * checking for an active session, starting the session, resolving
  * targets, or analyzing a target aborts the whole run. Progress
- * publishing is deliberately NOT fail-fast — see
- * publishProgressBestEffort's KDoc and ADR 0018.
+ * publishing (ADR 0018) and trust-status checking (ADR 0022) are the two
+ * deliberate exceptions — see their respective KDoc/ADR for why.
  *
  * CONCURRENT SCAN GUARDING (Sprint 007, ADR 0020): before anything else,
  * checks SecurityRepository.getActiveScanSession() — if a scan is already
@@ -43,6 +45,15 @@ import kotlinx.coroutines.withContext
  * AppError.ScanAlreadyInProgress rather than starting a second, competing
  * ScanSession. This check happens before startScanSession is ever called,
  * so there's nothing to clean up if it fails.
+ *
+ * TRUSTED ITEM SKIPPING (Sprint 009, ADR 0022): before analyzing a
+ * target, checks IsTrustedUseCase. A trusted target is skipped entirely
+ * (no analyzer ever runs against it) and counted in
+ * ScanStatistics.itemsTrusted, separate from itemsScanned. If the trust
+ * check itself fails, the FAIL-SAFE default is to proceed with full
+ * analysis anyway — see isTrustedBestEffort's KDoc for why silently
+ * skipping an unverifiable target would be the wrong default for a
+ * security product.
  *
  * CANCELLATION (Sprint 006, ADR 0019): a caller cancels a running scan
  * through ordinary structured concurrency — cancelling the coroutine/Job
@@ -59,6 +70,7 @@ class RunScanRequestUseCase @Inject constructor(
     private val resolveScanTargets: ResolveScanTargetsUseCase,
     private val analyzeScanTarget: AnalyzeScanTargetUseCase,
     private val buildThreat: BuildThreatUseCase,
+    private val isTrusted: IsTrustedUseCase,
     private val startScanSession: StartScanSessionUseCase,
     private val completeScanSession: CompleteScanSessionUseCase,
     private val securityRepository: SecurityRepository,
@@ -99,20 +111,25 @@ class RunScanRequestUseCase @Inject constructor(
 
             val threats = mutableListOf<Threat>()
             var inconclusiveCount = 0
+            var trustedCount = 0
 
             targets.forEachIndexed { index, target ->
                 coroutineContext.ensureActive()
 
-                when (val outcomeResult = analyzeScanTarget(target)) {
-                    is AppResult.Success -> {
-                        when (val outcome = outcomeResult.data) {
-                            is AnalysisOutcome.Flagged -> threats += buildThreat(outcome)
-                            is AnalysisOutcome.Inconclusive -> inconclusiveCount++
-                            is AnalysisOutcome.Clean -> Unit
+                if (isTrustedBestEffort(target.identifier)) {
+                    trustedCount++
+                } else {
+                    when (val outcomeResult = analyzeScanTarget(target)) {
+                        is AppResult.Success -> {
+                            when (val outcome = outcomeResult.data) {
+                                is AnalysisOutcome.Flagged -> threats += buildThreat(outcome)
+                                is AnalysisOutcome.Inconclusive -> inconclusiveCount++
+                                is AnalysisOutcome.Clean -> Unit
+                            }
                         }
+                        is AppResult.Failure -> return outcomeResult
+                        AppResult.Loading -> return AppResult.Loading
                     }
-                    is AppResult.Failure -> return outcomeResult
-                    AppResult.Loading -> return AppResult.Loading
                 }
                 publishProgressBestEffort(
                     ScanProgress(
@@ -125,9 +142,10 @@ class RunScanRequestUseCase @Inject constructor(
             }
 
             val statistics = ScanStatistics(
-                itemsScanned = targets.size,
+                itemsScanned = targets.size - trustedCount,
                 threatsFound = threats.size,
                 itemsInconclusive = inconclusiveCount,
+                itemsTrusted = trustedCount,
                 durationMillis = System.currentTimeMillis() - startedAtMillis,
             )
 
@@ -160,10 +178,28 @@ class RunScanRequestUseCase @Inject constructor(
      * because a progress-snapshot write failed would make the scan's
      * reliability depend on a feature whose whole purpose is secondary
      * to the scan itself. See ADR 0018 for the full reasoning; this is
-     * deliberately the ONE place in this UseCase that doesn't propagate
-     * AppResult.Failure.
+     * one of two deliberate exceptions in this UseCase that doesn't
+     * propagate AppResult.Failure — see isTrustedBestEffort for the other.
      */
     private suspend fun publishProgressBestEffort(progress: ScanProgress) {
         securityRepository.updateScanProgress(progress)
     }
+
+    /**
+     * If the trust-status check itself fails, the fail-safe default is
+     * `false` (treat as NOT trusted, proceed with full analysis) — never
+     * `true`. Silently skipping analysis of a target because a lookup
+     * failed would be exactly backwards for a security product: an
+     * unverifiable trust status must never be treated as equivalent to a
+     * verified one. This is the mirror image of publishProgressBestEffort
+     * — that one tolerates failure because losing a progress update is
+     * harmless; this one tolerates failure by choosing the SAFER of the
+     * two possible outcomes, not by ignoring the failure. See ADR 0022.
+     */
+    private suspend fun isTrustedBestEffort(identifier: String): Boolean =
+        when (val result = isTrusted(identifier)) {
+            is AppResult.Success -> result.data
+            is AppResult.Failure -> false
+            AppResult.Loading -> false
+        }
 }
