@@ -637,6 +637,49 @@ time in this project's history; `AnalysisEngineBindingModuleTest` now
 injects it directly to prove that, where every earlier version of that
 test deliberately avoided the attempt because it would have failed.
 
+## Phase C: UI Architecture
+
+### The first production screen (Sprint 017)
+
+Sixteen sprints of domain/data work, zero user-visible output — until
+this sprint. `feature:home`'s Sprint 003 placeholder is replaced with a
+real screen, and the pattern it establishes is meant to be followed
+exactly by every remaining feature screen, not just this one:
+
+```
+FeatureRoute (stateful)          FeatureScreen (stateless)
+  hiltViewModel()          →       pure function of FeatureUiState
+  collectAsStateWithLifecycle()    no ViewModel/DI awareness at all
+                                    → physically cannot hide business logic
+```
+
+`HomeViewModel` combines two Flow-based UseCases
+(`ObserveScanHistoryUseCase`, `ObserveTrustedItemsUseCase`) via
+`combine()` → `stateIn(WhileSubscribed(5_000))` — reactive by
+construction, the current standard Android lifecycle-aware state
+pattern. `GetLatestScanResultUseCase`/`GetActiveScanSessionUseCase` both
+exist but are deliberately unused here: one-shot suspend calls are a
+worse fit than deriving "last scan" from the same reactive Flow that
+already exists.
+
+**Testing pattern established:** `mockk` on `SecurityRepository`/
+`TrustedItemRepository` (stubbed only for the methods actually called)
+fed into real UseCase instances — not local hand-written `Fake*` classes
+(those exist only in `:domain`'s own test source set, invisible
+downstream) — proportionate for a ViewModel exercising 2 of 18 combined
+repository methods. Compose UI tests use `createComposeRule()` against
+the stateless `FeatureScreen` directly, needing no Hilt test
+infrastructure at all, for the same reason the stateful/stateless split
+matters.
+
+See ADR 0030 for the full reasoning, including a real bug caught while
+writing the ViewModel tests (`stateIn`'s `initialValue` means every new
+collector sees `Loading` first, as a genuinely separate emission from the
+real state — every test needed to consume it explicitly), and an
+explicit note that `OnboardingNavigationRoute` — itself still Sprint
+003's placeholder — remains the app's actual navigation start
+destination; that wasn't in this sprint's scope to change.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
