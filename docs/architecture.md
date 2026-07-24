@@ -366,6 +366,35 @@ Two deliberate asymmetries worth knowing:
   security product, so the failure is tolerated by picking the safer
   outcome, not by shrugging at it.
 
+### SecurityRepository's Real Persistence Schema — entities/DAOs only (Sprint 010)
+
+`SecurityRepository` has been contract-only since Sprint 004A. This
+sprint gives it a real Room schema in `core:database` — but deliberately
+**only** the schema (entities + DAOs), not the repository implementation
+itself. That split was a direct response to a real constraint: Room's
+KSP-generated code and any instrumented test cannot be compiled or run in
+this project's authoring sandbox, unlike every prior sprint's pure-Kotlin
+`domain` work. Building the smallest, most inspectable unit of real Room
+code first — and deferring the actual entity↔domain-model mapping layer
+to its own, separately-reviewed Sprint 011 — was the explicit tradeoff
+made to manage that risk. See ADR 0023 for the full reasoning, including
+why `ScanProgress` is deliberately NOT persisted (it stays in-memory
+even in the eventual real implementation) and why the schema bump uses
+`fallbackToDestructiveMigration()` rather than a real `Migration` (no
+real user data has ever existed in this schema to preserve).
+
+```
+ScanSessionEntity  (1)───(0..1) ScanStatisticsEntity   [CASCADE delete]
+       │
+       └──(0..n) ThreatEntity ──(0..n) DetectionEntity  [CASCADE delete,
+                                                           both hops]
+```
+
+DAOs return/accept entities directly — no `@Relation`/`@Transaction`
+multi-table joins. Assembling a full `ScanResult` from these tables is
+Sprint 011's job, done in Kotlin code over several simple DAO calls
+rather than one complex relational query.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

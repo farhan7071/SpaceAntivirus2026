@@ -12,9 +12,12 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Contract for everything the Security domain needs to persist and query.
  * This interface is the ONLY thing UseCases in this module know about —
- * they never see Room, DataStore, or any Android type. The implementation
- * (core:data, wiring in the real database) is Sprint 004B's job; this
- * sprint defines the shape only, per Sprint 004A's explicit scope.
+ * they never see Room, DataStore, or any Android type. The real
+ * implementation is Sprint 011's job, built against the Room schema laid
+ * down in Sprint 010 (ADR 0023) — this interface itself has defined the
+ * shape only since Sprint 004A. (An earlier version of this comment said
+ * "Sprint 004B" — that sprint ended up being enumeration, not this;
+ * correcting the stale reference while touching this file for Sprint 010.)
  *
  * Every method that can fail returns AppResult<T> (ADR 0007) rather than
  * throwing — including "not found" cases, via AppError.ScanSessionNotFound
