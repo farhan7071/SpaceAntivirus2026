@@ -2,6 +2,7 @@ package com.space.antivirus.domain.scoring
 
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
+import javax.inject.Inject
 
 /**
  * The default, reference RiskScorer: a Threat's overall severity is the
@@ -14,8 +15,13 @@ import com.space.antivirus.core.model.RiskLevel
  *
  * Relies on RiskLevel's declared ordinal order being ascending severity —
  * see RiskLevel's own KDoc for why that's documented as meaningful there.
+ *
+ * The `@Inject` constructor was added in Sprint 013 — this class existed
+ * since Sprint 004C but was never actually constructible by Hilt (no
+ * annotated constructor at all), one of two real DI gaps found during
+ * the Sprint 012 status review. See ADR 0026.
  */
-class HighestSeverityRiskScorer : RiskScorer {
+class HighestSeverityRiskScorer @Inject constructor() : RiskScorer {
 
     override fun score(detections: List<Detection>): RiskLevel {
         require(detections.isNotEmpty()) {

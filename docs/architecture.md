@@ -474,6 +474,43 @@ real implementation: `EnumerationRepository` (004B), `SecurityRepository`
 `FakeTrustedItemRepository` — now runs against real, persisted data for
 the first time, with no `domain` changes required to make that true.
 
+### Closing the analysis-side DI gaps (Sprint 013)
+
+A Sprint 012 status review found two real gaps: `ThreatAnalyzerRegistry`
+and `RiskScorer` both had concrete implementations
+(`DefaultThreatAnalyzerRegistry`, `HighestSeverityRiskScorer`) that were
+never bound into the Hilt graph — `HighestSeverityRiskScorer` didn't even
+have an `@Inject` constructor. Neither had ever caused a build failure
+only because no feature ViewModel yet injects anything downstream of
+them (every feature module is still the Sprint 003 placeholder).
+
+New module `core:analysisengine` hosts `AnalysisEngineBindingModule`:
+
+```
+@Multibinds Set<ThreatAnalyzer>              — legitimizes the empty-set
+                                                case; the first real
+                                                analyzer (Phase A) adds an
+                                                @IntoSet contribution in
+                                                its own module, no change
+                                                needed here
+@Binds ThreatAnalyzerRegistry  -> DefaultThreatAnalyzerRegistry
+@Binds RiskScorer              -> HighestSeverityRiskScorer
+```
+
+Verified by a real `@HiltAndroidTest` (`AnalysisEngineBindingModuleTest`,
+`app/src/androidTest`) using a new `HiltTestRunner` — whether Dagger's
+compile-time graph validation actually accepts these declarations isn't
+something a JVM unit test can check at all; it needs Hilt's own
+annotation processor running against the real, fully-assembled `:app`
+component.
+
+**Deliberately still open:** `ThreatDescriptionProvider` has no binding
+and no implementation — closing the two gaps above does NOT make
+`BuildThreatUseCase`/`RunScanRequestUseCase` fully Hilt-constructible yet.
+That copy needs Sprint 002.75's content-governance review (ADR 0016),
+explicitly scoped to a later phase, not absorbed into this sprint as a
+stub. See ADR 0026.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

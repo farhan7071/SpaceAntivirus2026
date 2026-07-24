@@ -4,6 +4,17 @@ plugins {
     id("spaceav.android.hilt")
 }
 
+android {
+    // Sprint 013: real Hilt-graph verification (a HiltAndroidTest smoke
+    // test) needs the instrumentation to launch HiltTestApplication
+    // instead of the real Application — overrides the plain
+    // AndroidJUnitRunner AndroidApplicationConventionPlugin sets by
+    // default, same override pattern Sprint 010 used for core:database.
+    defaultConfig {
+        testInstrumentationRunner = "com.space.antivirus.viruscleaner.mobilesecurity.HiltTestRunner"
+    }
+}
+
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:model"))
@@ -17,6 +28,7 @@ dependencies {
     implementation(project(":core:enumeration"))
     implementation(project(":core:securitydata"))
     implementation(project(":core:trusteddata"))
+    implementation(project(":core:analysisengine"))
     implementation(project(":domain"))
 
     implementation(project(":feature:onboarding"))
@@ -52,4 +64,14 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.compose.ui.test.junit4)
+    // Sprint 013: real Hilt-graph verification, not just static reasoning
+    // about whether @Binds/@Multibinds declarations compile. hilt-compiler
+    // must also run for the androidTest source set (kspAndroidTest) —
+    // Hilt generates test-specific components (Hilt_HiltTestRunner-adjacent
+    // classes) that only exist if its annotation processor runs there too,
+    // separately from the main variant's `ksp` configuration that
+    // spaceav.android.hilt already sets up.
+    androidTestImplementation(libs.hilt.android.testing)
+    androidTestImplementation(libs.truth)
+    kspAndroidTest(libs.hilt.compiler)
 }
