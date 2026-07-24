@@ -438,6 +438,42 @@ reasoning as Sprint 010: no Robolectric, and reliably mocking
 fragile in a way that looks like coverage without actually verifying
 transaction behavior. A real in-memory database is used instead.
 
+### TrustedItemRepositoryImpl — the same treatment, in one sprint instead of two (Sprint 012)
+
+`TrustedItemRepository` has been contract-only since Sprint 008 — the
+same situation `SecurityRepository` was in before Sprints 010/011.
+`AppDatabase`'s own KDoc had explicitly flagged `TrustedItemEntity` as
+"deliberately NOT here yet," a direct pointer to this sprint.
+
+**Why one sprint this time, not a two-sprint split like Security got:**
+`TrustedItem`'s schema is a single standalone table — no foreign keys, no
+multi-row write needing transactional atomicity. The risk that justified
+splitting Sprint 010/011 (subtle Room relational/transactional mistakes,
+hard to catch without a compiler) doesn't apply at the same scale here.
+See ADR 0025 for the full reasoning — the caution was proportionate to
+actual complexity each time, not a fixed process.
+
+```
+domain's TrustedItemRepository (contract, since Sprint 008)
+   ▲
+   │ @Binds
+TrustedItemRepositoryImpl (core:trusteddata, Sprint 012)
+   │
+   ├─▶ TrustedItemEntityMappers.kt
+   └─▶ TrustedItemDao (core:database — no foreign keys, no transactions)
+```
+
+Unlike `core:securitydata`, this module doesn't depend on Room directly —
+`TrustedItemRepositoryImpl` never calls a Room framework API itself, only
+plain suspend functions on `TrustedItemDao`.
+
+With this sprint, every repository this project has defined now has a
+real implementation: `EnumerationRepository` (004B), `SecurityRepository`
+(011), `TrustedItemRepository` (012). `IsTrustedUseCase` — wired into
+`RunScanRequestUseCase` back in Sprint 009 against
+`FakeTrustedItemRepository` — now runs against real, persisted data for
+the first time, with no `domain` changes required to make that true.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

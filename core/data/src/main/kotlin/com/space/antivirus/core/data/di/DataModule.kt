@@ -10,6 +10,7 @@ import com.space.antivirus.core.database.dao.DetectionDao
 import com.space.antivirus.core.database.dao.ScanSessionDao
 import com.space.antivirus.core.database.dao.ScanStatisticsDao
 import com.space.antivirus.core.database.dao.ThreatDao
+import com.space.antivirus.core.database.dao.TrustedItemDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,22 +34,21 @@ object DataModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "space_antivirus.db")
-            // Sprint 010 bumped the schema version 1 -> 2 (real entities
-            // replacing Sprint 003's PlaceholderEntity — see ADR 0023).
-            // No real Migration object exists yet because this database
-            // has never shipped with actual persisted rows; destructive
-            // migration is the correct, honest choice for a pre-1.0 app
-            // at this stage, not a shortcut around writing one. Revisit
-            // this the moment real user data needs to survive a schema
-            // change.
+            // Sprint 010 bumped 1 -> 2 (scan-history entities); Sprint 012
+            // bumped 2 -> 3 (TrustedItemEntity). See ADR 0023. No real
+            // Migration object exists yet because this database has never
+            // shipped with actual persisted rows; destructive migration is
+            // the correct, honest choice for a pre-1.0 app at this stage,
+            // not a shortcut around writing one. Revisit this the moment
+            // real user data needs to survive a schema change.
             .fallbackToDestructiveMigration()
             .build()
 
-    // Sprint 011: DAOs are provided here (not re-declared in
-    // core:securitydata) so SecurityRepositoryImpl can @Inject them
-    // directly without needing to know how AppDatabase itself is
-    // constructed — the same separation FakeSecurityRepository's tests
-    // already enjoy, just for the real implementation.
+    // Sprint 011: DAOs are provided here (not re-declared in the
+    // repository-implementation modules) so each RepositoryImpl can
+    // @Inject them directly without needing to know how AppDatabase
+    // itself is constructed — the same separation the Fake* test doubles
+    // already enjoy, just for the real implementations.
 
     @Provides
     @Singleton
@@ -65,4 +65,8 @@ object DataModule {
     @Provides
     @Singleton
     fun provideDetectionDao(appDatabase: AppDatabase): DetectionDao = appDatabase.detectionDao()
+
+    @Provides
+    @Singleton
+    fun provideTrustedItemDao(appDatabase: AppDatabase): TrustedItemDao = appDatabase.trustedItemDao()
 }
