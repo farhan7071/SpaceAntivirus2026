@@ -19,6 +19,19 @@ import com.space.antivirus.core.model.AnalysisOutcome
  *
  * This is aggregation policy, not detection policy — it never invents a
  * verdict beyond what the individual analyzers already returned.
+ *
+ * DEDUPLICATION (Sprint 015): concatenated Detections are deduplicated by
+ * exact (threatType, riskLevel, evidenceDescription) match before being
+ * placed into the final Flagged outcome. This does NOT contradict the
+ * "never drop evidence" rule above — that rule is about never discarding
+ * a Detection because a DIFFERENT analyzer disagreed or found something
+ * else; deduplication only ever collapses detections that are, in
+ * substance, saying the exact same thing. Two analyzers independently
+ * reaching an identical conclusion isn't two pieces of evidence, it's one
+ * piece of evidence confirmed twice — showing it as two identical rows
+ * would misrepresent the finding's actual weight, not just look
+ * redundant. The FIRST occurrence's Detection (with its own id and
+ * analyzerId) is kept; later exact duplicates are dropped.
  */
 class AnalysisOutcomeAggregator {
 
@@ -32,9 +45,12 @@ class AnalysisOutcomeAggregator {
 
         val flagged = outcomes.filterIsInstance<AnalysisOutcome.Flagged>()
         if (flagged.isNotEmpty()) {
+            val deduplicatedDetections = flagged
+                .flatMap { it.detections }
+                .distinctBy { Triple(it.threatType, it.riskLevel, it.evidenceDescription) }
             return AnalysisOutcome.Flagged(
                 targetIdentifier = targetIdentifier,
-                detections = flagged.flatMap { it.detections },
+                detections = deduplicatedDetections,
             )
         }
 

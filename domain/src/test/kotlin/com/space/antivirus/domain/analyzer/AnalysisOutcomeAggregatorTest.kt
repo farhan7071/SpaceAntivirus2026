@@ -13,11 +13,11 @@ class AnalysisOutcomeAggregatorTest {
     private val aggregator = AnalysisOutcomeAggregator()
     private val targetId = "com.example.app"
 
-    private fun detection(id: String) = Detection(
+    private fun detection(id: String, evidenceDescription: String = "evidence for $id") = Detection(
         id = id,
         analyzerId = AnalyzerId("test"),
         threatType = ThreatType.UNKNOWN,
-        evidenceDescription = "evidence",
+        evidenceDescription = evidenceDescription,
         riskLevel = RiskLevel.ATTENTION,
     )
 
@@ -72,6 +72,58 @@ class AnalysisOutcomeAggregatorTest {
 
         assertThat(result.reason).contains("reason A")
         assertThat(result.reason).contains("reason B")
+    }
+
+    @Test
+    fun `exact duplicate detections across analyzers are collapsed to one`() {
+        val duplicateEvidence = "matched the same known-bad signature"
+        val first = AnalysisOutcome.Flagged(
+            targetId,
+            listOf(detection("d1", evidenceDescription = duplicateEvidence)),
+        )
+        val second = AnalysisOutcome.Flagged(
+            targetId,
+            listOf(detection("d2", evidenceDescription = duplicateEvidence)),
+        )
+
+        val result = aggregator.aggregate(listOf(first, second)) as AnalysisOutcome.Flagged
+
+        // Two analyzers independently reaching the identical conclusion
+        // isn't two pieces of evidence — it's one piece of evidence
+        // confirmed twice. The first occurrence (d1) is kept.
+        assertThat(result.detections).hasSize(1)
+        assertThat(result.detections.first().id).isEqualTo("d1")
+    }
+
+    @Test
+    fun `detections with different evidence text are never deduplicated, even with the same threatType and riskLevel`() {
+        val first = AnalysisOutcome.Flagged(
+            targetId,
+            listOf(detection("d1", evidenceDescription = "requests SMS access with internet")),
+        )
+        val second = AnalysisOutcome.Flagged(
+            targetId,
+            listOf(detection("d2", evidenceDescription = "requests device admin with internet")),
+        )
+
+        val result = aggregator.aggregate(listOf(first, second)) as AnalysisOutcome.Flagged
+
+        assertThat(result.detections).hasSize(2)
+    }
+
+    @Test
+    fun `deduplication only collapses exact matches, partial overlap in one field is not enough`() {
+        val sameEvidenceDifferentRisk = listOf(
+            detection("d1", evidenceDescription = "shared evidence text").copy(riskLevel = RiskLevel.ATTENTION),
+            detection("d2", evidenceDescription = "shared evidence text").copy(riskLevel = RiskLevel.ACTION_NEEDED),
+        )
+        val result = aggregator.aggregate(
+            listOf(AnalysisOutcome.Flagged(targetId, sameEvidenceDifferentRisk)),
+        ) as AnalysisOutcome.Flagged
+
+        // Same evidence text, but a different risk level — a real
+        // disagreement about severity, not a duplicate; both are kept.
+        assertThat(result.detections).hasSize(2)
     }
 
     @Test

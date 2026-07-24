@@ -562,6 +562,52 @@ five classes touch it. The first time in this project real multi-class
 integration has been verifiable without either a domain-layer fake or a
 full instrumented test.
 
+### The second ThreatAnalyzer, and deduplication (Sprint 015)
+
+`AppIdentityImpersonationAnalyzer` (`core:analysisengine`) evaluates a
+genuinely different risk dimension than Sprint 014's analyzer — identity
+(is this app pretending to be a well-known brand?) rather than
+capability (permission combinations). Flags only an **exact** label
+match against a short, high-confidence list of well-known app names
+combined with a package-name mismatch; both conditions required, both
+conservative by design. Uses `ThreatType.POTENTIALLY_UNWANTED_APPLICATION`,
+distinct from Sprint 014's `SUSPICIOUS_PERMISSION_USAGE`.
+
+`AnalysisOutcomeAggregator` (`domain`, unchanged since Sprint 004C until
+now) gained real deduplication: concatenated `Detection`s are collapsed
+by exact `(threatType, riskLevel, evidenceDescription)` match before
+reaching the final outcome. This does not weaken the aggregator's
+existing "never drop evidence" rule — that rule is about never
+discarding a Detection because a *different* analyzer disagreed;
+deduplication only ever collapses detections saying the exact same thing.
+
+Both analyzers registered via one additional `@Binds`/`@IntoSet` line
+each in the same `AnalysisEngineBindingModule` — zero changes needed to
+`ThreatAnalyzerRegistry`, `AnalyzeScanTargetUseCase`, or
+`AnalyzerExecutor`, exactly the plug-in property those classes were
+designed around since Sprint 004C/006.
+
+```
+RunScanRequestUseCase
+   │
+   ▼
+AnalyzeScanTargetUseCase → registry.analyzersFor(ApplicationTarget)
+   │                              (now returns 2 analyzers)
+   ├─▶ SuspiciousPermissionPatternAnalyzer   ─┐  (concurrent,
+   └─▶ AppIdentityImpersonationAnalyzer      ─┘   fault-isolated)
+         │
+         ▼
+   AnalysisOutcomeAggregator.aggregate()
+         │  concatenate → deduplicate exact matches → Flagged | Clean
+         ▼
+```
+
+See ADR 0028 for the full reasoning, including a real regression this
+sprint's own self-review caught: an existing test fixture that generated
+identical placeholder evidence text across detections would have been
+silently collapsed by the new dedup logic, breaking a load-bearing
+existing test if left unfixed.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

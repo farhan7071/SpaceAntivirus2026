@@ -1,5 +1,6 @@
 package com.space.antivirus.core.analysisengine.di
 
+import com.space.antivirus.core.analysisengine.analyzer.AppIdentityImpersonationAnalyzer
 import com.space.antivirus.core.analysisengine.analyzer.SuspiciousPermissionPatternAnalyzer
 import com.space.antivirus.domain.analyzer.DefaultThreatAnalyzerRegistry
 import com.space.antivirus.domain.analyzer.ThreatAnalyzer
@@ -32,14 +33,12 @@ import dagger.multibindings.Multibinds
  * no way to know an EMPTY set is a legitimate value rather than a missing
  * binding.
  *
- * As of Sprint 014, the Set is no longer empty: SuspiciousPermissionPatternAnalyzer
- * (also in this module, since it's small pure logic with no reason to live
- * anywhere else) contributes via @Binds + @IntoSet below. ADR 0026
- * predicted future analyzers would live in "their own module" — this one
- * didn't need one, and stayed here instead; a genuinely larger or
- * differently-dependent future analyzer can still get its own module
- * later without requiring any change to this one, which is the property
- * that actually mattered.
+ * Two analyzers registered as of Sprint 015, both here for the same
+ * reason ADR 0027 gave for the first: small, pure Kotlin, no reason to
+ * live anywhere else. Phase A's plug-in architecture is holding exactly
+ * as designed — adding the second analyzer required zero changes to
+ * ThreatAnalyzerRegistry, AnalyzeScanTargetUseCase, or AnalyzerExecutor,
+ * only one new @Binds + @IntoSet line here.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -58,5 +57,11 @@ abstract class AnalysisEngineBindingModule {
     @IntoSet
     abstract fun bindSuspiciousPermissionPatternAnalyzer(
         impl: SuspiciousPermissionPatternAnalyzer,
+    ): ThreatAnalyzer
+
+    @Binds
+    @IntoSet
+    abstract fun bindAppIdentityImpersonationAnalyzer(
+        impl: AppIdentityImpersonationAnalyzer,
     ): ThreatAnalyzer
 }

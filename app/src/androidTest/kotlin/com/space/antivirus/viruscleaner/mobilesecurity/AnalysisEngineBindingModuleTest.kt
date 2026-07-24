@@ -24,10 +24,11 @@ import org.junit.runner.RunWith
  * not just that AnalysisEngineBindingModule's @Binds/@Multibinds
  * declarations compile in isolation, but that Hilt's own annotation
  * processor accepts the FULL app graph and successfully injects both
- * types at runtime. Updated in Sprint 014: the analyzer Set is no longer
- * empty now that SuspiciousPermissionPatternAnalyzer is registered, so
- * this test's assertions changed to match — a stale "the set is empty"
- * assertion would have been a real, silent regression if left unfixed.
+ * types at runtime. Updated in Sprint 015: a second analyzer
+ * (AppIdentityImpersonationAnalyzer) joined the registered set, so the
+ * exact-count assertions changed again — same discipline as Sprint 014's
+ * own update to this file, catching a stale assertion before it could
+ * ship as a silent regression.
  *
  * Deliberately does NOT attempt to inject RunScanRequestUseCase or
  * BuildThreatUseCase — those still can't be constructed, since
@@ -57,15 +58,18 @@ class AnalysisEngineBindingModuleTest {
     }
 
     @Test
-    fun threatAnalyzerRegistry_containsTheRealAnalyzerRegisteredInSprint014() {
+    fun threatAnalyzerRegistry_containsBothRealAnalyzers() {
         val analyzers = threatAnalyzerRegistry.allAnalyzers()
 
-        assertThat(analyzers).hasSize(1)
-        assertThat(analyzers.first().id).isEqualTo(AnalyzerId("suspicious-permission-pattern"))
+        assertThat(analyzers).hasSize(2)
+        assertThat(analyzers.map { it.id }).containsExactly(
+            AnalyzerId("suspicious-permission-pattern"),
+            AnalyzerId("app-identity-impersonation"),
+        )
     }
 
     @Test
-    fun threatAnalyzerRegistry_routesTheRealAnalyzerOnlyToApplicationTargets_notFileTargets() {
+    fun threatAnalyzerRegistry_routesBothRealAnalyzersOnlyToApplicationTargets_notFileTargets() {
         val fileTarget = ScanTarget.FileTarget(
             FileMetadata(
                 path = "/downloads/file.txt",
@@ -90,7 +94,7 @@ class AnalysisEngineBindingModuleTest {
         )
 
         assertThat(threatAnalyzerRegistry.analyzersFor(fileTarget)).isEmpty()
-        assertThat(threatAnalyzerRegistry.analyzersFor(applicationTarget)).hasSize(1)
+        assertThat(threatAnalyzerRegistry.analyzersFor(applicationTarget)).hasSize(2)
     }
 
     @Test
