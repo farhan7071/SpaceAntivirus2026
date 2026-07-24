@@ -12,10 +12,15 @@ import javax.inject.Inject
 
 /**
  * Wraps PackageManager — identity/install metadata only. Deliberately
- * does NOT read permissions, certificates, or manifest components; that's
- * analysis, not enumeration, and belongs to a later sprint's analyzers
- * operating on the InstalledApplicationInfo this produces, per Sprint
- * 004B's explicit scope.
+ * does NOT read certificates or manifest components beyond permissions;
+ * that's deeper analysis and belongs to a later sprint's analyzers
+ * operating on the InstalledApplicationInfo this produces.
+ *
+ * Requests PackageManager.GET_PERMISSIONS as of Sprint 014 — added
+ * alongside InstalledApplicationInfo.requestedPermissions when this
+ * project's first ThreatAnalyzer needed real permission data that
+ * neither this class nor that model actually carried before. See ADR
+ * 0027.
  *
  * Requires android.permission.QUERY_ALL_PACKAGES (declared in
  * AndroidManifest.xml as of this sprint). Without it, Android 11+'s
@@ -33,7 +38,9 @@ class InstalledApplicationEnumerator @Inject constructor(
     fun enumerate(): AppResult<List<InstalledApplicationInfo>> {
         val packageManager = context.packageManager
         return try {
-            val packages = packageManager.getInstalledPackages(PackageManager.GET_META_DATA)
+            val packages = packageManager.getInstalledPackages(
+                PackageManager.GET_META_DATA or PackageManager.GET_PERMISSIONS,
+            )
             val apps = packages.mapNotNull { packageInfo ->
                 val appInfo = packageInfo.applicationInfo ?: return@mapNotNull null
                 InstalledApplicationInfo(
@@ -54,6 +61,11 @@ class InstalledApplicationEnumerator @Inject constructor(
                     installedAtEpochMillis = packageInfo.firstInstallTime,
                     isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
                     apkPath = appInfo.sourceDir,
+                    // requestedPermissions is null (not empty) when a
+                    // package declares none at all — normalized to an
+                    // empty list here so nothing downstream needs to
+                    // handle a nullable permissions list.
+                    requestedPermissions = packageInfo.requestedPermissions?.toList() ?: emptyList(),
                 )
             }
             AppResult.Success(apps)

@@ -511,6 +511,57 @@ That copy needs Sprint 002.75's content-governance review (ADR 0016),
 explicitly scoped to a later phase, not absorbed into this sprint as a
 stub. See ADR 0026.
 
+### The first real ThreatAnalyzer (Sprint 014)
+
+Before writing any analyzer code, a real gap was found: `InstalledApplicationInfo`
+(Sprint 004B) carried no permission data at all, despite its own KDoc
+saying permission analysis belonged to "a later sprint's analyzers." Now
+this sprint. Extended (ADR 0027, a 4th breaking model change following
+the same pattern as ADR 0015/0017/0022): `requestedPermissions: List<String>`,
+populated by `InstalledApplicationEnumerator` requesting
+`PackageManager.GET_PERMISSIONS`.
+
+`SuspiciousPermissionPatternAnalyzer` (`core:analysisengine`) flags two
+permission COMBINATIONS, never a single permission alone:
+
+```
+SMS interception:     (READ_SMS or RECEIVE_SMS) + INTERNET
+Device-admin lock:     BIND_DEVICE_ADMIN + INTERNET
+```
+
+Both produce `RiskLevel.ATTENTION`, never `ACTION_NEEDED` — a heuristic
+this coarse shouldn't claim more certainty than it has. System apps are
+excluded entirely before either rule runs, not scored lower — a false
+"malware" flag on a core Android component would be a severe,
+trust-destroying false positive.
+
+Registered via `@Binds @IntoSet` directly in Sprint 013's
+`AnalysisEngineBindingModule` — small enough that it didn't need the
+separate module ADR 0026 predicted future analyzers would live in.
+
+```
+RunScanRequestUseCase (real, since Sprint 007)
+   │
+   ▼
+AnalyzeScanTargetUseCase → ThreatAnalyzerRegistry.analyzersFor(target)
+   │                              (now returns 1 analyzer for
+   │                               ApplicationTarget, 0 for FileTarget)
+   ▼
+AnalyzerExecutor.execute(SuspiciousPermissionPatternAnalyzer, target)
+   │
+   ▼
+AnalysisOutcome.Flagged | Clean   — the first non-Inconclusive real
+                                     results this pipeline has ever
+                                     produced
+```
+
+`AnalysisPipelineIntegrationTest` (`core:analysisengine/src/test`) runs
+the real registry, executor, aggregator, use case, and analyzer together
+as a plain JVM test — no fakes, no Android needed, since none of these
+five classes touch it. The first time in this project real multi-class
+integration has been verifiable without either a domain-layer fake or a
+full instrumented test.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

@@ -29,6 +29,7 @@ class ScanTargetCapabilityTest {
             installedAtEpochMillis = 0L,
             isSystemApp = false,
             apkPath = "/data/app/example.apk",
+            requestedPermissions = emptyList(),
         ),
     )
 

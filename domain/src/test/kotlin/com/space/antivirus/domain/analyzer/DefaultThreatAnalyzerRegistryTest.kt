@@ -33,6 +33,7 @@ class DefaultThreatAnalyzerRegistryTest {
             installedAtEpochMillis = 0L,
             isSystemApp = false,
             apkPath = "/data/app/example.apk",
+            requestedPermissions = emptyList(),
         ),
     )
 
