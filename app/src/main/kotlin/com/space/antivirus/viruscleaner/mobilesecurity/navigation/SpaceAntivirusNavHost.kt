@@ -42,9 +42,12 @@ import com.space.antivirus.feature.settings.SettingsRoute
  * screen inventory that isn't itself a sub-state of another screen.
  *
  * Every route below rendered only a placeholder as of Sprint 003 Task 4
- * ("No feature logic"). Onboarding and Home became real screens in
- * Sprints 018 and 017 respectively (ADR 0030); the rest remain
- * placeholders pending their own Phase C sprints. Deep-link handling for
+ * ("No feature logic"). Real screens landed in: Onboarding (Sprint 018),
+ * Home (Sprint 017), Security Center (Sprint 019), History (Sprint 021,
+ * reached only via Security Center's "View full history" — deliberately
+ * not a 5th bottom-nav tab, see TopLevelDestination's own KDoc). Clean,
+ * Settings, Premium, Notifications, and Real-Time remain placeholders
+ * pending their own Phase C+ sprints. Deep-link handling for
  * notification tap-through (Sprint 002.75 §12) is a later addition once
  * real notifications exist.
  */
@@ -78,7 +81,11 @@ fun SpaceAntivirusNavHost(
                 )
             }
             composable(HomeNavigationRoute) { HomeRoute() }
-            composable(SecurityCenterNavigationRoute) { SecurityCenterRoute() }
+            composable(SecurityCenterNavigationRoute) {
+                SecurityCenterRoute(
+                    onViewHistoryClick = { navController.navigate(HistoryNavigationRoute) },
+                )
+            }
             composable(CleanNavigationRoute) { CleanRoute() }
             composable(SettingsNavigationRoute) { SettingsRoute() }
             composable(PremiumNavigationRoute) { PremiumRoute() }

@@ -4,6 +4,8 @@ import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.designsystem.theme.SpaceAntivirusTheme
 import com.space.antivirus.core.model.RiskLevel
 import org.junit.Rule
@@ -12,17 +14,19 @@ import org.junit.Test
 /**
  * Tests the stateless SecurityCenterScreen directly with hand-built
  * SecurityCenterUiState, same pattern HomeScreenTest/OnboardingScreenTest
- * established (ADR 0030) — no Hilt test infrastructure needed.
+ * established (ADR 0030) — no Hilt test infrastructure needed. Updated in
+ * Sprint 021 for the new onViewHistoryClick callback (History's only
+ * entry point in the real app).
  */
 class SecurityCenterScreenTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    private fun setScreen(uiState: SecurityCenterUiState) {
+    private fun setScreen(uiState: SecurityCenterUiState, onViewHistoryClick: () -> Unit = {}) {
         composeTestRule.setContent {
             SpaceAntivirusTheme {
-                SecurityCenterScreen(uiState = uiState)
+                SecurityCenterScreen(uiState = uiState, onViewHistoryClick = onViewHistoryClick)
             }
         }
     }
@@ -101,5 +105,35 @@ class SecurityCenterScreenTest {
         setScreen(SecurityCenterUiState.Error("Something went wrong"))
 
         composeTestRule.onNodeWithText("Something went wrong").assertExists()
+    }
+
+    @Test
+    fun viewFullHistoryButton_existsRegardlessOfProtectionStatus() {
+        setScreen(
+            SecurityCenterUiState.Loaded(
+                protectionStatus = ProtectionStatus.UNKNOWN,
+                lastScanCompletedAtEpochMillis = null,
+                threats = emptyList(),
+            ),
+        )
+
+        composeTestRule.onNodeWithText("View full history").assertExists()
+    }
+
+    @Test
+    fun tappingViewFullHistory_invokesTheCallback() {
+        var clicked = false
+        setScreen(
+            uiState = SecurityCenterUiState.Loaded(
+                protectionStatus = ProtectionStatus.PROTECTED,
+                lastScanCompletedAtEpochMillis = 2_000L,
+                threats = emptyList(),
+            ),
+            onViewHistoryClick = { clicked = true },
+        )
+
+        composeTestRule.onNodeWithText("View full history").performClick()
+
+        assertThat(clicked).isTrue()
     }
 }

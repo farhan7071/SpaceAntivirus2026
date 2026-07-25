@@ -3,7 +3,9 @@ package com.space.antivirus.feature.security
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -19,6 +21,7 @@ import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.ui.component.AppCard
 import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
+import com.space.antivirus.core.ui.component.AppTextButton
 import com.space.antivirus.core.ui.component.Severity
 import com.space.antivirus.core.ui.component.StatusChip
 
@@ -29,20 +32,32 @@ import com.space.antivirus.core.ui.component.StatusChip
  * confirmed is genuinely part of this project's baseline (non-Extended)
  * Material icon set. No other icon is introduced, per ADR 0031's standing
  * caution about guessing at icon availability without a real compiler.
+ *
+ * Sprint 021: gained onViewHistoryClick — History (feature:history) was
+ * previously unreachable anywhere in the real app (not one of the 4
+ * bottom-nav destinations, nothing else linked to it). This screen is
+ * the natural place for that entry point, reusing the exact same
+ * callback-based navigation pattern already established for onboarding
+ * completion (Sprint 018) rather than inventing something new.
  */
 @Composable
 fun SecurityCenterRoute(
+    onViewHistoryClick: () -> Unit,
     viewModel: SecurityCenterViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    SecurityCenterScreen(uiState = uiState)
+    SecurityCenterScreen(uiState = uiState, onViewHistoryClick = onViewHistoryClick)
 }
 
 @Composable
-fun SecurityCenterScreen(uiState: SecurityCenterUiState, modifier: Modifier = Modifier) {
+fun SecurityCenterScreen(
+    uiState: SecurityCenterUiState,
+    onViewHistoryClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     when (uiState) {
         is SecurityCenterUiState.Loading -> SecurityCenterLoading(modifier)
-        is SecurityCenterUiState.Loaded -> SecurityCenterLoaded(uiState, modifier)
+        is SecurityCenterUiState.Loaded -> SecurityCenterLoaded(uiState, onViewHistoryClick, modifier)
         is SecurityCenterUiState.Error -> SecurityCenterError(uiState, modifier)
     }
 }
@@ -64,28 +79,43 @@ private fun SecurityCenterError(state: SecurityCenterUiState.Error, modifier: Mo
 }
 
 @Composable
-private fun SecurityCenterLoaded(state: SecurityCenterUiState.Loaded, modifier: Modifier = Modifier) {
+private fun SecurityCenterLoaded(
+    state: SecurityCenterUiState.Loaded,
+    onViewHistoryClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val spacing = LocalSpacing.current
 
-    when {
-        state.protectionStatus == ProtectionStatus.UNKNOWN -> AppEmptyState(
-            icon = Icons.Default.Warning,
-            message = "No scan results yet. Run a scan from Home to see your security status here.",
-            modifier = modifier.fillMaxSize(),
-        )
-        state.threats.isEmpty() -> AppEmptyState(
-            icon = Icons.Default.Warning,
-            message = "No threats found. Your last scan didn't detect anything to review.",
-            modifier = modifier.fillMaxSize(),
-        )
-        else -> LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(spacing.medium),
-            verticalArrangement = Arrangement.spacedBy(spacing.medium),
-        ) {
-            items(state.threats) { threat -> ThreatCard(threat) }
+    Column(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.weight(1f)) {
+            when {
+                state.protectionStatus == ProtectionStatus.UNKNOWN -> AppEmptyState(
+                    icon = Icons.Default.Warning,
+                    message = "No scan results yet. Run a scan from Home to see your security status here.",
+                    modifier = Modifier.fillMaxSize(),
+                )
+                state.threats.isEmpty() -> AppEmptyState(
+                    icon = Icons.Default.Warning,
+                    message = "No threats found. Your last scan didn't detect anything to review.",
+                    modifier = Modifier.fillMaxSize(),
+                )
+                else -> LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(spacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(spacing.medium),
+                ) {
+                    items(state.threats) { threat -> ThreatCard(threat) }
+                }
+            }
         }
+        AppTextButton(
+            text = "View full history",
+            onClick = onViewHistoryClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.medium),
+        )
     }
 }
 

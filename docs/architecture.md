@@ -793,6 +793,40 @@ does — three back-to-back `startScan()` calls with no `runCurrent()`
 between them would have silently verified nothing. Fixed by advancing the
 dispatcher explicitly between calls.
 
+### Scan Results / History (Sprint 021)
+
+`feature:history` was still Sprint 003's literal placeholder text — the
+one genuinely unbuilt "results" screen, distinct from Security Center
+(which already shows the *latest* scan's detail). `HistoryViewModel`
+reuses `ObserveScanHistoryUseCase` unmapped: every completed scan, not
+just the first, in the same most-recent-first order Sprint 010's query
+already provides. No new UseCase needed.
+
+A second real gap was found before building anything: History was
+unreachable anywhere in the real app — deliberately not one of the 4
+bottom-nav tabs (`TopLevelDestination`'s own KDoc), and nothing linked to
+it. Fixed with a "View full history" entry point on Security Center,
+reusing the same callback-based navigation pattern already established
+for onboarding completion (Sprint 018) — `onViewHistoryClick` threaded
+through `SecurityCenterRoute`, wired in `SpaceAntivirusNavHost`.
+
+```
+ObserveScanHistoryUseCase() — the same Flow all three screens now share
+   │
+   ├─▶ HomeViewModel          — .firstOrNull(), compact summary
+   ├─▶ SecurityCenterViewModel — .firstOrNull(), full threat detail
+   └─▶ HistoryViewModel        — the full list, every completed scan
+```
+
+A scan completing anywhere in the app is reflected consistently and
+immediately across all three screens with zero additional wiring — a
+direct payoff of the reactive-Flow architecture established since Sprint
+017, not something this sprint had to build specially.
+
+Each History entry shows its own metadata and, for scans with findings,
+every threat inline — no separate detail screen, since History already
+shows everything a detail screen would.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
