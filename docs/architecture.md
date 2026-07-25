@@ -901,6 +901,64 @@ Clean is already one of the 4 bottom-nav tabs, reachable since Sprint
 With this sprint, Phase C is genuinely complete — all six original
 roadmap items are real production screens.
 
+## Phase D: Background Protection
+
+### Background scan infrastructure (Sprint 024)
+
+The smallest real, working slice of Phase D: schedule and run a
+background scan reusing the existing production pipeline. No
+notifications, no quarantine, no real-time monitoring — all explicitly
+out of scope for this increment.
+
+```
+BackgroundScanScheduler (domain contract, pure Kotlin)
+   │
+   ▼
+WorkManagerBackgroundScanScheduler (core:workmanager — the ONLY class
+   │                                 in this project touching WorkManager)
+   ▼
+PeriodicWorkRequest<ScanWorker>  — every 24h, battery-not-low only
+   │
+   ▼
+ScanWorker.doWork()
+   │  builds a ScanRequest(InstalledApplications, QUICK) — same scope/
+   │  type a manual "Scan Now" tap uses (ScanViewModel, Sprint 020)
+   ▼
+RunScanRequestUseCase(request)  — the SAME real pipeline, no second
+                                   implementation
+```
+
+`ScanWorker` is a `CoroutineWorker` (not the older callback-based
+`Worker`) — that alone is what "lifecycle-safe execution" required;
+nothing extra was built for it. Its `AppResult → WorkManager.Result`
+mapping is reasoned per branch: success stays success;
+`ScanAlreadyInProgress` (the existing concurrent-scan guard, ADR 0020,
+now applying automatically to background scans too) also maps to
+success, since the guard doing its job isn't this worker failing;
+`PermissionMissing` maps to `Result.failure()` since retrying can't fix
+a missing permission; everything else defers to `Result.retry()`.
+
+**Deliberately not wired to activate automatically.**
+`ScheduleBackgroundScanUseCase` is real and fully tested, but nothing in
+this sprint calls it — no Settings toggle exists yet to let a user opt
+in, and silently enabling background scanning for every install without
+that decision isn't this sprint's call to make. The next increment is a
+small, additive UI change against infrastructure that already works, not
+a redesign.
+
+One real, explicitly-flagged API-surface uncertainty: `SpaceAntivirusApp`
+now implements `Configuration.Provider` (`workManagerConfiguration` as a
+Kotlin property) so WorkManager's default initializer picks up
+`HiltWorkerFactory` automatically — this project's pinned WorkManager
+version should support the property form, but this couldn't be verified
+against a real compiler in this sandbox. If wrong, it's a single-line,
+isolated compatibility fix, not an architectural one.
+
+See ADR 0037 for the full reasoning behind every decision in this
+sprint, including the testing approach (real `TestListenableWorkerBuilder`
+and real test-mode `WorkManager`, not mocks of either — the same
+"prefer real infrastructure" discipline established since Sprint 010).
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

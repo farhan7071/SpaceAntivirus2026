@@ -29,6 +29,7 @@ dependencies {
     implementation(project(":core:securitydata"))
     implementation(project(":core:trusteddata"))
     implementation(project(":core:analysisengine"))
+    implementation(project(":core:workmanager"))
     implementation(project(":domain"))
 
     implementation(project(":feature:onboarding"))
@@ -47,6 +48,11 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.androidx.profileinstaller)
+    // Sprint 024: SpaceAntivirusApp implements Configuration.Provider,
+    // supplying HiltWorkerFactory so @HiltWorker-annotated workers
+    // (ScanWorker, core:workmanager) can be constructed by Hilt.
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
     // BUGFIX (Sprint 003.5 recovery): TopLevelDestination.kt uses
     // Icons.Filled.Security and Icons.Filled.CleaningServices, which are
     // NOT part of the default material-icons-core set bundled with

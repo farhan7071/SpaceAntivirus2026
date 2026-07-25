@@ -38,6 +38,7 @@ include(":core:enumeration")
 include(":core:securitydata")
 include(":core:trusteddata")
 include(":core:analysisengine")
+include(":core:workmanager")
 
 // Domain — use cases that coordinate one or more core:data repositories.
 // Deliberately has zero Android dependency (pure Kotlin/JVM module).
