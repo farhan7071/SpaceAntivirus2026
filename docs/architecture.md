@@ -719,6 +719,32 @@ today (installed-application permission and identity checks, Sprints
 scanning, real-time monitoring) — no overpromising relative to the real
 pipeline.
 
+### Security Center (Sprint 019)
+
+No new pattern — follows ADR 0030 exactly. Reuses `ObserveScanHistoryUseCase`
+(the same Flow `HomeViewModel` already uses) to surface the *full*
+`Threat` list from the latest scan, not just a count — real titles and
+descriptions from Sprint 016's `ProductionThreatDescriptionProvider`, the
+first screen where a specific finding is actually readable.
+
+Two deliberate content-allocation choices: trusted items are NOT shown
+here (already on Home, no security-specific value in repeating it), and
+`ProtectionStatus` is duplicated rather than shared between
+`feature:home`/`feature:security` — feature modules don't depend on each
+other in this project, and a five-line `when` expression doesn't justify
+a new shared module yet (rule of three).
+
+`RiskLevel` → `Severity` mapping lives in `SecurityCenterScreen.kt`, not
+the ViewModel — `RiskLevel`'s own KDoc already says `core:ui`'s
+`Severity` should map onto it, and keeping the mapping in the Screen
+keeps the ViewModel free of any `core:ui` import.
+
+Same recurring bug caught again during self-review, worth naming as a
+pattern rather than a one-off: every new `stateIn`-based ViewModel test
+needs to explicitly consume the initial `Loading` emission before
+asserting on real state — first documented in ADR 0030, rediscovered and
+fixed here too. See ADR 0032.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
