@@ -866,6 +866,41 @@ Candidates only — nothing in this domain layer deletes a file. That's
 explicitly Clean UI's job, once this layer exists for it to act on. See
 ADR 0035 for the full reasoning.
 
+### Clean screen — genuinely closing Phase C (Sprint 023)
+
+After Sprint 022, verification against current `main` found Phase C
+wasn't actually complete: `feature:clean` was still Sprint 003's literal
+placeholder, and nothing referenced `FindCleanableItemsUseCase` outside
+`domain/`. Confirmed with the user before proceeding rather than assumed
+either way.
+
+`CleanViewModel` is action-triggered, not Flow-combine — same shape as
+`ScanViewModel` (Sprint 020), for the same reason: `FindCleanableItemsUseCase`
+is a one-shot file enumeration, not backed by an ongoing observable Flow
+the way persisted scan history is.
+
+**Display-only, deliberately.** `CleanableItem` was scoped (ADR 0035) as
+candidates only — no delete-capable UseCase or repository method exists
+anywhere in this project. Building a delete button that doesn't delete
+anything would be fake production code; real file deletion is separate,
+future domain work.
+
+```
+FindCleanableItemsUseCase(ScanScope.InternalStorage)  — user-triggered,
+   │                                                      one-shot
+   ▼
+CleanUiState.Loading → Loaded(items, totalSizeBytes) | Error
+```
+
+Fixed to `ScanScope.InternalStorage` for now — the UseCase already takes
+`ScanScope` as a parameter, so scope selection is a future, additive UI
+change, not a redesign. No navigation wiring needed: unlike History,
+Clean is already one of the 4 bottom-nav tabs, reachable since Sprint
+003. See ADR 0036.
+
+With this sprint, Phase C is genuinely complete — all six original
+roadmap items are real production screens.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
