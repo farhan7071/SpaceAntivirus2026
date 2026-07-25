@@ -8,8 +8,10 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.google.common.truth.Truth.assertThat
+import com.space.antivirus.core.common.AppError
 import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.workmanager.worker.ScanWorker
+import com.space.antivirus.domain.repository.BackgroundScanScheduler
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -21,6 +23,14 @@ import org.junit.runner.RunWith
  * mostly just re-assert whatever the mock was told to return, matching
  * how this project has always preferred real infrastructure over
  * fragile mocks for Room/Hilt-graph verification (Sprint 010+).
+ *
+ * Sprint 025: schedulePeriodicScan now requires an explicit
+ * intervalHours argument at every call site here — `scheduler` is typed
+ * as the concrete WorkManagerBackgroundScanScheduler class, and Kotlin
+ * overrides cannot redeclare a default parameter value the interface
+ * declares, so the interface's own default only applies to callers going
+ * through the BackgroundScanScheduler type, not this test's direct
+ * concrete-class reference.
  */
 @RunWith(AndroidJUnit4::class)
 class WorkManagerBackgroundScanSchedulerTest {
@@ -38,7 +48,7 @@ class WorkManagerBackgroundScanSchedulerTest {
 
     @Test
     fun schedulePeriodicScan_enqueuesWorkUnderTheExpectedUniqueName() = runTest {
-        val result = scheduler.schedulePeriodicScan()
+        val result = scheduler.schedulePeriodicScan(BackgroundScanScheduler.DEFAULT_INTERVAL_HOURS)
 
         assertThat(result).isEqualTo(AppResult.Success(Unit))
         val workInfos = WorkManager.getInstance(context)
@@ -50,8 +60,8 @@ class WorkManagerBackgroundScanSchedulerTest {
 
     @Test
     fun schedulePeriodicScan_calledTwice_doesNotDuplicateWork() = runTest {
-        scheduler.schedulePeriodicScan()
-        scheduler.schedulePeriodicScan()
+        scheduler.schedulePeriodicScan(BackgroundScanScheduler.DEFAULT_INTERVAL_HOURS)
+        scheduler.schedulePeriodicScan(BackgroundScanScheduler.DEFAULT_INTERVAL_HOURS)
 
         val workInfos = WorkManager.getInstance(context)
             .getWorkInfosForUniqueWork(ScanWorker.UNIQUE_WORK_NAME)
@@ -62,8 +72,31 @@ class WorkManagerBackgroundScanSchedulerTest {
     }
 
     @Test
+    fun schedulePeriodicScan_withACustomInterval_enqueuesSuccessfully() = runTest {
+        val result = scheduler.schedulePeriodicScan(intervalHours = 6L)
+
+        assertThat(result).isEqualTo(AppResult.Success(Unit))
+        val workInfos = WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork(ScanWorker.UNIQUE_WORK_NAME)
+            .get()
+        assertThat(workInfos).isNotEmpty()
+    }
+
+    @Test
+    fun schedulePeriodicScan_belowTheMinimumInterval_isRejectedWithoutEverCallingWorkManager() = runTest {
+        val result = scheduler.schedulePeriodicScan(intervalHours = 0L)
+
+        assertThat(result).isInstanceOf(AppResult.Failure::class.java)
+        assertThat((result as AppResult.Failure).error).isInstanceOf(AppError.InvalidScheduleConfiguration::class.java)
+        val workInfos = WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork(ScanWorker.UNIQUE_WORK_NAME)
+            .get()
+        assertThat(workInfos).isEmpty()
+    }
+
+    @Test
     fun cancelScheduledScan_removesPreviouslyScheduledWork() = runTest {
-        scheduler.schedulePeriodicScan()
+        scheduler.schedulePeriodicScan(BackgroundScanScheduler.DEFAULT_INTERVAL_HOURS)
 
         val result = scheduler.cancelScheduledScan()
 

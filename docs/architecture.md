@@ -959,6 +959,37 @@ sprint, including the testing approach (real `TestListenableWorkerBuilder`
 and real test-mode `WorkManager`, not mocks of either — the same
 "prefer real infrastructure" discipline established since Sprint 010).
 
+### Configurable scheduling and boot-lifecycle persistence (Sprint 025)
+
+Two real gaps closed, both confirmed against the repository before
+writing code, not assumed. First: `schedulePeriodicScan`'s interval was a
+hardcoded implementation constant — now an explicit `intervalHours`
+parameter (`BackgroundScanScheduler.DEFAULT_INTERVAL_HOURS = 24`,
+`MIN_INTERVAL_HOURS = 1`, validated with a new
+`AppError.InvalidScheduleConfiguration` rather than trusting WorkManager's
+own internal clamping). `ScheduleBackgroundScanUseCase` changed from
+`NoParamsUseCase<Unit>` to `UseCase<Long, Unit>` to carry it. Still
+deliberately not wired to activate — the same "foundation, not
+activation" discipline ADR 0037 established, extended one layer further.
+
+Second: `RECEIVE_BOOT_COMPLETED` is now declared in the manifest — without
+it, a scheduled periodic scan would silently stop firing after any device
+reboot until the user happened to relaunch the app. No custom
+`BroadcastReceiver` was written; WorkManager's own bundled boot-
+rescheduling component (merged automatically from its AAR) handles
+re-registering already-persisted work once the permission is present —
+writing one anyway would have been exactly the "duplicate scheduling
+logic" this sprint's own instructions prohibited.
+
+Also added: `setRequiresStorageNotLow(true)` (general background-work
+hygiene, not specific to scan content) and explicit `setBackoffCriteria`
+(`EXPONENTIAL`, `WorkRequest.MIN_BACKOFF_MILLIS`) — making a previously-
+implicit WorkManager default visible and intentional.
+
+See ADR 0038 for the full reasoning, including confirming directly (not
+assuming) that adding a new `AppError` case couldn't break any existing
+exhaustive `when` in the codebase before doing so.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

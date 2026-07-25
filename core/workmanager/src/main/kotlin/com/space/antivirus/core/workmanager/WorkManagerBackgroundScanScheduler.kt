@@ -1,10 +1,12 @@
 package com.space.antivirus.core.workmanager
 
 import android.content.Context
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.WorkRequest
 import com.space.antivirus.core.common.AppError
 import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.workmanager.worker.ScanWorker
@@ -19,21 +21,29 @@ import javax.inject.Inject
  * "contract in domain, real implementation in its own module" pattern
  * every prior repository has followed since Sprint 004B.
  *
- * SCAN_INTERVAL: once every 24 hours. No product requirement specified a
- * cadence; this is a deliberate, reasonable default for "background
- * protection" — frequent enough to be meaningful, far above WorkManager's
- * hard 15-minute platform minimum so it doesn't behave like an
- * unreasonably aggressive battery/resource consumer for an antivirus
- * app. Not wired to any Settings UI yet (no such screen exists), so this
- * is a fixed constant for now, not a configurable value — a reasonable
- * next increment once Settings exists to expose it.
+ * SCAN_INTERVAL (Sprint 025): now a caller-provided parameter, validated
+ * against BackgroundScanScheduler.MIN_INTERVAL_HOURS, rather than a
+ * hardcoded implementation constant. DEFAULT_INTERVAL_HOURS (still 24,
+ * unchanged from Sprint 024's original value — no product requirement
+ * specified a cadence) lives on the domain interface's companion object
+ * now, not here, since "what the default is" is a contract-level fact
+ * callers need to know, not an implementation detail.
  *
- * CONSTRAINTS: only setRequiresBatteryNotLow(true) — RunScanRequestUseCase's
+ * CONSTRAINTS: setRequiresBatteryNotLow(true) — RunScanRequestUseCase's
  * entire pipeline is on-device (no network calls anywhere in it, Sprints
  * 004B–021), so a network constraint would be an incorrect restriction,
- * not a sensible one. Battery-not-low is the one genuinely relevant
- * constraint for background work that shouldn't run during genuinely low
- * battery.
+ * not a sensible one. setRequiresStorageNotLow(true) added in Sprint 025
+ * — reasonable general hygiene for any background work, not specific to
+ * scan content, since this app also does file enumeration work
+ * (EnumerationRepository) that shouldn't run when storage is already
+ * critically constrained.
+ *
+ * BACKOFF (Sprint 025, made explicit rather than left as an implicit
+ * WorkManager default): EXPONENTIAL starting at WorkRequest.MIN_BACKOFF_MILLIS
+ * — the standard, conservative choice for a background task where a
+ * failure is more likely transient (Result.retry() in ScanWorker is only
+ * reached for failures ADR 0037 judged plausibly self-resolving) than
+ * something that benefits from hammering the retry immediately.
  *
  * ExistingPeriodicWorkPolicy.REPLACE — matches the domain contract's own
  * stated idempotency: re-scheduling replaces rather than duplicates.
@@ -54,23 +64,40 @@ class WorkManagerBackgroundScanScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : BackgroundScanScheduler {
 
-    override suspend fun schedulePeriodicScan(): AppResult<Unit> = try {
-        val constraints = Constraints.Builder()
-            .setRequiresBatteryNotLow(true)
-            .build()
+    override suspend fun schedulePeriodicScan(intervalHours: Long): AppResult<Unit> {
+        if (intervalHours < BackgroundScanScheduler.MIN_INTERVAL_HOURS) {
+            return AppResult.Failure(
+                AppError.InvalidScheduleConfiguration(
+                    "intervalHours must be at least ${BackgroundScanScheduler.MIN_INTERVAL_HOURS}, " +
+                        "got $intervalHours",
+                ),
+            )
+        }
 
-        val request = PeriodicWorkRequestBuilder<ScanWorker>(SCAN_INTERVAL_HOURS, TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .build()
+        return try {
+            val constraints = Constraints.Builder()
+                .setRequiresBatteryNotLow(true)
+                .setRequiresStorageNotLow(true)
+                .build()
 
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            ScanWorker.UNIQUE_WORK_NAME,
-            ExistingPeriodicWorkPolicy.REPLACE,
-            request,
-        )
-        AppResult.Success(Unit)
-    } catch (e: Exception) {
-        AppResult.Failure(AppError.Unexpected(e))
+            val request = PeriodicWorkRequestBuilder<ScanWorker>(intervalHours, TimeUnit.HOURS)
+                .setConstraints(constraints)
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    WorkRequest.MIN_BACKOFF_MILLIS,
+                    TimeUnit.MILLISECONDS,
+                )
+                .build()
+
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                ScanWorker.UNIQUE_WORK_NAME,
+                ExistingPeriodicWorkPolicy.REPLACE,
+                request,
+            )
+            AppResult.Success(Unit)
+        } catch (e: Exception) {
+            AppResult.Failure(AppError.Unexpected(e))
+        }
     }
 
     override suspend fun cancelScheduledScan(): AppResult<Unit> = try {
@@ -78,9 +105,5 @@ class WorkManagerBackgroundScanScheduler @Inject constructor(
         AppResult.Success(Unit)
     } catch (e: Exception) {
         AppResult.Failure(AppError.Unexpected(e))
-    }
-
-    private companion object {
-        const val SCAN_INTERVAL_HOURS = 24L
     }
 }

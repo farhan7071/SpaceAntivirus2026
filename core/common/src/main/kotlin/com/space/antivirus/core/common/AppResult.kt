@@ -24,7 +24,14 @@ sealed interface AppResult<out T> {
  * docs/adr/0013-security-domain-error-cases.md. ScanAlreadyInProgress was
  * added in Sprint 007 — see docs/adr/0020-concurrent-scan-guarding.md.
  * TrustedItemNotFound was added in Sprint 008 — see
- * docs/adr/0021-trusted-item-management.md.
+ * docs/adr/0021-trusted-item-management.md. InvalidScheduleConfiguration
+ * was added in Sprint 025 for BackgroundScanScheduler's now-configurable
+ * interval — see docs/adr/0038-configurable-background-scan-scheduling.md.
+ * Deliberately a distinct case from InvalidScanConfiguration rather than
+ * reused: that case's own name is specifically about a SCAN request, and
+ * stretching it to also mean "an invalid scheduling interval" would
+ * misdescribe what actually went wrong to anything reading the error
+ * category later.
  */
 sealed interface AppError {
     data object Network : AppError
@@ -35,6 +42,7 @@ sealed interface AppError {
     data class InvalidScanConfiguration(val reason: String) : AppError
     data class ScanAlreadyInProgress(val activeSessionId: String) : AppError
     data class TrustedItemNotFound(val itemId: String) : AppError
+    data class InvalidScheduleConfiguration(val reason: String) : AppError
     data class Unexpected(val cause: Throwable? = null) : AppError
 }
 
