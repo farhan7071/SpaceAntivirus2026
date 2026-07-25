@@ -1,6 +1,7 @@
 package com.space.antivirus.domain.analyzer
 
 import com.space.antivirus.core.model.AnalysisOutcome
+import javax.inject.Inject
 
 /**
  * Combines multiple analyzers' outcomes for the SAME target into one
@@ -32,8 +33,18 @@ import com.space.antivirus.core.model.AnalysisOutcome
  * would misrepresent the finding's actual weight, not just look
  * redundant. The FIRST occurrence's Detection (with its own id and
  * analyzerId) is kept; later exact duplicates are dropped.
+ *
+ * The @Inject constructor was missing until Sprint 020's follow-up fix —
+ * AnalyzeScanTargetUseCase has always taken this class as a constructor
+ * parameter, but nothing had ever actually exercised that path through
+ * Hilt's real graph until RunScanRequestUseCase became reachable from a
+ * real ViewModel (Sprint 020, ScanViewModel) for the first time. Same
+ * category of latent gap as HighestSeverityRiskScorer (Sprint 013) and
+ * FileTreeWalker (this same fix) — a class with real callers that had
+ * simply never been constructed by Hilt before something downstream
+ * finally needed the whole graph to resolve.
  */
-class AnalysisOutcomeAggregator {
+class AnalysisOutcomeAggregator @Inject constructor() {
 
     fun aggregate(outcomes: List<AnalysisOutcome>): AnalysisOutcome {
         require(outcomes.isNotEmpty()) { "Cannot aggregate an empty outcome list" }

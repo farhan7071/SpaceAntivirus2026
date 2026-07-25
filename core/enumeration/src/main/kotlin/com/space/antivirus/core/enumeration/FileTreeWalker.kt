@@ -3,6 +3,7 @@ package com.space.antivirus.core.enumeration
 import com.space.antivirus.core.model.EnumerationFilter
 import com.space.antivirus.core.model.FileMetadata
 import java.io.File
+import javax.inject.Inject
 
 /**
  * The actual file-traversal algorithm, deliberately isolated from any
@@ -12,8 +13,18 @@ import java.io.File
  * (resolving WHICH root path a ScanScope means) lives in
  * ScanScopePathResolver instead; this class only knows how to walk a
  * root File it's given.
+ *
+ * The @Inject constructor was missing until Sprint 020's follow-up fix —
+ * EnumerationRepositoryImpl has always taken this class as a constructor
+ * parameter, but nothing had ever actually exercised that path through
+ * Hilt's real graph until RunScanRequestUseCase became reachable from a
+ * real ViewModel (Sprint 020, ScanViewModel) for the first time. Same
+ * category of latent gap as HighestSeverityRiskScorer (Sprint 013) —
+ * a class with real callers that had simply never been constructed by
+ * Hilt before something downstream finally needed the whole graph to
+ * resolve.
  */
-class FileTreeWalker {
+class FileTreeWalker @Inject constructor() {
 
     fun walk(root: File, filter: EnumerationFilter): List<FileMetadata> {
         if (!root.exists()) return emptyList()
