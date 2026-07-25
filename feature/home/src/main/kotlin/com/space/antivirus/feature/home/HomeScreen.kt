@@ -3,9 +3,12 @@ package com.space.antivirus.feature.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -15,10 +18,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
+import com.space.antivirus.core.model.ScanProgress
 import com.space.antivirus.core.ui.component.AppCard
 import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
 import com.space.antivirus.core.ui.component.AppFilledButton
+import com.space.antivirus.core.ui.component.AppLinearProgress
+import com.space.antivirus.core.ui.component.AppTextButton
 import com.space.antivirus.core.ui.component.Severity
 import com.space.antivirus.core.ui.component.StatusChip
 import java.text.DateFormat
@@ -33,23 +39,44 @@ const val HOME_LOADING_TEST_TAG = "home_loading_indicator"
  * stateful/stateless split every remaining feature screen follows:
  * HomeRoute collects ViewModel state (the only place that touches
  * hiltViewModel()/collectAsStateWithLifecycle), HomeScreen is a pure
- * function of HomeUiState with no ViewModel/DI awareness at all — easily
- * previewable, easily UI-tested with a hand-built state, and physically
- * incapable of hiding business logic since it has no way to reach any.
+ * function of HomeUiState (+ ScanUiState as of Sprint 020) with no
+ * ViewModel/DI awareness at all.
+ *
+ * Sprint 020: the Scan Now button becomes real, driven by a SEPARATE
+ * ScanViewModel (ADR 0033) rather than folded into HomeViewModel — active
+ * scan orchestration and passive protection-status observation are
+ * different concerns of the same screen, each independently testable.
+ * Deliberately does NOT show per-threat completion detail here — Security
+ * Center (Sprint 019) already reactively shows that from the same
+ * underlying data this scan persists into; this screen shows only a
+ * brief completion summary.
  */
 @Composable
 fun HomeRoute(
-    viewModel: HomeViewModel = hiltViewModel(),
+    homeViewModel: HomeViewModel = hiltViewModel(),
+    scanViewModel: ScanViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    HomeScreen(uiState = uiState)
+    val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+    val scanState by scanViewModel.uiState.collectAsStateWithLifecycle()
+    HomeScreen(
+        uiState = uiState,
+        scanState = scanState,
+        onScanClick = scanViewModel::startScan,
+        onAcknowledgeScanResult = scanViewModel::acknowledgeResult,
+    )
 }
 
 @Composable
-fun HomeScreen(uiState: HomeUiState, modifier: Modifier = Modifier) {
+fun HomeScreen(
+    uiState: HomeUiState,
+    scanState: ScanUiState,
+    onScanClick: () -> Unit,
+    onAcknowledgeScanResult: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     when (uiState) {
         is HomeUiState.Loading -> HomeLoading(modifier)
-        is HomeUiState.Loaded -> HomeLoaded(uiState, modifier)
+        is HomeUiState.Loaded -> HomeLoaded(uiState, scanState, onScanClick, onAcknowledgeScanResult, modifier)
         is HomeUiState.Error -> HomeError(uiState, modifier)
     }
 }
@@ -75,7 +102,13 @@ private fun HomeError(state: HomeUiState.Error, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun HomeLoaded(state: HomeUiState.Loaded, modifier: Modifier = Modifier) {
+private fun HomeLoaded(
+    state: HomeUiState.Loaded,
+    scanState: ScanUiState,
+    onScanClick: () -> Unit,
+    onAcknowledgeScanResult: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val spacing = LocalSpacing.current
     Column(
         modifier = modifier
@@ -86,15 +119,7 @@ private fun HomeLoaded(state: HomeUiState.Loaded, modifier: Modifier = Modifier)
         ProtectionStatusCard(state.protectionStatus, state.lastScanSummary)
         LastScanCard(state.lastScanSummary)
         TrustedItemsCard(state.trustedItemsCount)
-        AppFilledButton(
-            text = "Scan Now",
-            onClick = {},
-            // Scan execution/progress UI is explicitly out of scope for
-            // this sprint (Phase C, first UI screen) — this is the
-            // "disabled or placeholder action" this sprint's own brief
-            // said was acceptable, not an oversight.
-            enabled = false,
-        )
+        ScanActionSection(scanState, onScanClick, onAcknowledgeScanResult)
     }
 }
 
@@ -146,4 +171,60 @@ private fun TrustedItemsCard(trustedItemsCount: Int) {
         "$trustedItemsCount items trusted"
     }
     AppCard(headline = "Trusted Items", supportingText = supportingText)
+}
+
+@Composable
+private fun ScanActionSection(
+    scanState: ScanUiState,
+    onScanClick: () -> Unit,
+    onAcknowledgeScanResult: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+        when (scanState) {
+            is ScanUiState.Completed -> ScanResultBanner(
+                message = if (scanState.isClean) {
+                    "Scan complete — no threats found (${scanState.itemsScanned} apps checked)."
+                } else {
+                    "Scan complete — ${scanState.threatsFound} item(s) found. " +
+                        "See Security Center for details."
+                },
+                onDismiss = onAcknowledgeScanResult,
+            )
+            is ScanUiState.Error -> ScanResultBanner(message = scanState.message, onDismiss = onAcknowledgeScanResult)
+            else -> Unit
+        }
+
+        if (scanState is ScanUiState.Running) {
+            ScanProgressIndicator(scanState.progress)
+        } else {
+            AppFilledButton(text = "Scan Now", onClick = onScanClick, enabled = true)
+        }
+    }
+}
+
+@Composable
+private fun ScanResultBanner(message: String, onDismiss: () -> Unit) {
+    AppCard(headline = "Scan Result", supportingText = message) {
+        AppTextButton(text = "Dismiss", onClick = onDismiss)
+    }
+}
+
+@Composable
+private fun ScanProgressIndicator(progress: ScanProgress?) {
+    val spacing = LocalSpacing.current
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+        val fraction = if (progress != null && progress.totalItems > 0) {
+            progress.itemsProcessed.toFloat() / progress.totalItems.toFloat()
+        } else {
+            null
+        }
+        AppLinearProgress(progress = fraction, modifier = Modifier.fillMaxWidth())
+        val label = if (progress != null && progress.totalItems > 0) {
+            "Scanning\u2026 ${progress.itemsProcessed} of ${progress.totalItems}"
+        } else {
+            "Starting scan\u2026"
+        }
+        Text(text = label, style = MaterialTheme.typography.labelMedium)
+    }
 }

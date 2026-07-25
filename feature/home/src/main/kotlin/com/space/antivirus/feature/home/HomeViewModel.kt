@@ -32,10 +32,12 @@ import kotlinx.coroutines.flow.stateIn
  * own Flow (updates live the moment a new scan completes while Home is
  * open, not just on next ViewModel creation). See docs/architecture.md.
  *
- * Active-scan-session state is deliberately NOT surfaced yet — this
- * sprint explicitly excludes scan execution/progress UI, so there's
- * nothing yet for that signal to disable or drive; the "Scan Now" entry
- * point is an unconditional placeholder per this sprint's own scope.
+ * Active-scan-session state (whether a scan is CURRENTLY running,
+ * independent of HomeViewModel's own passive observation) is deliberately
+ * NOT surfaced by this ViewModel — that's ScanViewModel's job (Sprint
+ * 020, ADR 0033), a separate ViewModel for the separate concern of active
+ * scan orchestration. HomeViewModel stays focused on passively reflecting
+ * whatever the latest persisted scan history/trusted items say.
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(

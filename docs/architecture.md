@@ -745,6 +745,54 @@ needs to explicitly consume the initial `Loading` emission before
 asserting on real state — first documented in ADR 0030, rediscovered and
 fixed here too. See ADR 0032.
 
+### First scan execution UI (Sprint 020)
+
+A real architectural gap was found and reported before writing any
+bridging code: `RunScanRequestUseCase` doesn't expose the session id it
+creates until the whole scan finishes, but `ObserveScanProgressUseCase`
+needs that id immediately to observe live progress. No existing single
+reactive path connects "start a scan" to "watch its progress."
+
+Bridged, not redesigned: `ScanViewModel` polls `GetActiveScanSessionUseCase`
+(bounded, 50ms × 20 attempts) immediately after triggering the scan,
+switching to `ObserveScanProgressUseCase(id)` once found. Session creation
+is a single early Room insert, so the window is generous. If the poll
+times out, progress observation is skipped and the scan's own result
+still reaches the UI normally — redesigning `RunScanRequestUseCase`'s
+signature (spanning Sprints 005–016, heavily tested) was judged out of
+proportion for one UI sprint. See ADR 0033 for the full reasoning.
+
+```
+ScanViewModel.startScan()
+   │
+   ├─▶ async { RunScanRequestUseCase(request) }  ─────────┐
+   │                                                        │
+   └─▶ launch {                                             │
+         val session = awaitActiveSession()  (bounded poll) │
+         session?.let {                                     │
+           ObserveScanProgressUseCase(it.id).collect { ... }│  (cancelled once
+         }                                                   │   the scan
+       }                                                     │   completes)
+                                                              ▼
+                                                    ScanUiState.Completed
+```
+
+A separate `ScanViewModel`, not folded into `HomeViewModel` — passive
+status observation and active scan orchestration are different concerns.
+No dialog used for progress/results: `AppConfirmDialog` is explicitly
+documented as reserved for blocking confirmations only, never
+informational content — both render inline on Home instead. No
+duplicate results detail either: `ScanUiState.Completed` carries only a
+brief summary; Security Center (Sprint 019) already reactively shows
+full per-threat detail from the same data this scan persists into.
+
+A real test-infrastructure gotcha caught while testing the double-trigger
+guard: `MainDispatcherRule` uses `StandardTestDispatcher`, which does NOT
+run `launch{}` immediately the way production's `Dispatchers.Main.immediate`
+does — three back-to-back `startScan()` calls with no `runCurrent()`
+between them would have silently verified nothing. Fixed by advancing the
+dispatcher explicitly between calls.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
