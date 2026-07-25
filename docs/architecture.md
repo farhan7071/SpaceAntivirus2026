@@ -827,6 +827,45 @@ Each History entry shows its own metadata and, for scans with findings,
 every threat inline — no separate detail screen, since History already
 shows everything a detail screen would.
 
+### Junk-file domain logic — Phase C's last domain gap (Sprint 022)
+
+Before writing any code, current `main` was checked directly against the
+original Phase C roadmap rather than assumed: five of six planned pieces
+were done (under evolved scope/numbering — Home, Onboarding, Security
+Center, Scan Execution, Scan Results/History), but junk-file domain logic
+never existed at all, and `feature:clean` was still Sprint 003's literal
+placeholder. This is that gap.
+
+`FindCleanableItemsUseCase` reuses `EnumerationRepository.enumerateFiles`
+(Sprint 004B) directly — no new repository, no new Hilt module. Genuinely
+separate from `ThreatAnalyzer`/`RunScanRequestUseCase`: a cache file is
+not a security concern, and `CleanableItem`/`CleanableCategory` are new,
+standalone models, not variants of `Threat`/`ThreatType`.
+
+```
+EnumerationRepository.enumerateFiles(scope)  — the same contract
+   │                                            RunScanRequestUseCase's
+   │                                            target resolution uses
+   ▼
+FindCleanableItemsUseCase
+   │  mapNotNull { JunkFileClassifier.classify(file, now) }
+   ▼
+List<CleanableItem>
+```
+
+`JunkFileClassifier` — four conservative, evidence-based rules, same
+discipline as Sprints 014/015's analyzers: `CACHE_FILE` (a `/cache/` path
+segment — safe by Android convention), `TEMPORARY_FILE` (a small closed
+extension set), `LOG_FILE` (`.log`), `LEFTOVER_INSTALLER` (a `.apk` in
+Downloads, unmodified for 24+ hours — the age requirement specifically
+avoids flagging an installer the user just downloaded). `nowEpochMillis`
+is an explicit parameter, never read internally, keeping the age-based
+rule fully deterministic and testable.
+
+Candidates only — nothing in this domain layer deletes a file. That's
+explicitly Clean UI's job, once this layer exists for it to act on. See
+ADR 0035 for the full reasoning.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
