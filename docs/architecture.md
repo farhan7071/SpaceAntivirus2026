@@ -990,6 +990,63 @@ See ADR 0038 for the full reasoning, including confirming directly (not
 assuming) that adding a new `AppError` case couldn't break any existing
 exhaustive `when` in the codebase before doing so.
 
+### Production Settings — exposing background protection (Sprint 026)
+
+Sprints 024–025 built real, fully-tested background scan infrastructure
+that nothing in the app ever called, by deliberate design. Before writing
+code, current `main` was verified directly: Sprint 025 present,
+`feature:settings` still Sprint 003's placeholder, no duplicate
+scheduling anywhere. This is that deliberately-deferred next increment —
+confirmed with zero changes to `core:workmanager`, checked via `git
+status` rather than assumed.
+
+```
+SettingsViewModel
+   │
+   ├─▶ combine(observeEnabled, observeInterval, observeLastScheduledAt,
+   │           transientError) → SettingsUiState.Loaded
+   │
+   ├─ onBackgroundProtectionToggled(enabled) ──▶ ScheduleBackgroundScanUseCase /
+   │                                              CancelBackgroundScanUseCase
+   │                                                  │ on Success only
+   │                                                  ▼
+   │                                          RecordBackgroundProtectionEnabledUseCase /
+   │                                          RecordBackgroundProtectionDisabledUseCase
+   │
+   └─ onIntervalSelected(interval) ──▶ SetScanIntervalUseCase, then
+                                        re-schedules only if currently enabled
+```
+
+**Persist-only-on-confirmed-success, throughout** — every preference
+write happens only after the corresponding scheduler call has already
+succeeded, which is what makes `lastScheduledAtEpochMillis` an honest
+signal rather than an assumption. Chosen specifically to avoid needing a
+live WorkManager query whose exact API availability at this project's
+pinned version couldn't be confidently verified.
+
+`UserPreferencesDataSource` (existing since Sprint 002.75's analytics-
+opt-out foundation, never actually consumed until now) gained three new
+keys; `DataStoreBackgroundProtectionPreferences` (new, `core:data`) is a
+thin domain-contract adapter over it — the first time `core:data`
+implements a domain interface, requiring it to depend on `:domain` for
+the first time too.
+
+Two real, non-obvious testing bugs were found and fixed while writing
+`SettingsViewModelTest` — both worth internalizing for any future
+ViewModel reading its own `uiState.value` synchronously inside an action
+handler:
+1. `.value` on a `stateIn(WhileSubscribed(...))`-backed flow doesn't
+   reflect real data until something actively collects it — reading
+   `.value` alone doesn't subscribe.
+2. Mocked `observe*` Flows are static; calling a separate mocked "write"
+   UseCase never makes them re-emit, so success-path tests need
+   `runCurrent()` + `cancelAndIgnoreRemainingEvents()`, not a further
+   `awaitItem()` that would hang forever.
+
+See ADR 0039 for the full reasoning, including preference persistence
+tested against a real, temp-file-backed `DataStore`
+(`PreferenceDataStoreFactory.create`), not a mock.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
