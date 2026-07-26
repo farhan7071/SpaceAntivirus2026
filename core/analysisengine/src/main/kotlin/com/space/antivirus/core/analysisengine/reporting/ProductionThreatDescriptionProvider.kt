@@ -32,6 +32,7 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
             ThreatType.MALWARE -> "Potential malware detected"
             ThreatType.POTENTIALLY_UNWANTED_APPLICATION -> "Possible app impersonation"
             ThreatType.SUSPICIOUS_PERMISSION_USAGE -> "Unusual permission combination"
+            ThreatType.SUSPICIOUS_APP_CONFIGURATION -> "App configuration worth reviewing"
             ThreatType.UNKNOWN -> "Flagged for review"
         }
 
@@ -53,6 +54,8 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
             "This app may be impersonating a well-known app. Here's why:"
         ThreatType.SUSPICIOUS_PERMISSION_USAGE ->
             "This app requests a permission combination worth reviewing:"
+        ThreatType.SUSPICIOUS_APP_CONFIGURATION ->
+            "Something about how this app is built or installed is worth reviewing:"
         ThreatType.UNKNOWN ->
             "This app was flagged for review based on the following:"
     }
@@ -66,6 +69,10 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
             "This doesn't necessarily mean the app is harmful — many legitimate apps use similar " +
                 "permissions. Consider reviewing whether these permissions make sense for what this " +
                 "app does, and checking your device's app permission settings if you're unsure."
+        ThreatType.SUSPICIOUS_APP_CONFIGURATION ->
+            "These are often legitimate for development, testing, or alternative app stores — " +
+                "consider whether this specific app's configuration makes sense given where and how " +
+                "you got it."
         ThreatType.UNKNOWN ->
             "Consider reviewing this app's details and permissions to decide whether it looks as expected."
     }

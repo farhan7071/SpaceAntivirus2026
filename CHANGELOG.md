@@ -6,6 +6,57 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 027 — Intelligent Threat Detection Engine v2
+
+### Added
+
+- **Six new production threat analyzers** (eight total, up from two):
+  `OverlayPermissionAnalyzer` (SYSTEM_ALERT_WINDOW + INTERNET),
+  `SurveillanceCombinationAnalyzer` (CAMERA + RECORD_AUDIO + INTERNET),
+  `DeviceAdministratorAnalyzer` (standalone device-admin flag),
+  `HighRiskPackageNameAnalyzer` (non-system apps claiming a reserved
+  Android system namespace), `DebuggableApplicationAnalyzer`
+  (release-build debuggable flag), and `UnknownInstallerSourceAnalyzer`
+  (unrecognized install provenance, the most conservative analyzer in
+  the project — LOW confidence by design). Every analyzer produces real,
+  evidence-based findings from actual `PackageManager` data — no demo or
+  hardcoded output.
+- **`Confidence`** (LOW/MODERATE/HIGH), a new axis on `Detection`
+  distinct from `RiskLevel` — how sure an analyzer is about its finding,
+  separate from how severe the finding would be if true.
+- **`CumulativeRiskScorer`**, replacing `HighestSeverityRiskScorer` as
+  the active scoring strategy (which remains in the project as a valid,
+  tested alternative). Two or more independent analyzers each
+  contributing an ATTENTION+/MODERATE+ finding on the same app now
+  escalate that app's overall risk to ACTION_NEEDED — the "Accessibility
+  + Overlay → high confidence, not two unrelated warnings" behavior this
+  sprint asked for, precisely defined and tested at its boundaries.
+- New `ThreatType.SUSPICIOUS_APP_CONFIGURATION` category for findings
+  about how an app is built or installed, distinct from what permissions
+  it requests or who it claims to be.
+- `InstalledApplicationInfo.isDebuggable` and `.installerPackageName`,
+  populated within the existing single `PackageManager` enumeration
+  pass — no new redundant calls introduced.
+
+### Changed
+
+- Duplicate threat elimination required no new merging logic — it's a
+  natural consequence of the per-app aggregation pipeline that has
+  existed since Sprint 004C. Verified directly with a new end-to-end
+  test: an app matching three analyzers at once produces exactly one
+  merged `Threat`, not three.
+- Scan results now naturally vary by device, since they always have —
+  every analyzer operates on the real, installed-app data of the device
+  running the scan. No device-detection logic was added or needed.
+
+See ADR 0041 for full reasoning, including which three of the ten
+candidate analyzers (Accessibility Service abuse, excessive background
+permissions, and VPN applications) were deliberately not attempted this
+sprint — the first and third need manifest-`<service>`-level data
+collection this sprint's scope didn't allow building with real
+confidence; the second was set aside to keep this sprint's scope
+proportionate rather than attempted superficially.
+
 ## Sprint 026.1 — Hotfix
 
 Real-device testing of Sprint 026 (Samsung Galaxy S9+ / Android 9 API 28,

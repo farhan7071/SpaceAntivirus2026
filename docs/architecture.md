@@ -1080,6 +1080,80 @@ why a meaningful automated regression test for this specific ordering
 bug isn't cleanly addable within this project's existing
 `HiltTestRunner`-based instrumented test infrastructure.
 
+## Phase D+: Detection Engine Quality
+
+### Intelligent Threat Detection Engine v2 (Sprint 027)
+
+Six new analyzers (eight total, up from two), a new `Confidence` axis
+distinct from `RiskLevel`, and a real cumulative scoring strategy —
+without redesigning the pipeline the first two analyzers already proved
+out.
+
+**Six new analyzers**, chosen for what could be built with real
+confidence, not to hit the brief's full candidate count of ten. Several
+candidates (Accessibility Service abuse, VPN applications) would need
+manifest-`<service>`-level `PackageManager` inspection this project's
+enumerator doesn't currently collect — deliberately not attempted rather
+than built without confidence:
+
+```
+OverlayPermissionAnalyzer          SYSTEM_ALERT_WINDOW + INTERNET
+SurveillanceCombinationAnalyzer    CAMERA + RECORD_AUDIO + INTERNET
+DeviceAdministratorAnalyzer        BIND_DEVICE_ADMIN standalone (INFO)
+HighRiskPackageNameAnalyzer        non-system app in a reserved namespace
+DebuggableApplicationAnalyzer      FLAG_DEBUGGABLE on a non-system app
+UnknownInstallerSourceAnalyzer     installerPackageName == null (LOW confidence)
+```
+
+The last two needed two new, defaulted `InstalledApplicationInfo` fields
+(`isDebuggable`, `installerPackageName`), populated within the enumerator's
+existing single enumeration loop — no new `PackageManager` call sequence,
+directly satisfying this sprint's performance requirement.
+
+**Duplicate elimination needed no new code.** `RunScanRequestUseCase`
+already resolves one `ScanTarget` per app and aggregates every
+registered analyzer's findings into one `Threat` per app (since Sprint
+004C). Adding six more analyzers means more analyzers contribute to that
+same, already-existing aggregate — confirmed directly, not assumed, by a
+new end-to-end test: an app matching three of the eight analyzers
+simultaneously produces exactly one `Threat` with all three reasons
+merged, through the real production pipeline.
+
+**`Confidence`** (LOW/MODERATE/HIGH) is a new, second axis on `Detection`
+— how sure an analyzer is about its finding, distinct from `RiskLevel`
+(how severe the finding would be if true). Added with a default
+(`MODERATE`), not as a breaking change, per this sprint's explicit
+constraint — `RiskScorer`'s own KDoc (Sprint 004C) had already
+anticipated exactly this addition.
+
+**`CumulativeRiskScorer`** replaces `HighestSeverityRiskScorer` as the
+bound implementation — which stays in the project, unchanged, as a
+genuine alternative (the whole point of `RiskScorer` being an
+interface). The escalation rule, stated precisely: never below the
+highest individual `RiskLevel` present; escalate to `ACTION_NEEDED` only
+when two or more **distinct analyzers** each contribute a detection that
+is **both** at least `ATTENTION` severity **and** at least `MODERATE`
+confidence. Both conditions matter independently — letting either the
+three new INFO-tier analyzers or the LOW-confidence installer-source
+analyzer alone co-sign an escalation would risk exactly the
+"never exaggerate risk" violation this project has avoided since its
+first analyzer.
+
+New `ThreatType.SUSPICIOUS_APP_CONFIGURATION` covers the three
+build/install-provenance findings — confirmed safe to add by finding the
+one exhaustive `when (ThreatType)` in the codebase before adding the
+case, not after.
+
+**Device-specific results and performance were both satisfied by
+construction**, not new logic — every analyzer already operates on real,
+per-device `PackageManager` data, and the enumerator already performs
+exactly one `getInstalledPackages()` call per scan. No device-branching
+or caching layer was added because none was needed.
+
+See ADR 0041 for the full reasoning behind every decision, including
+which three of the ten candidate analyzers were deliberately not
+attempted and why.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

@@ -17,6 +17,16 @@ package com.space.antivirus.core.model
  * integrity gap this project shouldn't silently allow, especially once
  * multiple analyzer types (signature, heuristic, AI, cloud) can all
  * produce Detections against the same target.
+ *
+ * `confidence` was added in Sprint 027 — RiskScorer's own KDoc (Sprint
+ * 004C) had already anticipated this exact addition ("a scoring strategy
+ * that weighs analyzer confidence, once that concept exists"). Unlike
+ * `analyzerId`, this DOES get a default (MODERATE) rather than being a
+ * breaking change — this sprint's own constraints explicitly rule out
+ * introducing breaking architectural changes, and dozens of existing
+ * Detection construction sites across this codebase would otherwise all
+ * need updating for a field most of them have no reason to specify
+ * explicitly. See ADR 0041.
  */
 data class Detection(
     val id: String,
@@ -24,4 +34,5 @@ data class Detection(
     val threatType: ThreatType,
     val evidenceDescription: String,
     val riskLevel: RiskLevel,
+    val confidence: Confidence = Confidence.MODERATE,
 )

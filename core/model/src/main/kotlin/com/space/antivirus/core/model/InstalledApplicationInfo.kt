@@ -15,6 +15,17 @@ package com.space.antivirus.core.model
  * within Phase A's own stated scope (detection capability), not a
  * roadmap-level architectural change — flagged directly rather than
  * worked around. See ADR 0027.
+ *
+ * `isDebuggable` and `installerPackageName` were added in Sprint 027 for
+ * two new analyzers needing them (DebuggableApplicationAnalyzer,
+ * UnknownInstallerSourceAnalyzer). Both default to their "nothing
+ * suspicious" value (false / null) rather than being breaking additions —
+ * this sprint's own constraints explicitly rule out breaking
+ * architectural changes, unlike Sprint 014's requestedPermissions
+ * addition. Both are populated from the SAME single PackageManager
+ * enumeration pass InstalledApplicationEnumerator already performs — no
+ * new PackageManager call sequence, matching this sprint's performance
+ * requirement directly. See ADR 0041.
  */
 data class InstalledApplicationInfo(
     val packageName: String,
@@ -25,6 +36,8 @@ data class InstalledApplicationInfo(
     val isSystemApp: Boolean,
     val apkPath: String,
     val requestedPermissions: List<String>,
+    val isDebuggable: Boolean = false,
+    val installerPackageName: String? = null,
 ) {
     init {
         require(packageName.isNotBlank()) { "packageName cannot be blank" }

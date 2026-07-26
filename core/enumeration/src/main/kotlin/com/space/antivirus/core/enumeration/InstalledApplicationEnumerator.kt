@@ -22,6 +22,19 @@ import javax.inject.Inject
  * neither this class nor that model actually carried before. See ADR
  * 0027.
  *
+ * Sprint 027: also populates isDebuggable (ApplicationInfo.FLAG_DEBUGGABLE,
+ * read from the SAME appInfo already fetched per iteration — no new
+ * PackageManager call) and installerPackageName. The latter uses the
+ * deprecated getInstallerPackageName(String) rather than API 30+'s
+ * getInstallSourceInfo() — this project's minSdk is 26 and targets API
+ * 28 through 35 (ADR 0003, Sprint 026.1's Android-9 verification), and
+ * getInstallerPackageName has been stable and functional since API 1;
+ * it's deprecated, not broken, on every API level this app supports.
+ * Branching for a newer API just to avoid a @Suppress("DEPRECATION")
+ * would add real complexity for zero behavioral benefit within this
+ * app's actual supported range — same reasoning already applied to
+ * versionCode below.
+ *
  * Requires android.permission.QUERY_ALL_PACKAGES (declared in
  * AndroidManifest.xml as of this sprint). Without it, Android 11+'s
  * package-visibility filtering does NOT throw — it silently returns a
@@ -66,6 +79,8 @@ class InstalledApplicationEnumerator @Inject constructor(
                     // empty list here so nothing downstream needs to
                     // handle a nullable permissions list.
                     requestedPermissions = packageInfo.requestedPermissions?.toList() ?: emptyList(),
+                    isDebuggable = (appInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0,
+                    installerPackageName = installerPackageNameFor(packageManager, packageInfo.packageName),
                 )
             }
             AppResult.Success(apps)
@@ -74,5 +89,21 @@ class InstalledApplicationEnumerator @Inject constructor(
             // real-world failure mode is silent filtering, not this catch.
             AppResult.Failure(AppError.PermissionMissing)
         }
+    }
+
+    /**
+     * Best-effort — a small, defensive try/catch of its own, separate
+     * from the outer one. getInstallerPackageName can throw
+     * IllegalArgumentException for a package PackageManager otherwise
+     * happily returned in getInstalledPackages() (a known, documented
+     * edge case for certain system/pseudo packages) — that's a reason to
+     * treat installer provenance as unknown for THAT one package, not a
+     * reason to fail the entire enumeration the outer catch guards.
+     */
+    private fun installerPackageNameFor(packageManager: PackageManager, packageName: String): String? = try {
+        @Suppress("DEPRECATION")
+        packageManager.getInstallerPackageName(packageName)
+    } catch (e: IllegalArgumentException) {
+        null
     }
 }

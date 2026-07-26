@@ -2,7 +2,13 @@ package com.space.antivirus.core.analysisengine
 
 import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.analysisengine.analyzer.AppIdentityImpersonationAnalyzer
+import com.space.antivirus.core.analysisengine.analyzer.DebuggableApplicationAnalyzer
+import com.space.antivirus.core.analysisengine.analyzer.DeviceAdministratorAnalyzer
+import com.space.antivirus.core.analysisengine.analyzer.HighRiskPackageNameAnalyzer
+import com.space.antivirus.core.analysisengine.analyzer.OverlayPermissionAnalyzer
 import com.space.antivirus.core.analysisengine.analyzer.SuspiciousPermissionPatternAnalyzer
+import com.space.antivirus.core.analysisengine.analyzer.SurveillanceCombinationAnalyzer
+import com.space.antivirus.core.analysisengine.analyzer.UnknownInstallerSourceAnalyzer
 import com.space.antivirus.core.analysisengine.reporting.ProductionThreatDescriptionProvider
 import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalysisOutcome
@@ -13,6 +19,7 @@ import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.domain.analyzer.AnalysisOutcomeAggregator
 import com.space.antivirus.domain.analyzer.AnalyzerExecutor
 import com.space.antivirus.domain.analyzer.DefaultThreatAnalyzerRegistry
+import com.space.antivirus.domain.scoring.CumulativeRiskScorer
 import com.space.antivirus.domain.scoring.HighestSeverityRiskScorer
 import com.space.antivirus.domain.usecase.AnalyzeScanTargetUseCase
 import com.space.antivirus.domain.usecase.BuildThreatUseCase
@@ -119,4 +126,75 @@ class ThreatBuildingPipelineIntegrationTest {
             assertThat(threat.description).contains("SMS")
             assertThat(threat.description).contains("impersonating")
         }
+
+    @Test
+    fun `an app triggering three independent Sprint 027 analyzers still produces exactly ONE Threat`() = runTest {
+        // Directly demonstrates this sprint's own worked example (Chrome:
+        // Dangerous Permission / Overlay / Unknown Installer -> one merged
+        // result, not three separate ones): a single app matching
+        // SurveillanceCombinationAnalyzer, OverlayPermissionAnalyzer, and
+        // UnknownInstallerSourceAnalyzer simultaneously, run through the
+        // real, full production pipeline with ALL eight production
+        // analyzers registered — the same registry the real app builds,
+        // not a hand-picked subset.
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val registry = DefaultThreatAnalyzerRegistry(
+            setOf(
+                SuspiciousPermissionPatternAnalyzer(),
+                AppIdentityImpersonationAnalyzer(),
+                OverlayPermissionAnalyzer(),
+                SurveillanceCombinationAnalyzer(),
+                DeviceAdministratorAnalyzer(),
+                HighRiskPackageNameAnalyzer(),
+                DebuggableApplicationAnalyzer(),
+                UnknownInstallerSourceAnalyzer(),
+            ),
+        )
+        val analyzeUseCase =
+            AnalyzeScanTargetUseCase(registry, AnalyzerExecutor(), AnalysisOutcomeAggregator(), dispatcher)
+        val buildThreat = BuildThreatUseCase(CumulativeRiskScorer(), ProductionThreatDescriptionProvider())
+
+        val target = ScanTarget.ApplicationTarget(
+            InstalledApplicationInfo(
+                packageName = "com.example.suspicious",
+                appLabel = "Example",
+                versionName = "1.0",
+                versionCode = 1L,
+                installedAtEpochMillis = 0L,
+                isSystemApp = false,
+                apkPath = "/data/app/example.apk",
+                requestedPermissions = listOf(
+                    "android.permission.CAMERA",
+                    "android.permission.RECORD_AUDIO",
+                    "android.permission.SYSTEM_ALERT_WINDOW",
+                    "android.permission.INTERNET",
+                ),
+                installerPackageName = null,
+            ),
+        )
+
+        val outcome = (analyzeUseCase(target) as AppResult.Success).data as AnalysisOutcome.Flagged
+        val threat = buildThreat(outcome)
+
+        // Exactly one Threat for this app — the merging this sprint asked
+        // for is a natural consequence of the existing per-target
+        // aggregation architecture (ADR 0041), not new merging logic.
+        assertThat(threat.detections).hasSize(3)
+        val analyzerIds = threat.detections.map { it.analyzerId.value }.toSet()
+        assertThat(analyzerIds).containsExactly(
+            "surveillance-permission-combination",
+            "overlay-permission-pattern",
+            "unknown-installer-source",
+        )
+
+        // Two of the three (surveillance, overlay) are ATTENTION+MODERATE
+        // from distinct analyzers — CumulativeRiskScorer escalates.
+        assertThat(threat.riskLevel).isEqualTo(RiskLevel.ACTION_NEEDED)
+
+        // Every reason shows up in the one combined description.
+        assertThat(threat.description).contains("camera")
+        assertThat(threat.description).contains("microphone")
+        assertThat(threat.description).contains("draw over other apps")
+        assertThat(threat.description).contains("unrecognized source")
+    }
 }

@@ -39,6 +39,12 @@ import org.junit.runner.RunWith
  * history. Every previous version of this test deliberately avoided
  * attempting that injection because it would have failed; now it's the
  * whole point of this update.
+ *
+ * Updated again in Sprint 027: six more analyzers joined the registered
+ * set (eight total), and RiskScorer's bound implementation changed from
+ * HighestSeverityRiskScorer to CumulativeRiskScorer — same discipline as
+ * every prior analyzer-count update, catching a stale assertion before
+ * it could ship as a silent regression.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -70,18 +76,24 @@ class AnalysisEngineBindingModuleTest {
     }
 
     @Test
-    fun threatAnalyzerRegistry_containsBothRealAnalyzers() {
+    fun threatAnalyzerRegistry_containsAllEightRealAnalyzers() {
         val analyzers = threatAnalyzerRegistry.allAnalyzers()
 
-        assertThat(analyzers).hasSize(2)
+        assertThat(analyzers).hasSize(8)
         assertThat(analyzers.map { it.id }).containsExactly(
             AnalyzerId("suspicious-permission-pattern"),
             AnalyzerId("app-identity-impersonation"),
+            AnalyzerId("overlay-permission-pattern"),
+            AnalyzerId("surveillance-permission-combination"),
+            AnalyzerId("device-administrator-standalone"),
+            AnalyzerId("high-risk-package-name"),
+            AnalyzerId("debuggable-application"),
+            AnalyzerId("unknown-installer-source"),
         )
     }
 
     @Test
-    fun threatAnalyzerRegistry_routesBothRealAnalyzersOnlyToApplicationTargets_notFileTargets() {
+    fun threatAnalyzerRegistry_routesAllRealAnalyzersOnlyToApplicationTargets_notFileTargets() {
         val fileTarget = ScanTarget.FileTarget(
             FileMetadata(
                 path = "/downloads/file.txt",
@@ -106,7 +118,7 @@ class AnalysisEngineBindingModuleTest {
         )
 
         assertThat(threatAnalyzerRegistry.analyzersFor(fileTarget)).isEmpty()
-        assertThat(threatAnalyzerRegistry.analyzersFor(applicationTarget)).hasSize(2)
+        assertThat(threatAnalyzerRegistry.analyzersFor(applicationTarget)).hasSize(8)
     }
 
     @Test
