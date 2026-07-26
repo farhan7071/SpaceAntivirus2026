@@ -59,6 +59,44 @@
         </activity>
 
         <!--
+          Sprint 026.1 hotfix — root cause of the real-device
+          NoSuchMethodException on ScanWorker's <init>(Context, WorkerParameters):
+          WorkManager's default ContentProvider-based auto-initializer
+          (androidx.startup) runs during ContentProvider.onCreate(), which
+          the Android platform always executes BEFORE Application.onCreate()
+          — and therefore before Hilt has field-injected
+          SpaceAntivirusApp.workerFactory. Reading Configuration.Provider's
+          workManagerConfiguration that early is not guaranteed to see a
+          correctly-initialized HiltWorkerFactory, so WorkManager silently
+          falls back to its own default, non-Hilt-aware WorkerFactory —
+          which only knows how to construct a Worker via the plain
+          2-argument (Context, WorkerParameters) constructor. ScanWorker's
+          real constructor also takes RunScanRequestUseCase, so reflection
+          fails with exactly the reported NoSuchMethodException. This is
+          not an Android-9-specific platform behavior — ContentProvider-
+          before-Application ordering is constant across API levels — it
+          was simply the first device this was exercised on.
+
+          This <meta-data> override disables that default initializer.
+          SpaceAntivirusApp now calls WorkManager.initialize(...) manually
+          from Application.onCreate(), which the Hilt-generated base class
+          always calls AFTER field injection completes — guaranteeing
+          workerFactory is real before WorkManager ever touches it. This
+          is the documented, standard fix for this exact Hilt+WorkManager
+          integration pattern, not a workaround.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
+        <!--
           NOTE for Sprint 004: real-time protection's foreground service
           goes here with an explicit foregroundServiceType (resolving
           Sprint 001 Risk #2 / Sprint 002 §9's specialUse decision) once

@@ -1047,6 +1047,39 @@ See ADR 0039 for the full reasoning, including preference persistence
 tested against a real, temp-file-backed `DataStore`
 (`PreferenceDataStoreFactory.create`), not a mock.
 
+### Sprint 026.1 hotfix — ScanWorker instantiation on real devices
+
+Real-device testing found `ScanWorker` construction throwing
+`NoSuchMethodException` when Background Protection was enabled — not an
+Android 9-specific bug, despite first surfacing there. Root cause, traced
+end to end (Settings toggle → `ScheduleBackgroundScanUseCase` →
+`BackgroundScanScheduler` → WorkManager → its `WorkerFactory` →
+`ScanWorker`'s constructor) before any fix was written: WorkManager's
+default `ContentProvider`-based auto-initializer runs before
+`Application.onCreate()` on every API level — a platform fundamental,
+not something that varies by version — so it could read
+`SpaceAntivirusApp`'s `Configuration.Provider` before Hilt had
+field-injected `HiltWorkerFactory`, silently falling back to
+WorkManager's own non-Hilt-aware default factory.
+
+Fixed with the standard, documented pattern for this exact integration:
+disable the default auto-initializer (manifest `<meta-data>` override)
+and call `WorkManager.initialize(...)` manually, synchronously, in
+`SpaceAntivirusApp.onCreate()` — which Hilt's generated base class always
+runs after field injection completes.
+
+A background-dispatch variant of this fix was drafted (to also address a
+separately-reported startup frame skip) and deliberately reverted: it
+would have raced against WorkManager's own bundled boot-rescheduling
+receiver (`RECEIVE_BOOT_COMPLETED`, Sprint 025), a real correctness risk
+not worth an unverified performance gain. The startup-jank audit
+(`MainActivity`, `SpaceAntivirusApp`, `DataModule`, `OnboardingViewModel`)
+found no other synchronous main-thread work reachable from cold
+launch — see ADR 0040 for the full trace, including an honest account of
+why a meaningful automated regression test for this specific ordering
+bug isn't cleanly addable within this project's existing
+`HiltTestRunner`-based instrumented test infrastructure.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
