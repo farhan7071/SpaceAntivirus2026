@@ -66,4 +66,27 @@ class DeviceAdministratorAnalyzerTest {
         val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
         assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.HIGH)
     }
+
+    @Test
+    fun `device admin plus internet is Clean here - Sprint 028 fix, avoids overlap with the existing combo rule`() =
+        runTest {
+            // SuspiciousPermissionPatternAnalyzer's device-admin+INTERNET
+            // combo rule already covers this exact app, more specifically
+            // and at higher severity — this analyzer firing too would be a
+            // second, redundant finding about the same underlying fact.
+            val result = analyzer.analyze(
+                appTarget(
+                    permissions = listOf("android.permission.BIND_DEVICE_ADMIN", "android.permission.INTERNET"),
+                ),
+            )
+
+            assertThat((result as AppResult.Success).data).isInstanceOf(AnalysisOutcome.Clean::class.java)
+        }
+
+    @Test
+    fun `device admin without internet is still Flagged - this analyzer's own reason to exist`() = runTest {
+        val result = analyzer.analyze(appTarget(permissions = listOf("android.permission.BIND_DEVICE_ADMIN")))
+
+        assertThat((result as AppResult.Success).data).isInstanceOf(AnalysisOutcome.Flagged::class.java)
+    }
 }

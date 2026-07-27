@@ -10,8 +10,8 @@ import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ThreatType
-import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import com.space.antivirus.core.model.identifier
+import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import java.util.UUID
 import javax.inject.Inject
 
@@ -30,6 +30,24 @@ import javax.inject.Inject
  * its own, without any other corroborating signal, this is informational
  * awareness ("here's an app with elevated device control, worth
  * knowing"), not a finding that should read as alarming.
+ *
+ * Sprint 028 fix (real-device report — "some applications generate
+ * multiple repetitive findings"): this analyzer now ALSO excludes apps
+ * that have INTERNET permission, not just the "system app" check it
+ * always had. The original design let this fire independently even when
+ * SuspiciousPermissionPatternAnalyzer's device-admin+INTERNET rule
+ * ALSO fired on the same app — two separate findings about essentially
+ * the same underlying fact (this app has device admin privileges),
+ * described in different words. This analyzer's own reason to exist is
+ * to catch device-admin apps that the COMBO rule can't see (no INTERNET
+ * permission at all); once an app has both device-admin AND INTERNET,
+ * the combo rule already covers it, more specifically and at higher
+ * severity — this analyzer adding a second, overlapping INFO-level
+ * finding on top would be redundant, not additional evidence.
+ * AnalysisOutcomeAggregator's own dedup (Sprint 015) is exact-match only
+ * by design and can't collapse two genuinely differently-worded
+ * detections like these — the fix has to be at the analyzer level, not
+ * the aggregator. See ADR 0042.
  *
  * System apps excluded entirely, same reasoning as every prior analyzer.
  */
@@ -55,7 +73,17 @@ class DeviceAdministratorAnalyzer @Inject constructor() : ThreatAnalyzer {
             return AppResult.Success(AnalysisOutcome.Clean(targetIdentifier))
         }
 
-        if (DEVICE_ADMIN_PERMISSION !in app.requestedPermissions) {
+        val permissions = app.requestedPermissions.toSet()
+        val hasDeviceAdmin = DEVICE_ADMIN_PERMISSION in permissions
+        val hasInternet = INTERNET_PERMISSION in permissions
+
+        if (!hasDeviceAdmin || hasInternet) {
+            // Either no device-admin capability at all, or the app also
+            // has INTERNET — in which case SuspiciousPermissionPatternAnalyzer's
+            // device-admin+INTERNET combo rule already covers this app,
+            // more specifically and at higher severity. Adding a second,
+            // overlapping finding here would be redundant, not additional
+            // evidence.
             return AppResult.Success(AnalysisOutcome.Clean(targetIdentifier))
         }
 
@@ -77,5 +105,6 @@ class DeviceAdministratorAnalyzer @Inject constructor() : ThreatAnalyzer {
 
     private companion object {
         const val DEVICE_ADMIN_PERMISSION = "android.permission.BIND_DEVICE_ADMIN"
+        const val INTERNET_PERMISSION = "android.permission.INTERNET"
     }
 }

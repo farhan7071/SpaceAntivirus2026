@@ -6,6 +6,58 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 028 — Threat Intelligence Refinement & Confidence Engine
+
+Real-device testing of Sprint 027's eight analyzers reported five
+concrete quality issues. This sprint fixes three, adds zero new
+analyzers, and touches nothing outside `core:model`, `core:enumeration`,
+and `core:analysisengine` — no UI, no navigation, no regressions to
+existing analyzers, confidence scoring, severity model, threat
+explanations, scan performance, or the Sprint 027 compile/Windows
+compatibility fixes.
+
+### Fixed
+
+- **`HighRiskPackageNameAnalyzer` false-flagging legitimate Google
+  apps.** `com.google.android.` is no longer treated as a reserved
+  system namespace — many genuine, Play-Store-distributed Google apps
+  (Gmail, YouTube, Maps) use it, and `isSystemApp` (the analyzer's only
+  prior protection) is commonly `false` for exactly these apps once
+  updated via the Play Store. `com.android.` and `android.` remain
+  reserved and continue to work as before.
+- **Repetitive findings on the same app.** `DeviceAdministratorAnalyzer`
+  now also excludes apps with `INTERNET` permission — it was overlapping
+  with `SuspiciousPermissionPatternAnalyzer`'s existing device-admin+
+  INTERNET combo rule (Sprint 014), producing two differently-worded
+  findings about the same underlying fact. This analyzer's own purpose
+  is catching device-admin apps the combo rule can't see; once an app
+  has both permissions, the combo rule already covers it more
+  specifically.
+- **No contextual awareness for expected permission combinations.**
+  `SurveillanceCombinationAnalyzer` now skips apps declaring
+  `ApplicationInfo.CATEGORY_VIDEO` or `CATEGORY_SOCIAL` entirely, rather
+  than flagging them with softened wording — a video-calling app
+  legitimately needing camera+microphone+internet isn't suspicious, and
+  not flagging it is more honest than flagging it with a caveat.
+
+### Added
+
+- `AppCategory`, mapped from `ApplicationInfo.category` (stable since
+  API 26, this project's exact `minSdk`) via its own named constants.
+  `InstalledApplicationInfo.category` defaults to `UNDEFINED`, populated
+  in the existing enumeration pass — no new `PackageManager` call.
+
+### Not changed
+
+- No new analyzers, per the real-device report's own instruction to
+  improve false-positive resistance before adding more.
+  `AppIdentityImpersonationAnalyzer` and `AnalysisOutcomeAggregator`
+  were both reviewed and deliberately left as-is — see ADR 0042 for why.
+
+See ADR 0042 for full reasoning, including independent verification of
+the two "integration fixes" this sprint's brief described as already
+merged, before treating them as baseline.
+
 ## Sprint 027 — Intelligent Threat Detection Engine v2
 
 ### Added

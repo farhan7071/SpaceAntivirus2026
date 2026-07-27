@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import com.space.antivirus.core.common.AppError
 import com.space.antivirus.core.common.AppResult
+import com.space.antivirus.core.model.AppCategory
 import com.space.antivirus.core.model.InstalledApplicationInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -34,6 +35,13 @@ import javax.inject.Inject
  * would add real complexity for zero behavioral benefit within this
  * app's actual supported range — same reasoning already applied to
  * versionCode below.
+ *
+ * Sprint 028: also populates category, from ApplicationInfo.category —
+ * a real, stable Android API since API 26 (this project's exact
+ * minSdk), read from the same appInfo already fetched per iteration, no
+ * new PackageManager call. Mapped via ApplicationInfo's own named
+ * CATEGORY_* constants, not guessed integer values, to eliminate any
+ * risk of an incorrect raw-int mapping.
  *
  * Requires android.permission.QUERY_ALL_PACKAGES (declared in
  * AndroidManifest.xml as of this sprint). Without it, Android 11+'s
@@ -81,6 +89,7 @@ class InstalledApplicationEnumerator @Inject constructor(
                     requestedPermissions = packageInfo.requestedPermissions?.toList() ?: emptyList(),
                     isDebuggable = (appInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0,
                     installerPackageName = installerPackageNameFor(packageManager, packageInfo.packageName),
+                    category = categoryFor(appInfo.category),
                 )
             }
             AppResult.Success(apps)
@@ -105,5 +114,20 @@ class InstalledApplicationEnumerator @Inject constructor(
         packageManager.getInstallerPackageName(packageName)
     } catch (e: IllegalArgumentException) {
         null
+    }
+
+    private fun categoryFor(rawCategory: Int): AppCategory = when (rawCategory) {
+        ApplicationInfo.CATEGORY_GAME -> AppCategory.GAME
+        ApplicationInfo.CATEGORY_AUDIO -> AppCategory.AUDIO
+        ApplicationInfo.CATEGORY_VIDEO -> AppCategory.VIDEO
+        ApplicationInfo.CATEGORY_IMAGE -> AppCategory.IMAGE
+        ApplicationInfo.CATEGORY_SOCIAL -> AppCategory.SOCIAL
+        ApplicationInfo.CATEGORY_NEWS -> AppCategory.NEWS
+        ApplicationInfo.CATEGORY_MAPS -> AppCategory.MAPS
+        ApplicationInfo.CATEGORY_PRODUCTIVITY -> AppCategory.PRODUCTIVITY
+        // CATEGORY_UNDEFINED and anything this project doesn't map both
+        // land here deliberately — an unrecognized value must never be
+        // silently treated as a positively-identified category.
+        else -> AppCategory.UNDEFINED
     }
 }

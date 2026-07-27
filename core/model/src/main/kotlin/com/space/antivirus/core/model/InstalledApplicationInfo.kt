@@ -26,6 +26,11 @@ package com.space.antivirus.core.model
  * enumeration pass InstalledApplicationEnumerator already performs — no
  * new PackageManager call sequence, matching this sprint's performance
  * requirement directly. See ADR 0041.
+ *
+ * `category` was added in Sprint 028 so an analyzer can recognize when a
+ * permission combination is expected for the app's own declared category
+ * (ADR 0042) — same defaulted, non-breaking pattern, same single
+ * enumeration pass, no new PackageManager call.
  */
 data class InstalledApplicationInfo(
     val packageName: String,
@@ -38,6 +43,7 @@ data class InstalledApplicationInfo(
     val requestedPermissions: List<String>,
     val isDebuggable: Boolean = false,
     val installerPackageName: String? = null,
+    val category: AppCategory = AppCategory.UNDEFINED,
 ) {
     init {
         require(packageName.isNotBlank()) { "packageName cannot be blank" }

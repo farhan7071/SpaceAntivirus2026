@@ -54,10 +54,26 @@ class HighRiskPackageNameAnalyzerTest {
     }
 
     @Test
-    fun `the com-google-android namespace is also covered`() = runTest {
-        val result = analyzer.analyze(appTarget(packageName = "com.google.android.fakegmail"))
+    fun `com-google-android is no longer a reserved namespace - Sprint 028 false-positive fix`() = runTest {
+        // Real-device testing found this exact pattern false-flagging
+        // genuine, Play-Store-distributed Google apps (Gmail as
+        // com.google.android.gm, YouTube as com.google.android.youtube) —
+        // isSystemApp=false is completely normal for a Google app once
+        // it's been updated via the Play Store, so the system-app
+        // exclusion this analyzer already had couldn't protect against
+        // exactly the apps most likely to trip this rule.
+        val result = analyzer.analyze(appTarget(packageName = "com.google.android.gm"))
 
-        assertThat((result as AppResult.Success).data).isInstanceOf(AnalysisOutcome.Flagged::class.java)
+        assertThat((result as AppResult.Success).data).isInstanceOf(AnalysisOutcome.Clean::class.java)
+    }
+
+    @Test
+    fun `com-android- and android- remain reserved - the fix removed one namespace, not the whole rule`() = runTest {
+        val comAndroidResult = analyzer.analyze(appTarget(packageName = "com.android.fakeupdate"))
+        val androidResult = analyzer.analyze(appTarget(packageName = "android.fakecomponent"))
+
+        assertThat((comAndroidResult as AppResult.Success).data).isInstanceOf(AnalysisOutcome.Flagged::class.java)
+        assertThat((androidResult as AppResult.Success).data).isInstanceOf(AnalysisOutcome.Flagged::class.java)
     }
 
     @Test

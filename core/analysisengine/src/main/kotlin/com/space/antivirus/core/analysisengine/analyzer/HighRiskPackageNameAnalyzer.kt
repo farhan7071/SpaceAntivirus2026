@@ -10,8 +10,8 @@ import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ThreatType
-import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import com.space.antivirus.core.model.identifier
+import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import java.util.UUID
 import javax.inject.Inject
 
@@ -21,9 +21,9 @@ import javax.inject.Inject
  * within it: that analyzer checks the app's DISPLAY LABEL against a
  * known-brand list; this one checks whether a NON-system app's PACKAGE
  * NAME itself impersonates Android's own reserved system namespaces
- * (com.android.*, android.*, com.google.android.* claimed by a non-
- * system app) — a well-known malware-naming pattern intended to look
- * trustworthy in a package list or permission-grant dialog.
+ * (com.android.*, android.* claimed by a non-system app) — a well-known
+ * malware-naming pattern intended to look trustworthy in a package list
+ * or permission-grant dialog.
  *
  * Deliberately a small, exact-prefix check, not substring/fuzzy matching
  * anywhere in the package name — the same false-positive discipline
@@ -32,10 +32,28 @@ import javax.inject.Inject
  * legitimate; only an exact PREFIX match against these specific reserved
  * namespaces is checked.
  *
- * The isSystemApp exclusion is the load-bearing check here, not just
- * precedent: without it, every genuine system app would trip this rule
- * immediately, since real system apps legitimately live under these
- * exact namespaces.
+ * Sprint 028 fix (real-device false-positive report): "com.google.android."
+ * was removed from the reserved namespace list. It was a genuine mistake
+ * in Sprint 027's original design — that namespace is NOT exclusively
+ * reserved for pre-installed system components the way "com.android."
+ * and "android." are. Many entirely legitimate, Play-Store-distributed
+ * Google apps use it (Gmail as com.google.android.gm, YouTube as
+ * com.google.android.youtube, Maps as com.google.android.apps.maps), and
+ * critically, isSystemApp only reflects whether an APK currently lives
+ * in the read-only system partition — a Google app UPDATED via the Play
+ * Store after first boot commonly becomes isSystemApp=false while still
+ * being completely genuine. The isSystemApp exclusion this analyzer
+ * already had could not protect against that case, since the exact apps
+ * likely to trip this rule were exactly the ones no longer flagged as
+ * system apps. "com.android." and "android." don't have this problem —
+ * Google's own Play Store app-signing policies do not permit ordinary
+ * third-party or even Google-published Play Store apps to use those
+ * specific namespaces, making them a genuinely reliable signal on their
+ * own. See ADR 0042.
+ *
+ * The isSystemApp exclusion remains load-bearing for what's left: real
+ * AOSP/system components legitimately living under com.android./android.
+ * still need it.
  */
 class HighRiskPackageNameAnalyzer @Inject constructor() : ThreatAnalyzer {
 
@@ -80,7 +98,6 @@ class HighRiskPackageNameAnalyzer @Inject constructor() : ThreatAnalyzer {
     private companion object {
         val RESERVED_SYSTEM_NAMESPACES = listOf(
             "com.android.",
-            "com.google.android.",
             "android.",
         )
     }

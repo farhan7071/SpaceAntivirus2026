@@ -1154,6 +1154,53 @@ See ADR 0041 for the full reasoning behind every decision, including
 which three of the ten candidate analyzers were deliberately not
 attempted and why.
 
+### Threat Intelligence Refinement (Sprint 028)
+
+Real-device testing of Sprint 027's eight analyzers reported five
+concrete quality issues — none asking for more coverage. Sprint 028
+fixes three, adds zero new analyzers, per the explicit "improve
+false-positive resistance before introducing additional analyzers"
+instruction. Two prior "integration fixes" claimed as already-merged
+baseline (`ScanTarget.identifier` relocated to `core:model`;
+`FileTreeWalker`'s hidden-file/dot-file exclusion) were verified against
+the real commit history — not accepted at face value — before being
+treated as such.
+
+**`HighRiskPackageNameAnalyzer`** no longer treats `com.google.android.`
+as a reserved namespace. This was a genuine Sprint 027 design mistake:
+many entirely legitimate Google apps (Gmail, YouTube, Maps) use it, and
+`isSystemApp` — the analyzer's only prior protection — is commonly
+`false` for exactly these apps once updated via the Play Store.
+`com.android.` and `android.` remain reserved; Play Store signing policy
+doesn't permit ordinary apps to use those specifically.
+
+**`DeviceAdministratorAnalyzer`** now also excludes apps with `INTERNET`
+permission. The real cause of "repetitive findings": this analyzer and
+`SuspiciousPermissionPatternAnalyzer`'s existing device-admin+INTERNET
+combo rule (Sprint 014) could both fire on the same app. The fix is at
+the analyzer level, not `AnalysisOutcomeAggregator`'s dedup (which stays
+exact-match by design) — this analyzer's whole purpose is catching
+device-admin apps the combo rule can't see, so once an app has both, the
+combo rule already covers it, more specifically and at higher severity.
+
+**`SurveillanceCombinationAnalyzer`** now skips apps declaring
+`ApplicationInfo.CATEGORY_VIDEO` or `CATEGORY_SOCIAL` entirely, rather
+than softening the finding's wording. A video-calling app legitimately
+needing camera+microphone+internet isn't suspicious at all — not
+flagging it is more honest than flagging it with a caveat.
+
+New **`AppCategory`** model, mapped from `ApplicationInfo.category` (a
+real, stable API since API 26, this project's exact `minSdk` — no
+API-level branching needed) via its own named `CATEGORY_*` constants,
+not guessed integers. `InstalledApplicationInfo.category` defaults to
+`UNDEFINED`, populated in the enumerator's existing single enumeration
+pass — no new `PackageManager` call, same non-breaking pattern as Sprint
+027's `isDebuggable`/`installerPackageName`.
+
+`AppIdentityImpersonationAnalyzer` and `AnalysisOutcomeAggregator` were
+both reviewed and deliberately left unchanged — see ADR 0042 for why
+neither needed to move.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
