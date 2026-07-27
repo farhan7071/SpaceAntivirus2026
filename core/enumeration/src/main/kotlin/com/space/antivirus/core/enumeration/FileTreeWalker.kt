@@ -30,9 +30,9 @@ class FileTreeWalker @Inject constructor() {
         if (!root.exists()) return emptyList()
 
         return root.walkTopDown()
-            .onEnter { directory -> filter.includeHiddenFiles || !directory.isHidden }
+            .onEnter { directory -> filter.includeHiddenFiles || (!directory.isHidden && !directory.name.startsWith(".")) }
             .filterNot { it == root } // the scope's own root isn't a scan target, only its contents are
-            .filter { file -> filter.includeHiddenFiles || !file.isHidden }
+            .filter { file -> filter.includeHiddenFiles || (!file.isHidden && !file.name.startsWith(".")) }
             .filterNot { file -> isExcluded(file, filter.excludedPathPrefixes) }
             .filter { file -> matchesSize(file, filter) }
             .map { it.toFileMetadata() }
