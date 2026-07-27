@@ -10,7 +10,7 @@ import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.ScanStatistics
 import com.space.antivirus.core.model.Threat
 import com.space.antivirus.domain.UseCase
-import com.space.antivirus.domain.analyzer.identifier
+import com.space.antivirus.core.model.identifier
 import com.space.antivirus.domain.repository.SecurityRepository
 import javax.inject.Inject
 import kotlin.coroutines.coroutineContext

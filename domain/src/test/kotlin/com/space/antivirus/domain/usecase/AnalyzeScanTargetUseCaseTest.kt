@@ -14,7 +14,7 @@ import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.domain.analyzer.AnalysisOutcomeAggregator
 import com.space.antivirus.domain.analyzer.AnalyzerExecutor
 import com.space.antivirus.domain.analyzer.ThreatAnalyzer
-import com.space.antivirus.domain.analyzer.identifier
+import com.space.antivirus.core.model.identifier
 import com.space.antivirus.domain.fake.FakeThreatAnalyzer
 import com.space.antivirus.domain.fake.FakeThreatAnalyzerRegistry
 import com.space.antivirus.domain.fake.ThrowingThreatAnalyzer

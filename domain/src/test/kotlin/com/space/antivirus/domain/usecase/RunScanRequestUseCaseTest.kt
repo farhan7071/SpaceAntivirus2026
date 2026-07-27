@@ -19,7 +19,7 @@ import com.space.antivirus.core.model.TrustedItemType
 import com.space.antivirus.domain.analyzer.AnalysisOutcomeAggregator
 import com.space.antivirus.domain.analyzer.AnalyzerExecutor
 import com.space.antivirus.domain.analyzer.ThreatAnalyzer
-import com.space.antivirus.domain.analyzer.identifier
+import com.space.antivirus.core.model.identifier
 import com.space.antivirus.domain.fake.DelayingThreatAnalyzer
 import com.space.antivirus.domain.fake.FakeEnumerationRepository
 import com.space.antivirus.domain.fake.FakeSecurityRepository

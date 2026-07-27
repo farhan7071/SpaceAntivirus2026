@@ -9,7 +9,7 @@ import com.space.antivirus.domain.UseCase
 import com.space.antivirus.domain.analyzer.AnalysisOutcomeAggregator
 import com.space.antivirus.domain.analyzer.AnalyzerExecutor
 import com.space.antivirus.domain.analyzer.ThreatAnalyzerRegistry
-import com.space.antivirus.domain.analyzer.identifier
+import com.space.antivirus.core.model.identifier
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async

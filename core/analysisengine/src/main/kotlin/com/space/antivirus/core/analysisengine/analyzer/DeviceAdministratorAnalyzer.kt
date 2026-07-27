@@ -11,7 +11,7 @@ import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.domain.analyzer.ThreatAnalyzer
-import com.space.antivirus.domain.analyzer.identifier
+import com.space.antivirus.core.model.identifier
 import java.util.UUID
 import javax.inject.Inject
 
