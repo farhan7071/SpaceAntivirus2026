@@ -84,10 +84,9 @@ class HighRiskPackageNameAnalyzer @Inject constructor() : ThreatAnalyzer {
             id = UUID.randomUUID().toString(),
             analyzerId = id,
             threatType = ThreatType.POTENTIALLY_UNWANTED_APPLICATION,
-            evidenceDescription = "Package name (${app.packageName}) uses the \"$matchedNamespace\" " +
-                "namespace, normally reserved for genuine Android system components, but this app " +
-                "is not a system app — a pattern commonly associated with malware intentionally " +
-                "named to look trustworthy in a package list.",
+            evidenceDescription = "Package (${app.packageName}) uses the \"$matchedNamespace\" " +
+                "namespace reserved for system apps, but isn't one — a pattern used by malware to " +
+                "look trustworthy.",
             riskLevel = RiskLevel.ATTENTION,
             confidence = Confidence.HIGH,
         )

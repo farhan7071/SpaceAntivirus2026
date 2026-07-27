@@ -65,30 +65,81 @@ class SecurityCenterScreenTest {
     }
 
     @Test
-    fun needsAttentionStatus_rendersEveryThreatsTitleAndDescription() {
+    fun needsAttentionStatus_showsAppIdentityFirst_forEachDifferentApp() {
+        // Sprint 029 root-cause fix, at the rendering layer: two different
+        // apps must be visually distinguishable by name, not just their
+        // shared, generic threatType category.
         setScreen(
             SecurityCenterUiState.Loaded(
                 protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
                 lastScanCompletedAtEpochMillis = 2_000L,
                 threats = listOf(
                     ThreatSummary(
-                        title = "Unusual permission combination",
-                        description = "Requests SMS access together with INTERNET access",
+                        appLabel = "Chrome",
+                        packageName = "com.android.chrome",
                         riskLevel = RiskLevel.ATTENTION,
+                        reasons = listOf("SMS access with INTERNET access"),
+                        recommendation = "Review if unexpected.",
                     ),
                     ThreatSummary(
-                        title = "Possible app impersonation",
-                        description = "Package identity does not match the real app",
+                        appLabel = "WhatsApp",
+                        packageName = "com.definitely.not.whatsapp",
                         riskLevel = RiskLevel.ATTENTION,
+                        reasons = listOf("Package doesn't match the real app"),
+                        recommendation = "Verify the official listing.",
                     ),
                 ),
             ),
         )
 
-        composeTestRule.onNodeWithText("Unusual permission combination").assertExists()
-        composeTestRule.onNodeWithText("Requests SMS access together with INTERNET access").assertExists()
-        composeTestRule.onNodeWithText("Possible app impersonation").assertExists()
-        composeTestRule.onNodeWithText("Package identity does not match the real app").assertExists()
+        composeTestRule.onNodeWithText("Chrome").assertExists()
+        composeTestRule.onNodeWithText("com.android.chrome").assertExists()
+        composeTestRule.onNodeWithText("WhatsApp").assertExists()
+        composeTestRule.onNodeWithText("com.definitely.not.whatsapp").assertExists()
+    }
+
+    @Test
+    fun aThreatWithMultipleReasons_showsEveryReasonAsItsOwnBullet() {
+        setScreen(
+            SecurityCenterUiState.Loaded(
+                protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
+                lastScanCompletedAtEpochMillis = 2_000L,
+                threats = listOf(
+                    ThreatSummary(
+                        appLabel = "Example App",
+                        packageName = "com.example.app",
+                        riskLevel = RiskLevel.ACTION_NEEDED,
+                        reasons = listOf("Overlay reason", "Surveillance reason", "Installer reason"),
+                        recommendation = "Review these findings.",
+                    ),
+                ),
+            ),
+        )
+
+        composeTestRule.onNodeWithText("\u2022 Overlay reason").assertExists()
+        composeTestRule.onNodeWithText("\u2022 Surveillance reason").assertExists()
+        composeTestRule.onNodeWithText("\u2022 Installer reason").assertExists()
+    }
+
+    @Test
+    fun aThreatCard_showsARecommendation() {
+        setScreen(
+            SecurityCenterUiState.Loaded(
+                protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
+                lastScanCompletedAtEpochMillis = 2_000L,
+                threats = listOf(
+                    ThreatSummary(
+                        appLabel = "Example App",
+                        packageName = "com.example.app",
+                        riskLevel = RiskLevel.ATTENTION,
+                        reasons = listOf("Some reason"),
+                        recommendation = "Review if unexpected.",
+                    ),
+                ),
+            ),
+        )
+
+        composeTestRule.onNodeWithText("Review if unexpected.").assertExists()
     }
 
     @Test

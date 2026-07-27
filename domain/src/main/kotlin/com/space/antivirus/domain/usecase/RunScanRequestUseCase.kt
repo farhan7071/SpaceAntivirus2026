@@ -122,7 +122,7 @@ class RunScanRequestUseCase @Inject constructor(
                     when (val outcomeResult = analyzeScanTarget(target)) {
                         is AppResult.Success -> {
                             when (val outcome = outcomeResult.data) {
-                                is AnalysisOutcome.Flagged -> threats += buildThreat(outcome)
+                                is AnalysisOutcome.Flagged -> threats += buildThreat(outcome, target)
                                 is AnalysisOutcome.Inconclusive -> inconclusiveCount++
                                 is AnalysisOutcome.Clean -> Unit
                             }

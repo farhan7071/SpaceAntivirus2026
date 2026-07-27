@@ -61,10 +61,8 @@ class OverlayPermissionAnalyzer @Inject constructor() : ThreatAnalyzer {
             id = UUID.randomUUID().toString(),
             analyzerId = id,
             threatType = ThreatType.SUSPICIOUS_PERMISSION_USAGE,
-            evidenceDescription = "Requests permission to draw over other apps (SYSTEM_ALERT_WINDOW) " +
-                "together with INTERNET access — a pattern commonly associated with overlay-based " +
-                "credential-harvesting apps that display a fake screen over a legitimate one and " +
-                "transmit whatever the user enters.",
+            evidenceDescription = "Can draw over other apps (SYSTEM_ALERT_WINDOW) with INTERNET " +
+                "access — a pattern used by overlay credential-harvesting apps.",
             riskLevel = RiskLevel.ATTENTION,
             confidence = Confidence.MODERATE,
         )

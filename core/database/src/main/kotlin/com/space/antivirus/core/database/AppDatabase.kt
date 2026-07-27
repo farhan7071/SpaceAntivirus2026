@@ -17,11 +17,14 @@ import com.space.antivirus.core.database.entity.TrustedItemEntity
  * Sprint 010 (version 1 -> 2): real scan-history entities land, replacing
  * Sprint 003's PlaceholderEntity. Sprint 012 (version 2 -> 3):
  * TrustedItemEntity added — a single, standalone table with no relation
- * to the scan-history schema. Both bumps pair with
- * fallbackToDestructiveMigration() in core:data's DataModule rather than
- * a real Migration object — see ADR 0023 for why that's the correct,
- * honest choice for a pre-1.0 app with no real persisted rows yet to
- * preserve across either change.
+ * to the scan-history schema. Sprint 029 (version 3 -> 4):
+ * ThreatEntity.appLabel and DetectionEntity.confidence added (ADR 0043) —
+ * a real root-cause fix and a real pre-existing persistence gap found
+ * while investigating a real-device report, not schema churn for its own
+ * sake. All bumps pair with fallbackToDestructiveMigration() in
+ * core:data's DataModule rather than a real Migration object — see ADR
+ * 0023 for why that's the correct, honest choice for a pre-1.0 app with
+ * no real persisted rows yet to preserve across any of these changes.
  *
  * ScanProgress remains deliberately NOT persisted here — see ADR 0023
  * for why it stays an in-memory-only concept even in the real
@@ -35,7 +38,7 @@ import com.space.antivirus.core.database.entity.TrustedItemEntity
         DetectionEntity::class,
         TrustedItemEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

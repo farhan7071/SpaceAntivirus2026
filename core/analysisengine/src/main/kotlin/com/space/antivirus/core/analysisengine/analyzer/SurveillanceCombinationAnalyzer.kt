@@ -80,10 +80,8 @@ class SurveillanceCombinationAnalyzer @Inject constructor() : ThreatAnalyzer {
             id = UUID.randomUUID().toString(),
             analyzerId = id,
             threatType = ThreatType.SUSPICIOUS_PERMISSION_USAGE,
-            evidenceDescription = "Requests camera access, microphone access, and internet access " +
-                "together — the combination needed to record audio and video and transmit it, a " +
-                "pattern worth reviewing on an app you don't recognize as a camera or " +
-                "communication app.",
+            evidenceDescription = "Camera, microphone, and internet access together — can record " +
+                "and transmit media. Expected for camera or communication apps.",
             riskLevel = RiskLevel.ATTENTION,
             confidence = Confidence.MODERATE,
         )

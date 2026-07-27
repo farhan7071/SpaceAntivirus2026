@@ -6,6 +6,7 @@ import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.ScanSessionState
 import com.space.antivirus.core.model.Threat
+import com.space.antivirus.domain.reporting.ThreatDescriptionProvider
 import com.space.antivirus.domain.usecase.ObserveScanHistoryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -33,10 +34,19 @@ import kotlinx.coroutines.flow.stateIn
  * summary already lives on Home, and repeating it here wouldn't add any
  * security-specific value; this screen's distinct purpose is threat
  * detail, not a second home-page.
+ *
+ * Sprint 029: gained ThreatDescriptionProvider as a second dependency —
+ * needed to call recommendationFor(threatType) when building each
+ * ThreatSummary. This is a real, verified root-cause fix (ADR 0043), not
+ * a cosmetic addition: this screen previously showed threat.title (a
+ * generic, threatType-derived category label) as its headline instead of
+ * the app's actual name, and a single long concatenated description
+ * instead of separate evidence bullets — see ThreatSummary's own KDoc.
  */
 @HiltViewModel
 class SecurityCenterViewModel @Inject constructor(
     observeScanHistory: ObserveScanHistoryUseCase,
+    private val descriptionProvider: ThreatDescriptionProvider,
 ) : ViewModel() {
 
     val uiState: StateFlow<SecurityCenterUiState> = observeScanHistory()
@@ -77,9 +87,15 @@ class SecurityCenterViewModel @Inject constructor(
     }
 
     private fun Threat.toSummary(): ThreatSummary = ThreatSummary(
-        title = title,
-        description = description,
+        // Defensive fallback, not expected in practice — every real
+        // Threat since Sprint 029 has appLabel populated by
+        // BuildThreatUseCase. Falling back to the package name rather
+        // than showing a blank headline if it were ever empty.
+        appLabel = appLabel.ifBlank { targetIdentifier },
+        packageName = targetIdentifier,
         riskLevel = riskLevel,
+        reasons = detections.map { it.evidenceDescription },
+        recommendation = descriptionProvider.recommendationFor(threatType),
     )
 
     private companion object {
@@ -111,8 +127,24 @@ enum class ProtectionStatus {
     UNKNOWN,
 }
 
+/**
+ * Sprint 029 (ADR 0043) — restructured for app-identity-first,
+ * evidence-grouped display, replacing the prior (title, description)
+ * shape. `title` was a generic, threatType-derived category label (e.g.
+ * "Unusual permission combination") shown as the card's headline instead
+ * of the app's actual name — when different apps shared a threatType,
+ * they showed identical headline text, indistinguishable from literal
+ * duplication in a list. `description` concatenated every Detection's
+ * full evidence text plus generic lead-in/suggested-action prose into
+ * one long paragraph. `appLabel` is now the headline; `reasons` (one
+ * short line per Detection, unpacked from the same detections list that
+ * always existed) render as separate bullets; `recommendation` is a
+ * short, separate, threatType-derived action line.
+ */
 data class ThreatSummary(
-    val title: String,
-    val description: String,
+    val appLabel: String,
+    val packageName: String,
     val riskLevel: RiskLevel,
+    val reasons: List<String>,
+    val recommendation: String,
 )

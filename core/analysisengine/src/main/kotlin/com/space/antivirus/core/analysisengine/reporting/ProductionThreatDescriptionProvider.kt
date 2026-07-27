@@ -24,6 +24,16 @@ import javax.inject.Inject
  * but `detections` is the full list, and the content-style-guide's
  * always-show-evidence rule requires every piece of it to be visible,
  * not just whichever one happened to drive the headline category.
+ *
+ * Sprint 029: descriptionFor's long-form output is kept as-is
+ * (unchanged behavior, still persisted on Threat.description) rather
+ * than rewritten — the new, restructured report UI (SecurityCenterScreen)
+ * no longer uses it as its primary display; it renders each Detection's
+ * own (now-shortened) evidenceDescription as a bullet, plus this new
+ * recommendationFor(threatType), instead. Removing descriptionFor
+ * entirely would be exactly the kind of large refactor this sprint's own
+ * engineering requirements ask to avoid, for a field with no remaining
+ * caller that actually needs deleting today.
  */
 class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescriptionProvider {
 
@@ -45,6 +55,25 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
         val evidence = detections.joinToString(separator = " ") { it.evidenceDescription }
 
         return "${leadInFor(threatType)} $evidence ${suggestedActionFor(threatType)}"
+    }
+
+    /**
+     * A short, actionable recommendation — 1-2 sentences, not the longer
+     * prose suggestedActionFor produces for descriptionFor's legacy
+     * output. This is what the restructured report UI's "Recommendation"
+     * section actually shows.
+     */
+    override fun recommendationFor(threatType: ThreatType): String = when (threatType) {
+        ThreatType.MALWARE ->
+            "Research this app or remove it if you don't recognize or trust its source."
+        ThreatType.POTENTIALLY_UNWANTED_APPLICATION ->
+            "Verify this app came from the official listing for the brand it names."
+        ThreatType.SUSPICIOUS_PERMISSION_USAGE ->
+            "Often expected for the right kind of app. Review if unexpected."
+        ThreatType.SUSPICIOUS_APP_CONFIGURATION ->
+            "Often normal for development, testing, or alternative app stores."
+        ThreatType.UNKNOWN ->
+            "Review this app's details and permissions if it doesn't look as expected."
     }
 
     private fun leadInFor(threatType: ThreatType): String = when (threatType) {

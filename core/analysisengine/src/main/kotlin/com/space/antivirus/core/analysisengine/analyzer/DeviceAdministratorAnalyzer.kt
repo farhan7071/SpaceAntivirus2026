@@ -91,11 +91,8 @@ class DeviceAdministratorAnalyzer @Inject constructor() : ThreatAnalyzer {
             id = UUID.randomUUID().toString(),
             analyzerId = id,
             threatType = ThreatType.SUSPICIOUS_APP_CONFIGURATION,
-            evidenceDescription = "Holds device administrator privileges (BIND_DEVICE_ADMIN) — this " +
-                "gives the app elevated control over your device (enforcing password rules, remotely " +
-                "wiping data, disabling the camera) and makes it harder to uninstall than a typical " +
-                "app. Common for legitimate enterprise/MDM and some security apps; worth confirming " +
-                "you recognize and trust this one.",
+            evidenceDescription = "Holds device administrator privileges — harder to uninstall, " +
+                "can enforce device-wide policies. Common for MDM and security apps.",
             riskLevel = RiskLevel.INFO,
             confidence = Confidence.HIGH,
         )

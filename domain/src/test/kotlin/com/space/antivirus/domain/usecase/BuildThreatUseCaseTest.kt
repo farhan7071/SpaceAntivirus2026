@@ -4,7 +4,9 @@ import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.model.AnalysisOutcome
 import com.space.antivirus.core.model.AnalyzerId
 import com.space.antivirus.core.model.Detection
+import com.space.antivirus.core.model.InstalledApplicationInfo
 import com.space.antivirus.core.model.RiskLevel
+import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.domain.fake.FakeThreatDescriptionProvider
 import com.space.antivirus.domain.scoring.HighestSeverityRiskScorer
@@ -22,6 +24,19 @@ class BuildThreatUseCaseTest {
         riskLevel = riskLevel,
     )
 
+    private fun appTarget(packageName: String, appLabel: String) = ScanTarget.ApplicationTarget(
+        InstalledApplicationInfo(
+            packageName = packageName,
+            appLabel = appLabel,
+            versionName = "1.0",
+            versionCode = 1L,
+            installedAtEpochMillis = 0L,
+            isSystemApp = false,
+            apkPath = "/data/app/example.apk",
+            requestedPermissions = emptyList(),
+        ),
+    )
+
     @Test
     fun `builds a valid Threat from a Flagged outcome`() {
         val descriptionProvider = FakeThreatDescriptionProvider(
@@ -29,6 +44,7 @@ class BuildThreatUseCaseTest {
             description = "This app requests SMS access unrelated to its stated purpose.",
         )
         val useCase = BuildThreatUseCase(HighestSeverityRiskScorer(), descriptionProvider)
+        val target = appTarget("com.example.suspicious", "Suspicious App")
         val outcome = AnalysisOutcome.Flagged(
             targetIdentifier = "com.example.suspicious",
             detections = listOf(
@@ -36,7 +52,7 @@ class BuildThreatUseCaseTest {
             ),
         )
 
-        val threat = useCase(outcome, nowEpochMillis = 1_000L)
+        val threat = useCase(outcome, target, nowEpochMillis = 1_000L)
 
         assertThat(threat.targetIdentifier).isEqualTo("com.example.suspicious")
         assertThat(threat.riskLevel).isEqualTo(RiskLevel.ATTENTION)
@@ -51,10 +67,27 @@ class BuildThreatUseCaseTest {
     }
 
     @Test
+    fun `appLabel is populated from the target's displayLabel - Sprint 029 root-cause fix`() {
+        // The real fix this test exists for: before Sprint 029, Threat
+        // never carried the app's actual name at all.
+        val useCase = BuildThreatUseCase(HighestSeverityRiskScorer(), FakeThreatDescriptionProvider())
+        val target = appTarget("com.example.suspicious", "Suspicious App")
+        val outcome = AnalysisOutcome.Flagged(
+            targetIdentifier = "com.example.suspicious",
+            detections = listOf(detection(RiskLevel.ATTENTION, ThreatType.UNKNOWN, "d1")),
+        )
+
+        val threat = useCase(outcome, target)
+
+        assertThat(threat.appLabel).isEqualTo("Suspicious App")
+    }
+
+    @Test
     fun `threatType and riskLevel are driven by the highest-severity detection`() {
         val useCase = BuildThreatUseCase(HighestSeverityRiskScorer(), FakeThreatDescriptionProvider())
+        val target = appTarget("com.example.app", "Example")
         val outcome = AnalysisOutcome.Flagged(
-            targetIdentifier = "file.apk",
+            targetIdentifier = "com.example.app",
             detections = listOf(
                 detection(RiskLevel.INFO, ThreatType.UNKNOWN, "low"),
                 detection(RiskLevel.ACTION_NEEDED, ThreatType.MALWARE, "high"),
@@ -62,7 +95,7 @@ class BuildThreatUseCaseTest {
             ),
         )
 
-        val threat = useCase(outcome)
+        val threat = useCase(outcome, target)
 
         assertThat(threat.riskLevel).isEqualTo(RiskLevel.ACTION_NEEDED)
         assertThat(threat.threatType).isEqualTo(ThreatType.MALWARE)
@@ -72,10 +105,11 @@ class BuildThreatUseCaseTest {
     fun `description provider receives the same threatType and detections used to build the Threat`() {
         val descriptionProvider = FakeThreatDescriptionProvider()
         val useCase = BuildThreatUseCase(HighestSeverityRiskScorer(), descriptionProvider)
+        val target = appTarget("com.example.app", "Example")
         val detections = listOf(detection(RiskLevel.ACTION_NEEDED, ThreatType.MALWARE, "d1"))
-        val outcome = AnalysisOutcome.Flagged(targetIdentifier = "file.apk", detections = detections)
+        val outcome = AnalysisOutcome.Flagged(targetIdentifier = "com.example.app", detections = detections)
 
-        val threat = useCase(outcome)
+        val threat = useCase(outcome, target)
 
         assertThat(descriptionProvider.lastTitleRequestArgs).isEqualTo(ThreatType.MALWARE to detections)
         assertThat(descriptionProvider.lastDescriptionRequestArgs).isEqualTo(ThreatType.MALWARE to detections)
@@ -85,13 +119,14 @@ class BuildThreatUseCaseTest {
     @Test
     fun `generates a unique id per call`() {
         val useCase = BuildThreatUseCase(HighestSeverityRiskScorer(), FakeThreatDescriptionProvider())
+        val target = appTarget("com.example.app", "Example")
         val outcome = AnalysisOutcome.Flagged(
-            targetIdentifier = "file.apk",
+            targetIdentifier = "com.example.app",
             detections = listOf(detection(RiskLevel.ATTENTION, ThreatType.UNKNOWN, "d1")),
         )
 
-        val first = useCase(outcome)
-        val second = useCase(outcome)
+        val first = useCase(outcome, target)
+        val second = useCase(outcome, target)
 
         assertThat(first.id).isNotEqualTo(second.id)
     }

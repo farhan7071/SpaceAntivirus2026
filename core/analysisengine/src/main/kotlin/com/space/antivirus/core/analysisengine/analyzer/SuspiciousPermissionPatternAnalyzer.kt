@@ -85,8 +85,7 @@ class SuspiciousPermissionPatternAnalyzer @Inject constructor() : ThreatAnalyzer
                 id = UUID.randomUUID().toString(),
                 analyzerId = id,
                 threatType = ThreatType.SUSPICIOUS_PERMISSION_USAGE,
-                evidenceDescription = "Requests SMS access (READ_SMS or RECEIVE_SMS) together with " +
-                    "INTERNET access — a permission combination commonly associated with " +
+                evidenceDescription = "SMS access with INTERNET access — a pattern linked to " +
                     "SMS-intercepting malware.",
                 riskLevel = RiskLevel.ATTENTION,
             )
@@ -97,9 +96,8 @@ class SuspiciousPermissionPatternAnalyzer @Inject constructor() : ThreatAnalyzer
                 id = UUID.randomUUID().toString(),
                 analyzerId = id,
                 threatType = ThreatType.SUSPICIOUS_PERMISSION_USAGE,
-                evidenceDescription = "Requests device administrator privileges (BIND_DEVICE_ADMIN) " +
-                    "together with INTERNET access — a permission combination commonly associated " +
-                    "with ransomware and removal-resistant lock-screen malware.",
+                evidenceDescription = "Requests device administrator privileges with INTERNET " +
+                    "access — a pattern linked to ransomware and lock-screen malware.",
                 riskLevel = RiskLevel.ATTENTION,
             )
         }

@@ -55,10 +55,8 @@ class DebuggableApplicationAnalyzer @Inject constructor() : ThreatAnalyzer {
             id = UUID.randomUUID().toString(),
             analyzerId = id,
             threatType = ThreatType.SUSPICIOUS_APP_CONFIGURATION,
-            evidenceDescription = "Built as debuggable — a debugger can attach to this app while " +
-                "it's running and inspect or modify its data. Normal for apps still in " +
-                "development or testing; a finished app you downloaded normally shouldn't be " +
-                "shipped this way.",
+            evidenceDescription = "Built as debuggable — a debugger can attach and inspect its " +
+                "data. Normal for apps still in development or testing.",
             riskLevel = RiskLevel.INFO,
             confidence = Confidence.HIGH,
         )

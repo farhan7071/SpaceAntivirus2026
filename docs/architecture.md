@@ -1201,6 +1201,51 @@ pass — no new `PackageManager` call, same non-breaking pattern as Sprint
 both reviewed and deliberately left unchanged — see ADR 0042 for why
 neither needed to move.
 
+### Report quality and deduplication (Sprint 029)
+
+Real-device testing reported the scan report looking like the same app
+appeared multiple times. Traced through every layer before writing any
+fix, not assumed: `AnalysisOutcomeAggregator`, `RunScanRequestUseCase`'s
+scan loop, Room persistence, and repository reconstruction all already
+correctly produce exactly one `Threat` per app per scan (proven directly
+with an end-to-end test since Sprint 027). The actual cause: `Threat`
+never carried the app's display name — `ThreatCard` showed
+`threat.title` (a generic, `threatType`-derived category label) as its
+headline instead, so different apps sharing a `threatType` showed
+identical headline text, visually indistinguishable from duplication.
+
+```
+BuildThreatUseCase(outcome, target)  — target added Sprint 029
+   │  target.displayLabel (new ScanTarget extension, parallel to identifier)
+   ▼
+Threat.appLabel  — the missing identity field
+   │
+   ▼
+SecurityCenterScreen.ThreatCard: appLabel (headline) → packageName →
+   risk chip → Evidence (one bullet per Detection.evidenceDescription,
+   now shortened) → Recommendation (new, threatType-derived, NOT
+   persisted — recomputed from the already-persisted threatType)
+```
+
+Every analyzer's evidence text was shortened to 1-2 sentences; every
+existing test's required substring was checked against the exact
+resulting string, not assumed preserved. A second, separate,
+pre-existing bug was found and fixed while extending this exact Room
+schema: `Detection.confidence` (Sprint 027) was never actually
+persisted — `DetectionEntity` had no column for it, so it silently reset
+to its default on every read. Schema version 3→4, using this project's
+existing `fallbackToDestructiveMigration()` policy (ADR 0023) — no new
+Migration object needed.
+
+`feature:history` was deliberately left with its own old, separate
+`ThreatSummary`-equivalent type, unchanged — a real, valuable, but
+distinct future effort, not silently dropped.
+
+See ADR 0043 for full reasoning, including a process note about a real
+mistake made and corrected during this sprint's own implementation: a
+stale local clone initially led to Sprint 028's fixes being incorrectly
+assumed missing.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

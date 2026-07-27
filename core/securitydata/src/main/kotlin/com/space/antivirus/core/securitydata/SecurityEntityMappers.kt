@@ -5,6 +5,7 @@ import com.space.antivirus.core.database.entity.ScanSessionEntity
 import com.space.antivirus.core.database.entity.ScanStatisticsEntity
 import com.space.antivirus.core.database.entity.ThreatEntity
 import com.space.antivirus.core.model.AnalyzerId
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanSession
@@ -66,6 +67,7 @@ fun Threat.toEntity(sessionId: String): ThreatEntity = ThreatEntity(
     title = title,
     description = description,
     discoveredAtEpochMillis = discoveredAtEpochMillis,
+    appLabel = appLabel,
 )
 
 /** Detections live in their own table (ADR 0023) — a ThreatEntity alone
@@ -81,6 +83,7 @@ fun ThreatEntity.toDomain(detections: List<Detection>): Threat = Threat(
     description = description,
     detections = detections,
     discoveredAtEpochMillis = discoveredAtEpochMillis,
+    appLabel = appLabel,
 )
 
 fun Detection.toEntity(threatId: String): DetectionEntity = DetectionEntity(
@@ -90,6 +93,7 @@ fun Detection.toEntity(threatId: String): DetectionEntity = DetectionEntity(
     threatType = threatType.name,
     evidenceDescription = evidenceDescription,
     riskLevel = riskLevel.name,
+    confidence = confidence.name,
 )
 
 fun DetectionEntity.toDomain(): Detection = Detection(
@@ -98,4 +102,5 @@ fun DetectionEntity.toDomain(): Detection = Detection(
     threatType = ThreatType.valueOf(threatType),
     evidenceDescription = evidenceDescription,
     riskLevel = RiskLevel.valueOf(riskLevel),
+    confidence = Confidence.valueOf(confidence),
 )

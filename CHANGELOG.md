@@ -6,6 +6,48 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 029 — Report Quality & Deduplication
+
+Real-device testing reported the scan report looking harder to read than
+Sprint 027's despite better detection logic. Traced to the actual root
+cause before any fix was written: `Threat` never carried the app's
+display name, so different apps sharing a generic finding category
+looked identical in the list — not literal duplication, which the
+architecture already prevented (verified directly, not assumed).
+
+### Fixed
+
+- **Apps indistinguishable in the report.** `Threat.appLabel` is now a
+  real field, populated end to end from the app's actual name. Scan
+  report cards now show the application's name and package before any
+  explanation.
+- **Verbose, repetitive explanations.** Every analyzer's evidence text
+  shortened to 1-2 concise sentences. The report now shows one short
+  bullet per finding instead of one long concatenated paragraph.
+- **No clear recommendation.** New `ThreatDescriptionProvider.recommendationFor()`
+  — a short, separate, actionable line per finding category, shown in
+  its own section.
+- **A second, real, pre-existing bug found while extending this exact
+  schema:** `Detection.confidence` (Sprint 027) was never actually
+  persisted to Room — silently reset to its default on every read.
+  Fixed alongside the main work.
+
+### Changed
+
+- `SecurityCenterScreen`'s report cards restructured: application
+  identity first, then risk, then evidence (as bullets), then
+  recommendation — replacing one long paragraph per finding.
+- Room schema version 3→4 (`ThreatEntity.appLabel`,
+  `DetectionEntity.confidence`), using this project's existing
+  destructive-migration policy for its pre-1.0 state.
+
+### Not changed
+
+- `feature:history` retains its own separate, older report layout for
+  now — a real, deferred next step, not a silent gap.
+
+See ADR 0043 for full reasoning.
+
 ## Sprint 028 — Threat Intelligence Refinement & Confidence Engine
 
 Real-device testing of Sprint 027's eight analyzers reported five

@@ -14,6 +14,17 @@ import androidx.room.PrimaryKey
  * be exactly the kind of shortcut this project avoids. CASCADE delete
  * from ThreatEntity: a detection never outlives the threat it's evidence
  * for.
+ *
+ * confidence added Sprint 029 — a real, pre-existing gap found while
+ * extending this exact schema for another reason: Detection.confidence
+ * was added to the domain model in Sprint 027 but this entity was never
+ * updated to persist it, so it silently reverted to its default
+ * (MODERATE) on every read from the database, regardless of what an
+ * analyzer actually set. Not yet user-visible (nothing currently
+ * displays confidence directly, and RiskLevel — which IS persisted
+ * directly on ThreatEntity — is computed once at scan time, not
+ * recomputed from reconstituted Detections on read), but a genuine data-
+ * integrity gap worth closing while already here. See ADR 0043.
  */
 @Entity(
     tableName = "detections",
@@ -34,4 +45,5 @@ data class DetectionEntity(
     val threatType: String,
     val evidenceDescription: String,
     val riskLevel: String,
+    val confidence: String,
 )

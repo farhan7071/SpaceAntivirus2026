@@ -1,7 +1,9 @@
 package com.space.antivirus.domain.usecase
 
 import com.space.antivirus.core.model.AnalysisOutcome
+import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.Threat
+import com.space.antivirus.core.model.displayLabel
 import com.space.antivirus.domain.reporting.ThreatDescriptionProvider
 import com.space.antivirus.domain.scoring.RiskScorer
 import java.util.UUID
@@ -27,6 +29,15 @@ import javax.inject.Inject
  * to categorization instead of severity. riskLevel itself comes from the
  * injected RiskScorer, not computed locally, so swapping the scoring
  * strategy (ADR 0015) automatically changes this too.
+ *
+ * Sprint 029: gained a `target` parameter, used only to populate
+ * Threat.appLabel via ScanTarget.displayLabel — the real root-cause fix
+ * for a genuine identity gap (ADR 0043). `outcome.targetIdentifier` and
+ * `target.identifier` are always the same String (the caller — always
+ * RunScanRequestUseCase — builds outcome by analyzing this exact
+ * target), so this parameter carries no new correctness risk of a
+ * mismatch; it exists purely to reach displayLabel, which
+ * targetIdentifier alone can't provide.
  */
 class BuildThreatUseCase @Inject constructor(
     private val riskScorer: RiskScorer,
@@ -34,6 +45,7 @@ class BuildThreatUseCase @Inject constructor(
 ) {
     operator fun invoke(
         outcome: AnalysisOutcome.Flagged,
+        target: ScanTarget,
         nowEpochMillis: Long = System.currentTimeMillis(),
     ): Threat {
         val drivingDetection = outcome.detections.maxBy { it.riskLevel }
@@ -48,6 +60,7 @@ class BuildThreatUseCase @Inject constructor(
             description = descriptionProvider.descriptionFor(threatType, outcome.detections),
             detections = outcome.detections,
             discoveredAtEpochMillis = nowEpochMillis,
+            appLabel = target.displayLabel,
         )
     }
 }

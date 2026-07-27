@@ -61,10 +61,8 @@ class UnknownInstallerSourceAnalyzer @Inject constructor() : ThreatAnalyzer {
             id = UUID.randomUUID().toString(),
             analyzerId = id,
             threatType = ThreatType.SUSPICIOUS_APP_CONFIGURATION,
-            evidenceDescription = "Installed from an unrecognized source — no installer app (like " +
-                "an app store) is associated with this install. Common for sideloaded APKs, " +
-                "alternative app stores, or developer testing, and not on its own a sign of a " +
-                "problem — just useful context if you don't remember installing this app.",
+            evidenceDescription = "Installed from an unrecognized source. Common for sideloaded " +
+                "APKs or alternative app stores.",
             riskLevel = RiskLevel.INFO,
             confidence = Confidence.LOW,
         )

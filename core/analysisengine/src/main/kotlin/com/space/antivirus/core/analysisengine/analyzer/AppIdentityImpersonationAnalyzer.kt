@@ -84,10 +84,8 @@ class AppIdentityImpersonationAnalyzer @Inject constructor() : ThreatAnalyzer {
             id = UUID.randomUUID().toString(),
             analyzerId = id,
             threatType = ThreatType.POTENTIALLY_UNWANTED_APPLICATION,
-            evidenceDescription = "App is labeled \"${app.appLabel}\", matching a well-known app name, " +
-                "but its package identity (${app.packageName}) does not match that app's real, " +
-                "official package (${expectedPackageName}) — a pattern commonly associated with " +
-                "apps impersonating a trusted brand.",
+            evidenceDescription = "Labeled \"${app.appLabel}\" but package (${app.packageName}) " +
+                "doesn't match ${expectedPackageName} — a pattern used by apps impersonating this brand.",
             riskLevel = RiskLevel.ATTENTION,
         )
 

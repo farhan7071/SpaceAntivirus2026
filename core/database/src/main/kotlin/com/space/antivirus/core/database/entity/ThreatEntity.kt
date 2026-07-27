@@ -9,6 +9,8 @@ import androidx.room.PrimaryKey
  * Room persistence for Threat (core:model, Sprint 004A/004C). Many
  * threats per session — CASCADE delete so removing a session (or
  * clearing history) doesn't leave orphaned threat rows.
+ *
+ * appLabel added Sprint 029 (ADR 0043) — see Threat's own KDoc for why.
  */
 @Entity(
     tableName = "threats",
@@ -31,4 +33,5 @@ data class ThreatEntity(
     val title: String,
     val description: String,
     val discoveredAtEpochMillis: Long,
+    val appLabel: String,
 )

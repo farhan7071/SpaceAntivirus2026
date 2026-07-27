@@ -80,20 +80,20 @@ class ThreatBuildingPipelineIntegrationTest {
         val analyzeUseCase =
             AnalyzeScanTargetUseCase(registry, AnalyzerExecutor(), AnalysisOutcomeAggregator(), dispatcher)
         val buildThreat = BuildThreatUseCase(HighestSeverityRiskScorer(), ProductionThreatDescriptionProvider())
+        val target = appTarget(permissions = listOf("android.permission.READ_SMS", "android.permission.INTERNET"))
 
-        val outcome = (
-            analyzeUseCase(
-                appTarget(permissions = listOf("android.permission.READ_SMS", "android.permission.INTERNET")),
-            ) as AppResult.Success
-            ).data as AnalysisOutcome.Flagged
+        val outcome = (analyzeUseCase(target) as AppResult.Success).data as AnalysisOutcome.Flagged
 
-        val threat = buildThreat(outcome)
+        val threat = buildThreat(outcome, target)
 
         assertThat(threat.title).isEqualTo("Unusual permission combination")
         assertThat(threat.description).contains("SMS")
         assertThat(threat.description).contains("INTERNET")
         assertThat(threat.riskLevel).isEqualTo(RiskLevel.ATTENTION)
         assertThat(threat.threatType).isEqualTo(ThreatType.SUSPICIOUS_PERMISSION_USAGE)
+        // Sprint 029 root-cause fix, verified end to end through the real
+        // production pipeline, not just BuildThreatUseCaseTest's isolation.
+        assertThat(threat.appLabel).isEqualTo("Example")
     }
 
     @Test
@@ -106,18 +106,15 @@ class ThreatBuildingPipelineIntegrationTest {
             val analyzeUseCase =
                 AnalyzeScanTargetUseCase(registry, AnalyzerExecutor(), AnalysisOutcomeAggregator(), dispatcher)
             val buildThreat = BuildThreatUseCase(HighestSeverityRiskScorer(), ProductionThreatDescriptionProvider())
+            val target = appTarget(
+                appLabel = "WhatsApp",
+                packageName = "com.definitely.not.whatsapp",
+                permissions = listOf("android.permission.READ_SMS", "android.permission.INTERNET"),
+            )
 
-            val outcome = (
-                analyzeUseCase(
-                    appTarget(
-                        appLabel = "WhatsApp",
-                        packageName = "com.definitely.not.whatsapp",
-                        permissions = listOf("android.permission.READ_SMS", "android.permission.INTERNET"),
-                    ),
-                ) as AppResult.Success
-                ).data as AnalysisOutcome.Flagged
+            val outcome = (analyzeUseCase(target) as AppResult.Success).data as AnalysisOutcome.Flagged
 
-            val threat = buildThreat(outcome)
+            val threat = buildThreat(outcome, target)
 
             // One Threat, but both analyzers' evidence must be visible in
             // its description — the always-show-evidence rule doesn't stop
@@ -125,6 +122,9 @@ class ThreatBuildingPipelineIntegrationTest {
             assertThat(threat.detections).hasSize(2)
             assertThat(threat.description).contains("SMS")
             assertThat(threat.description).contains("impersonating")
+            // Sprint 029 root-cause fix: appLabel is the app's real name,
+            // not the (deliberately fake, for this test) package name.
+            assertThat(threat.appLabel).isEqualTo("WhatsApp")
         }
 
     @Test
@@ -174,7 +174,7 @@ class ThreatBuildingPipelineIntegrationTest {
         )
 
         val outcome = (analyzeUseCase(target) as AppResult.Success).data as AnalysisOutcome.Flagged
-        val threat = buildThreat(outcome)
+        val threat = buildThreat(outcome, target)
 
         // Exactly one Threat for this app — the merging this sprint asked
         // for is a natural consequence of the existing per-target
@@ -196,5 +196,12 @@ class ThreatBuildingPipelineIntegrationTest {
         assertThat(threat.description).contains("microphone")
         assertThat(threat.description).contains("draw over other apps")
         assertThat(threat.description).contains("unrecognized source")
+
+        // Sprint 029 root-cause fix, end to end: this Threat's identity
+        // is the app's real name, not just its generic threatType-derived
+        // title — this is what makes three different apps sharing a
+        // threatType distinguishable in a report, instead of looking like
+        // the same finding repeated.
+        assertThat(threat.appLabel).isEqualTo("Example")
     }
 }

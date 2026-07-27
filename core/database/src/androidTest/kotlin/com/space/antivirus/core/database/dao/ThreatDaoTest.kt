@@ -54,6 +54,7 @@ class ThreatDaoTest {
         title = "Test threat",
         description = "Test description",
         discoveredAtEpochMillis = 0L,
+        appLabel = "Example App",
     )
 
     @Test

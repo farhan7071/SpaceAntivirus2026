@@ -57,6 +57,7 @@ class DetectionDaoTest {
                     title = "Test threat",
                     description = "Test description",
                     discoveredAtEpochMillis = 0L,
+                    appLabel = "Example App",
                 ),
             ),
         )
@@ -69,6 +70,7 @@ class DetectionDaoTest {
         threatType = "MALWARE",
         evidenceDescription = "matched a known-bad signature",
         riskLevel = "ACTION_NEEDED",
+        confidence = "HIGH",
     )
 
     @Test
