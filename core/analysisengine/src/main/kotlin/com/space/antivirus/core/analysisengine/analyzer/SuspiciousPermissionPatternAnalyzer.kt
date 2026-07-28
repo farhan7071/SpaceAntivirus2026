@@ -5,12 +5,14 @@ import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalysisOutcome
 import com.space.antivirus.core.model.AnalyzerCapability
 import com.space.antivirus.core.model.AnalyzerId
+import com.space.antivirus.core.model.AppCategory
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ThreatType
-import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import com.space.antivirus.core.model.identifier
+import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import java.util.UUID
 import javax.inject.Inject
 
@@ -52,6 +54,19 @@ import javax.inject.Inject
  * definition in this threat model, and a false "malware" flag on a core
  * Android system component would be a severe, trust-destroying false
  * positive, exactly the failure mode this analyzer is designed to avoid.
+ *
+ * Sprint 031 (ADR 0045): confidence is no longer a flat MODERATE for
+ * either rule — both now go through ConfidenceModulation, which lowers
+ * confidence one tier when the app was installed from a known app store
+ * or (for the SMS rule specifically) declares AppCategory.SOCIAL, the
+ * category messaging apps most plausibly declare. The device-admin rule
+ * has no comparably reliable "consistent category" — Android's own
+ * category taxonomy has no MDM/enterprise-management category to check
+ * against — so only installer trust applies there. RiskLevel itself is
+ * unchanged; CumulativeRiskScorer's existing "MODERATE+ confidence
+ * required to co-escalate" rule (unchanged, ADR 0041) is what actually
+ * benefits from this — a downgraded LOW-confidence finding simply can't
+ * contribute toward escalating a Threat to ACTION_NEEDED anymore.
  */
 class SuspiciousPermissionPatternAnalyzer @Inject constructor() : ThreatAnalyzer {
 
@@ -88,6 +103,11 @@ class SuspiciousPermissionPatternAnalyzer @Inject constructor() : ThreatAnalyzer
                 evidenceDescription = "SMS access with INTERNET access — a pattern linked to " +
                     "SMS-intercepting malware.",
                 riskLevel = RiskLevel.ATTENTION,
+                confidence = ConfidenceModulation.modulate(
+                    base = Confidence.MODERATE,
+                    app = app,
+                    categoryIsConsistent = app.category == AppCategory.SOCIAL,
+                ),
             )
         }
 
@@ -99,6 +119,11 @@ class SuspiciousPermissionPatternAnalyzer @Inject constructor() : ThreatAnalyzer
                 evidenceDescription = "Requests device administrator privileges with INTERNET " +
                     "access — a pattern linked to ransomware and lock-screen malware.",
                 riskLevel = RiskLevel.ATTENTION,
+                confidence = ConfidenceModulation.modulate(
+                    base = Confidence.MODERATE,
+                    app = app,
+                    categoryIsConsistent = false,
+                ),
             )
         }
 

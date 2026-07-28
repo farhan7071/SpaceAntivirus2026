@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalysisOutcome
 import com.space.antivirus.core.model.AppCategory
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.InstalledApplicationInfo
 import com.space.antivirus.core.model.ScanTarget
 import kotlinx.coroutines.test.runTest
@@ -17,6 +18,7 @@ class SurveillanceCombinationAnalyzerTest {
         permissions: List<String> = emptyList(),
         isSystemApp: Boolean = false,
         category: AppCategory = AppCategory.UNDEFINED,
+        installerPackageName: String? = null,
     ) = ScanTarget.ApplicationTarget(
         InstalledApplicationInfo(
             packageName = "com.example.app",
@@ -28,6 +30,7 @@ class SurveillanceCombinationAnalyzerTest {
             apkPath = "/data/app/example.apk",
             requestedPermissions = permissions,
             category = category,
+            installerPackageName = installerPackageName,
         ),
     )
 
@@ -100,4 +103,40 @@ class SurveillanceCombinationAnalyzerTest {
 
         assertThat((result as AppResult.Success).data).isInstanceOf(AnalysisOutcome.Flagged::class.java)
     }
+
+    // --- Sprint 031: confidence modulation for the non-suppressed path (ADR 0045) ---
+
+    @Test
+    fun `an UNDEFINED-category app has default MODERATE confidence with no installer signal`() = runTest {
+        val result = analyzer.analyze(appTarget(permissions = allThree))
+
+        val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+        assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.MODERATE)
+    }
+
+    @Test
+    fun `installed from the Play Store downgrades confidence to LOW, still Flagged - not suppressed`() = runTest {
+        // The ride-sharing-app case this sprint's real-device findings
+        // named: a category that isn't VIDEO/SOCIAL (so not suppressed
+        // above), but a real, on-device legitimacy signal still applies.
+        val result = analyzer.analyze(
+            appTarget(permissions = allThree, installerPackageName = "com.android.vending"),
+        )
+
+        val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+        assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.LOW)
+    }
+
+    @Test
+    fun `PRODUCTIVITY category alone does not downgrade confidence - category consistency is not reused here`() =
+        runTest {
+            // Confirms categoryIsConsistent is deliberately false for this
+            // analyzer's ConfidenceModulation call - VIDEO/SOCIAL are
+            // already fully suppressed above, so no category should be
+            // able to ALSO trigger a downgrade at the confidence stage.
+            val result = analyzer.analyze(appTarget(permissions = allThree, category = AppCategory.PRODUCTIVITY))
+
+            val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+            assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.MODERATE)
+        }
 }

@@ -6,6 +6,55 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 031 — Detection Intelligence & Confidence Engine v2
+
+Physical-device testing reported well-known, feature-rich apps
+(communication, banking, Samsung, ride-sharing) reaching Action Needed
+despite expected permission usage. Diagnosed from actual engine
+behavior, not assumptions, before any change was made.
+
+### Fixed
+
+- **Legitimate apps over-escalated to Action Needed.** Three
+  permission-behavior analyzers (SMS/device-admin, overlay, camera+mic+
+  internet) always reported flat Moderate confidence with no awareness
+  that feature-rich, legitimate apps commonly need several of their
+  respective permission clusters at once. New `ConfidenceModulation`
+  lowers confidence one tier when a real, already-collected, on-device
+  signal suggests legitimacy — installed from a known app store (Google
+  Play, Samsung Galaxy Store), or a declared app category consistent
+  with the specific finding. `CumulativeRiskScorer`'s escalation rule
+  itself is **unchanged** — it was already correct; it just wasn't being
+  given confidence values that reflected everything already known about
+  the app.
+
+### Added
+
+- Contextual "why might this still be legitimate" explanations,
+  automatically appended when every finding behind a card has been
+  confidence-downgraded.
+- A visible confidence indicator (Low/Moderate/High) in each card's
+  expanded detail, alongside the recommendation.
+
+### Not changed, deliberately
+
+- `AppIdentityImpersonationAnalyzer` and `HighRiskPackageNameAnalyzer`
+  do not use confidence modulation — an app claiming a false identity or
+  squatting a reserved namespace has no legitimate excuse regardless of
+  app store or category.
+- `SurveillanceCombinationAnalyzer`'s existing category suppression
+  (video-calling apps) is untouched.
+- No analyzer removed, no detection capability reduced. A genuinely
+  suspicious app with no legitimacy signal still escalates exactly as
+  before — verified with the exact same existing test, left unmodified,
+  passing alongside a new one proving the fix.
+- No new Room schema, no new `InstalledApplicationInfo` fields — both
+  signals used were already collected in prior sprints.
+
+See ADR 0045 for full reasoning, including an honest note on the one
+area (a Samsung Galaxy Store package name) not verified against a live
+device in this sandbox.
+
 ## Sprint 030 — Security Center UI/UX Modernization
 
 Rebuilds the Security Center and History screens into a polished,

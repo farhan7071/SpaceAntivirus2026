@@ -147,6 +147,7 @@ private fun ScanHistoryEntryCard(entry: ScanHistoryEntry, onIgnoreClick: (String
                         technicalDetail = threat.technicalDetail,
                         evidenceBullets = threat.evidenceBullets,
                         recommendation = threat.recommendation,
+                        confidenceLabel = threat.confidenceLabel,
                         onIgnoreClick = { onIgnoreClick(threat.packageName) },
                         onOpenAppInfoClick = { openAppInfo(context, threat.packageName) },
                         onUninstallClick = { requestUninstall(context, threat.packageName) },

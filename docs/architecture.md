@@ -1293,6 +1293,67 @@ See ADR 0044 for full reasoning, including the one area of this sprint
 (exact extended Material icon names) not verified against a real
 compiler in this sandbox.
 
+### Confidence Engine v2 (Sprint 031)
+
+Physical-device testing reported well-known, feature-rich apps
+(communication, banking, Samsung, ride-sharing) reaching `ACTION_NEEDED`
+despite expected behavior. Traced to actual code before any fix was
+written, not assumed: `CumulativeRiskScorer`'s escalation rule (two or
+more distinct analyzers, each `ATTENTION`+/`MODERATE`+, escalate
+together) was re-verified correct and left completely unchanged. The
+real gap: three permission-behavior analyzers
+(`SuspiciousPermissionPatternAnalyzer`, `OverlayPermissionAnalyzer`,
+`SurveillanceCombinationAnalyzer`) always reported a flat `MODERATE`
+confidence, with no awareness that legitimate, feature-rich apps
+routinely need several of the permission clusters they each check for
+simultaneously.
+
+```
+ConfidenceModulation (core:analysisengine, new, shared by the three
+permission-behavior analyzers only — NOT the identity-deception ones,
+AppIdentityImpersonationAnalyzer/HighRiskPackageNameAnalyzer, which have
+no legitimate reason to be false regardless of store or category)
+
+  installerPackageName ∈ {Play Store, Samsung Galaxy Store}   ─┐
+                                                                 ├─ OR → one confidence tier down
+  category consistent with THIS analyzer's specific finding   ─┘
+     (each analyzer judges its own consistent-category set —
+      not one shared list)
+
+         ↓ (both signals evidence the SAME question — one downgrade, not additive)
+
+CumulativeRiskScorer — UNCHANGED. Its existing "MODERATE+ confidence
+required to co-escalate" rule now naturally excludes downgraded
+findings, with no scorer-level change needed.
+```
+
+`SurveillanceCombinationAnalyzer`'s existing Sprint 028 category
+suppression (`VIDEO`/`SOCIAL` fully skipped, not just downgraded) is
+unchanged — that reasoning still holds exactly as written. `ConfidenceModulation`
+only covers the remaining, non-suppressed path (e.g. a ride-sharing app
+with safety-recording features that may not declare either category).
+
+Evidence is preserved either way — a downgraded finding still shows,
+still explains itself, just no longer counts toward escalation on its
+own. `ThreatDescriptionProvider.recommendationFor` now explicitly states
+why when every Detection behind a finding is `LOW` confidence, and each
+`ThreatSummary` carries a `confidenceLabel` (highest `Confidence` among
+its Detections) shown in `ThreatSummaryCard`'s expanded state — both
+additive to the Sprint 030 UI, no restructuring.
+
+No new `InstalledApplicationInfo` field, no Room schema change — both
+signals used (`installerPackageName`, `category`) were already
+collected. No analyzer removed or weakened for genuinely suspicious
+apps: the existing Sprint 027 test proving an app with no legitimacy
+signal still escalates was left completely unmodified and still passes,
+alongside a new sibling test proving the identical scenario from a
+trusted installer no longer does.
+
+See ADR 0045 for full reasoning, including which two analyzers were
+deliberately excluded from confidence modulation and why, and an honest
+note on the one area (the Samsung Galaxy Store package name) not
+verified against a live device in this sandbox.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

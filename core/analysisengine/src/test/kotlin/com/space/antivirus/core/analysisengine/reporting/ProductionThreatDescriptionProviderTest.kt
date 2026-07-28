@@ -2,6 +2,7 @@ package com.space.antivirus.core.analysisengine.reporting
 
 import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.model.AnalyzerId
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ThreatType
@@ -16,12 +17,14 @@ class ProductionThreatDescriptionProviderTest {
         threatType: ThreatType = ThreatType.UNKNOWN,
         riskLevel: RiskLevel = RiskLevel.ATTENTION,
         analyzerId: AnalyzerId = AnalyzerId("test-analyzer"),
+        confidence: Confidence = Confidence.MODERATE,
     ) = Detection(
         id = "d1",
         analyzerId = analyzerId,
         threatType = threatType,
         evidenceDescription = evidenceDescription,
         riskLevel = riskLevel,
+        confidence = confidence,
     )
 
     // --- title coverage: every ThreatType ---
@@ -277,5 +280,79 @@ class ProductionThreatDescriptionProviderTest {
         val second = provider.shortSummaryFor(detections)
 
         assertThat(first).isEqualTo(second)
+    }
+
+    // --- recommendationFor: Sprint 031, "why might this still be legitimate" (ADR 0045, goal #5) ---
+
+    @Test
+    fun `when every detection is LOW confidence, the recommendation explains why it might still be legitimate`() {
+        val detections = listOf(
+            detection(evidenceDescription = "sms access with internet access", confidence = Confidence.LOW),
+        )
+
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            detections,
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).contains("more likely expected behavior")
+    }
+
+    @Test
+    fun `the base recommendation is still present, not replaced, when the legitimacy sentence is appended`() {
+        val detections = listOf(
+            detection(evidenceDescription = "camera and microphone access", confidence = Confidence.LOW),
+        )
+
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            detections,
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).contains("calls or media")
+        assertThat(recommendation).contains("more likely expected behavior")
+    }
+
+    @Test
+    fun `when even one detection is MODERATE or higher confidence, no legitimacy sentence is appended`() {
+        val detections = listOf(
+            detection(
+                evidenceDescription = "sms access with internet access",
+                confidence = Confidence.LOW,
+                analyzerId = AnalyzerId("analyzer-a"),
+            ),
+            detection(
+                evidenceDescription = "device administrator privileges",
+                confidence = Confidence.MODERATE,
+                analyzerId = AnalyzerId("analyzer-b"),
+            ),
+        )
+
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            detections,
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).doesNotContain("more likely expected behavior")
+    }
+
+    @Test
+    fun `ACTION_NEEDED never gets the legitimacy sentence, even with LOW-confidence detections`() {
+        // Urgency takes precedence - see the method's own KDoc. In
+        // practice CumulativeRiskScorer wouldn't produce ACTION_NEEDED
+        // from only LOW-confidence detections, but this confirms the
+        // ordering is enforced here too, not just relied upon upstream.
+        val detections = listOf(detection(confidence = Confidence.LOW))
+
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            detections,
+            RiskLevel.ACTION_NEEDED,
+        )
+
+        assertThat(recommendation).isEqualTo("Review immediately.")
     }
 }

@@ -2,6 +2,7 @@ package com.space.antivirus.feature.security
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.ScanSessionState
@@ -129,6 +130,7 @@ class SecurityCenterViewModel @Inject constructor(
         technicalDetail = description,
         evidenceBullets = detections.map { it.evidenceDescription },
         recommendation = descriptionProvider.recommendationFor(threatType, detections, riskLevel),
+        confidenceLabel = detections.maxOf { it.confidence }.toDisplayLabel(),
     )
 
     private companion object {
@@ -172,6 +174,14 @@ enum class ProtectionStatus {
  * a core:ui presentation concern, derived from evidenceBullets text in
  * SecurityCenterScreen.kt, matching the same layering this ViewModel
  * already used for RiskLevel -> Severity.
+ *
+ * Sprint 031 (ADR 0045, goal #6 — confidence transparency): `confidenceLabel`
+ * added, the highest Confidence among this Threat's own Detections
+ * (same "report the strongest signal" precedent BuildThreatUseCase
+ * already uses for threatType). Deliberately a plain String, not
+ * core:model's Confidence type — core:ui has no dependency on core:model
+ * and this stays consistent with that, the mapping done here rather than
+ * passed through as a domain type.
  */
 data class ThreatSummary(
     val appLabel: String,
@@ -181,4 +191,11 @@ data class ThreatSummary(
     val technicalDetail: String,
     val evidenceBullets: List<String>,
     val recommendation: String,
+    val confidenceLabel: String,
 )
+
+private fun Confidence.toDisplayLabel(): String = when (this) {
+    Confidence.LOW -> "Low"
+    Confidence.MODERATE -> "Moderate"
+    Confidence.HIGH -> "High"
+}

@@ -6,6 +6,8 @@ import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalysisOutcome
 import com.space.antivirus.core.model.AnalyzerCapability
 import com.space.antivirus.core.model.AnalyzerId
+import com.space.antivirus.core.model.AppCategory
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.FileMetadata
 import com.space.antivirus.core.model.InstalledApplicationInfo
 import com.space.antivirus.core.model.ScanTarget
@@ -20,6 +22,8 @@ class SuspiciousPermissionPatternAnalyzerTest {
         packageName: String = "com.example.app",
         isSystemApp: Boolean = false,
         permissions: List<String> = emptyList(),
+        installerPackageName: String? = null,
+        category: AppCategory = AppCategory.UNDEFINED,
     ) = ScanTarget.ApplicationTarget(
         InstalledApplicationInfo(
             packageName = packageName,
@@ -30,6 +34,8 @@ class SuspiciousPermissionPatternAnalyzerTest {
             isSystemApp = isSystemApp,
             apkPath = "/data/app/example.apk",
             requestedPermissions = permissions,
+            installerPackageName = installerPackageName,
+            category = category,
         ),
     )
 
@@ -185,7 +191,87 @@ class SuspiciousPermissionPatternAnalyzerTest {
         assertThat(outcome.targetIdentifier).isEqualTo("com.suspicious.app")
     }
 
-    // --- wrong target type ---
+    // --- Sprint 031: confidence modulation (ADR 0045) ---
+
+    @Test
+    fun `SMS pattern default confidence is MODERATE with no legitimacy signal`() = runTest {
+        val result = analyzer.analyze(
+            appTarget(permissions = listOf("android.permission.READ_SMS", "android.permission.INTERNET")),
+        )
+
+        val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+        assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.MODERATE)
+    }
+
+    @Test
+    fun `SMS pattern from the Play Store is downgraded to LOW confidence, still Flagged`() = runTest {
+        val result = analyzer.analyze(
+            appTarget(
+                permissions = listOf("android.permission.READ_SMS", "android.permission.INTERNET"),
+                installerPackageName = "com.android.vending",
+            ),
+        )
+
+        val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+        assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.LOW)
+        // Evidence is preserved, not suppressed - goal #3's "preserve
+        // evidence, continue informing the user."
+        assertThat(outcome.detections.single().evidenceDescription).contains("SMS")
+    }
+
+    @Test
+    fun `SMS pattern on a SOCIAL-category app is also downgraded to LOW confidence`() = runTest {
+        val result = analyzer.analyze(
+            appTarget(
+                permissions = listOf("android.permission.READ_SMS", "android.permission.INTERNET"),
+                category = AppCategory.SOCIAL,
+            ),
+        )
+
+        val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+        assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.LOW)
+    }
+
+    @Test
+    fun `SMS pattern on a PRODUCTIVITY-category app is NOT downgraded - only SOCIAL is consistent for this rule`() =
+        runTest {
+            val result = analyzer.analyze(
+                appTarget(
+                    permissions = listOf("android.permission.READ_SMS", "android.permission.INTERNET"),
+                    category = AppCategory.PRODUCTIVITY,
+                ),
+            )
+
+            val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+            assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.MODERATE)
+        }
+
+    @Test
+    fun `device admin pattern from the Play Store is downgraded to LOW - installer trust applies to both rules`() =
+        runTest {
+            val result = analyzer.analyze(
+                appTarget(
+                    permissions = listOf("android.permission.BIND_DEVICE_ADMIN", "android.permission.INTERNET"),
+                    installerPackageName = "com.android.vending",
+                ),
+            )
+
+            val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+            assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.LOW)
+        }
+
+    @Test
+    fun `device admin pattern is NOT downgraded by category - no category is consistent for this rule`() = runTest {
+        val result = analyzer.analyze(
+            appTarget(
+                permissions = listOf("android.permission.BIND_DEVICE_ADMIN", "android.permission.INTERNET"),
+                category = AppCategory.PRODUCTIVITY,
+            ),
+        )
+
+        val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+        assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.MODERATE)
+    }
 
     @Test
     fun `a FileTarget is rejected with InvalidScanConfiguration, not a crash`() = runTest {

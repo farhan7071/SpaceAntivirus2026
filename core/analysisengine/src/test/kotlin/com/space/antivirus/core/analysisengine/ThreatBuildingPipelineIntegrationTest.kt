@@ -12,6 +12,7 @@ import com.space.antivirus.core.analysisengine.analyzer.UnknownInstallerSourceAn
 import com.space.antivirus.core.analysisengine.reporting.ProductionThreatDescriptionProvider
 import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalysisOutcome
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.InstalledApplicationInfo
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
@@ -203,5 +204,76 @@ class ThreatBuildingPipelineIntegrationTest {
         // threatType distinguishable in a report, instead of looking like
         // the same finding repeated.
         assertThat(threat.appLabel).isEqualTo("Example")
+    }
+
+    @Test
+    fun `Sprint 031 fix - the SAME permission combination from a trusted installer no longer escalates`() = runTest {
+        // The exact regression this sprint exists to fix, demonstrated
+        // against the real production pipeline: identical evidence to
+        // the test directly above it, differing only in installerPackageName.
+        // Communication/ride-sharing-style apps legitimately requesting
+        // camera+microphone+overlay+internet, distributed through a real
+        // app store, should no longer reach ACTION_NEEDED purely because
+        // several ordinary permission-behavior analyzers agree — that
+        // agreement is no longer strong enough on its own once a real,
+        // on-device legitimacy signal is present.
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val registry = DefaultThreatAnalyzerRegistry(
+            setOf(
+                SuspiciousPermissionPatternAnalyzer(),
+                AppIdentityImpersonationAnalyzer(),
+                OverlayPermissionAnalyzer(),
+                SurveillanceCombinationAnalyzer(),
+                DeviceAdministratorAnalyzer(),
+                HighRiskPackageNameAnalyzer(),
+                DebuggableApplicationAnalyzer(),
+                UnknownInstallerSourceAnalyzer(),
+            ),
+        )
+        val analyzeUseCase =
+            AnalyzeScanTargetUseCase(registry, AnalyzerExecutor(), AnalysisOutcomeAggregator(), dispatcher)
+        val buildThreat = BuildThreatUseCase(CumulativeRiskScorer(), ProductionThreatDescriptionProvider())
+
+        val target = ScanTarget.ApplicationTarget(
+            InstalledApplicationInfo(
+                packageName = "com.example.communication",
+                appLabel = "Example Communication App",
+                versionName = "1.0",
+                versionCode = 1L,
+                installedAtEpochMillis = 0L,
+                isSystemApp = false,
+                apkPath = "/data/app/example.apk",
+                requestedPermissions = listOf(
+                    "android.permission.CAMERA",
+                    "android.permission.RECORD_AUDIO",
+                    "android.permission.SYSTEM_ALERT_WINDOW",
+                    "android.permission.INTERNET",
+                ),
+                // The only change from the test above: a real, known,
+                // on-device legitimacy signal.
+                installerPackageName = "com.android.vending",
+            ),
+        )
+
+        val outcome = (analyzeUseCase(target) as AppResult.Success).data as AnalysisOutcome.Flagged
+        val threat = buildThreat(outcome, target)
+
+        // Both surveillance and overlay still fire — evidence is
+        // preserved, users are still informed (goal #3) — but both are
+        // now LOW confidence, so neither qualifies to co-escalate.
+        // UnknownInstallerSourceAnalyzer no longer fires at all, since
+        // installerPackageName is no longer null.
+        assertThat(threat.detections).hasSize(2)
+        val analyzerIds = threat.detections.map { it.analyzerId.value }.toSet()
+        assertThat(analyzerIds).containsExactly("surveillance-permission-combination", "overlay-permission-pattern")
+        assertThat(threat.detections.map { it.confidence }).containsExactly(Confidence.LOW, Confidence.LOW)
+
+        // The actual fix: ATTENTION, not ACTION_NEEDED.
+        assertThat(threat.riskLevel).isEqualTo(RiskLevel.ATTENTION)
+
+        // Evidence remains fully visible despite the lower confidence -
+        // "preserve evidence, continue informing the user."
+        assertThat(threat.description).contains("camera")
+        assertThat(threat.description).contains("draw over other apps")
     }
 }

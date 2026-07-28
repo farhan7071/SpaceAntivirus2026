@@ -5,13 +5,14 @@ import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalysisOutcome
 import com.space.antivirus.core.model.AnalyzerCapability
 import com.space.antivirus.core.model.AnalyzerId
+import com.space.antivirus.core.model.AppCategory
 import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ThreatType
-import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import com.space.antivirus.core.model.identifier
+import com.space.antivirus.domain.analyzer.ThreatAnalyzer
 import java.util.UUID
 import javax.inject.Inject
 
@@ -27,6 +28,19 @@ import javax.inject.Inject
  * signal, neither permission is on its own.
  *
  * System apps excluded entirely, same reasoning as every prior analyzer.
+ *
+ * Sprint 031 (ADR 0045): confidence is no longer a flat MODERATE.
+ * Overlay is legitimately common for several declared categories, not
+ * just one — chat-head-style messaging (SOCIAL), picture-in-picture
+ * (VIDEO), multi-window/note-taking tools (PRODUCTIVITY), and in-game
+ * overlays like FPS counters or voice chat indicators (GAME). Unlike
+ * SurveillanceCombinationAnalyzer's Sprint 028 category suppression
+ * (camera+microphone for VIDEO/SOCIAL is unambiguous enough to skip
+ * entirely), overlay usage across this wider set of categories is common
+ * but not as uniformly guaranteed-legitimate, so this stays a confidence
+ * downgrade via ConfidenceModulation, not a suppression — the finding
+ * still surfaces, just no longer able to co-escalate a Threat to
+ * ACTION_NEEDED on its own when a genuine legitimacy signal is present.
  */
 class OverlayPermissionAnalyzer @Inject constructor() : ThreatAnalyzer {
 
@@ -64,7 +78,11 @@ class OverlayPermissionAnalyzer @Inject constructor() : ThreatAnalyzer {
             evidenceDescription = "Can draw over other apps (SYSTEM_ALERT_WINDOW) with INTERNET " +
                 "access — a pattern used by overlay credential-harvesting apps.",
             riskLevel = RiskLevel.ATTENTION,
-            confidence = Confidence.MODERATE,
+            confidence = ConfidenceModulation.modulate(
+                base = Confidence.MODERATE,
+                app = app,
+                categoryIsConsistent = app.category in CATEGORIES_EXPECTING_OVERLAY,
+            ),
         )
 
         return AppResult.Success(AnalysisOutcome.Flagged(targetIdentifier, listOf(detection)))
@@ -73,5 +91,11 @@ class OverlayPermissionAnalyzer @Inject constructor() : ThreatAnalyzer {
     private companion object {
         const val OVERLAY_PERMISSION = "android.permission.SYSTEM_ALERT_WINDOW"
         const val INTERNET_PERMISSION = "android.permission.INTERNET"
+        val CATEGORIES_EXPECTING_OVERLAY = setOf(
+            AppCategory.SOCIAL,
+            AppCategory.VIDEO,
+            AppCategory.PRODUCTIVITY,
+            AppCategory.GAME,
+        )
     }
 }

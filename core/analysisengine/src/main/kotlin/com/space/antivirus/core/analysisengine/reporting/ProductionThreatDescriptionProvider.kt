@@ -1,5 +1,6 @@
 package com.space.antivirus.core.analysisengine.reporting
 
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ThreatType
@@ -74,6 +75,19 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
      * ACTION_NEEDED finding (CumulativeRiskScorer's escalation for two or
      * more independent, meaningful signals) always reads as urgent,
      * regardless of which specific evidence produced it.
+     *
+     * Sprint 031 (ADR 0045, goal #5 — "why might this still be
+     * legitimate"): when every Detection behind this finding has been
+     * downgraded to LOW confidence by ConfidenceModulation, an explicit
+     * sentence is appended explaining why, rather than leaving the lower
+     * confidence implicit and unexplained. Deliberately generic about
+     * WHICH signal applied (installer vs. category) rather than trying
+     * to reconstruct that from evidence text a second time — the
+     * reasoning is the same either way ("a real, on-device signal
+     * suggests this is more likely expected"), and this method already
+     * has no way to distinguish the two without ConfidenceModulation
+     * itself returning more than a Confidence value, which would be a
+     * larger, unwarranted change for what this sentence needs to say.
      */
     override fun recommendationFor(
         threatType: ThreatType,
@@ -85,7 +99,7 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
         }
 
         val evidence = combinedEvidenceLowercase(detections)
-        return when {
+        val baseRecommendation = when {
             "camera" in evidence || "microphone" in evidence ->
                 "Expected if you actively use this application for calls or media."
             "draw over other apps" in evidence ->
@@ -93,6 +107,14 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
             "sms" in evidence ->
                 "Review why this app needs SMS access if you don't expect it to."
             else -> defaultRecommendationFor(threatType)
+        }
+
+        return if (detections.isNotEmpty() && detections.all { it.confidence == Confidence.LOW }) {
+            "$baseRecommendation This is more likely expected behavior — it's a common pattern for " +
+                "apps from an established app store or in a matching app category, both real signals " +
+                "that lower (without ruling out) concern."
+        } else {
+            baseRecommendation
         }
     }
 

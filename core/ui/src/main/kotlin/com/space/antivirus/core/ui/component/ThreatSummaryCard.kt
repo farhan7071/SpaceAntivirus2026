@@ -73,6 +73,12 @@ import com.space.antivirus.core.designsystem.theme.SeverityColors
  * system apps before ever producing a Detection (ADR 0027 onward), so
  * any app this card can even be built for is already guaranteed
  * non-system by construction.
+ *
+ * Sprint 031 (ADR 0045, goal #6 — confidence transparency): gained
+ * confidenceLabel, shown in the expanded state alongside the
+ * recommendation. A plain String, not core:model's Confidence type —
+ * consistent with this component's existing zero-dependency-on-domain
+ * shape; the mapping happens in each screen's ViewModel.
  */
 @Composable
 fun ThreatSummaryCard(
@@ -84,6 +90,7 @@ fun ThreatSummaryCard(
     technicalDetail: String,
     evidenceBullets: List<String>,
     recommendation: String,
+    confidenceLabel: String,
     onIgnoreClick: () -> Unit,
     onOpenAppInfoClick: () -> Unit,
     onUninstallClick: () -> Unit,
@@ -138,6 +145,7 @@ fun ThreatSummaryCard(
                         technicalDetail = technicalDetail,
                         evidenceBullets = evidenceBullets,
                         recommendation = recommendation,
+                        confidenceLabel = confidenceLabel,
                     )
                 }
 
@@ -222,7 +230,12 @@ private fun EvidenceIconRow(icons: Set<EvidenceIcon>) {
 }
 
 @Composable
-private fun ExpandedDetail(technicalDetail: String, evidenceBullets: List<String>, recommendation: String) {
+private fun ExpandedDetail(
+    technicalDetail: String,
+    evidenceBullets: List<String>,
+    recommendation: String,
+    confidenceLabel: String,
+) {
     val spacing = LocalSpacing.current
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
         Text(text = "Why it was flagged", style = MaterialTheme.typography.titleSmall)
@@ -234,6 +247,16 @@ private fun ExpandedDetail(technicalDetail: String, evidenceBullets: List<String
 
         Text(text = "Recommendation", style = MaterialTheme.typography.titleSmall)
         Text(text = recommendation, style = MaterialTheme.typography.bodySmall)
+
+        // Sprint 031 (ADR 0045, goal #6 — confidence transparency):
+        // shown alongside the recommendation, not the evidence bullets —
+        // this is about how sure the ENGINE is overall, not a property
+        // of any one piece of evidence.
+        Text(
+            text = "Confidence: $confidenceLabel",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

@@ -31,6 +31,7 @@ class ThreatSummaryCardTest {
         technicalDetail: String = "Full technical explanation goes here.",
         evidenceBullets: List<String> = listOf("Camera access", "Microphone access"),
         recommendation: String = "Review if unexpected.",
+        confidenceLabel: String = "Moderate",
         onIgnoreClick: () -> Unit = {},
         onOpenAppInfoClick: () -> Unit = {},
         onUninstallClick: () -> Unit = {},
@@ -46,6 +47,7 @@ class ThreatSummaryCardTest {
                     technicalDetail = technicalDetail,
                     evidenceBullets = evidenceBullets,
                     recommendation = recommendation,
+                    confidenceLabel = confidenceLabel,
                     onIgnoreClick = onIgnoreClick,
                     onOpenAppInfoClick = onOpenAppInfoClick,
                     onUninstallClick = onUninstallClick,
@@ -91,6 +93,17 @@ class ThreatSummaryCardTest {
         composeTestRule.onNodeWithText("\u2022 Camera access").assertExists()
         composeTestRule.onNodeWithText("\u2022 Microphone access").assertExists()
         composeTestRule.onNodeWithText("Review if unexpected.").assertExists()
+    }
+
+    @Test
+    fun theConfidenceLabel_onlyAppearsAfterExpanding_sameAsTheRestOfTheExpandedDetail() {
+        setCard(confidenceLabel = "Low")
+
+        composeTestRule.onNodeWithText("Confidence: Low").assertDoesNotExist()
+
+        composeTestRule.onNodeWithText("View details").performClick()
+
+        composeTestRule.onNodeWithText("Confidence: Low").assertExists()
     }
 
     @Test

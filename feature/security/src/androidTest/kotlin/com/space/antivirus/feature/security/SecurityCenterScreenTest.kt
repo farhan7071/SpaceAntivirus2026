@@ -54,6 +54,7 @@ class SecurityCenterScreenTest {
         technicalDetail: String = "The full technical explanation.",
         evidenceBullets: List<String> = listOf("Some reason"),
         recommendation: String = "Review if unexpected.",
+        confidenceLabel: String = "Moderate",
     ) = ThreatSummary(
         appLabel = appLabel,
         packageName = packageName,
@@ -62,6 +63,7 @@ class SecurityCenterScreenTest {
         technicalDetail = technicalDetail,
         evidenceBullets = evidenceBullets,
         recommendation = recommendation,
+        confidenceLabel = confidenceLabel,
     )
 
     @Test

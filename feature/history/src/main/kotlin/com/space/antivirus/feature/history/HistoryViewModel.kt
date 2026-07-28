@@ -2,6 +2,7 @@ package com.space.antivirus.feature.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.Threat
@@ -90,6 +91,7 @@ class HistoryViewModel @Inject constructor(
         technicalDetail = description,
         evidenceBullets = detections.map { it.evidenceDescription },
         recommendation = descriptionProvider.recommendationFor(threatType, detections, riskLevel),
+        confidenceLabel = detections.maxOf { it.confidence }.toDisplayLabel(),
     )
 
     private companion object {
@@ -116,7 +118,9 @@ data class ScanHistoryEntry(
 
 /** Sprint 030 (ADR 0044) — see SecurityCenterViewModel.ThreatSummary's
  *  own KDoc for the full reasoning; this is the identical shape, kept
- *  local rather than shared per the rule-of-three note above. */
+ *  local rather than shared per the rule-of-three note above.
+ *  Sprint 031: gained confidenceLabel, same reasoning as
+ *  SecurityCenterViewModel's identical addition. */
 data class ThreatSummary(
     val appLabel: String,
     val packageName: String,
@@ -125,4 +129,11 @@ data class ThreatSummary(
     val technicalDetail: String,
     val evidenceBullets: List<String>,
     val recommendation: String,
+    val confidenceLabel: String,
 )
+
+private fun Confidence.toDisplayLabel(): String = when (this) {
+    Confidence.LOW -> "Low"
+    Confidence.MODERATE -> "Moderate"
+    Confidence.HIGH -> "High"
+}

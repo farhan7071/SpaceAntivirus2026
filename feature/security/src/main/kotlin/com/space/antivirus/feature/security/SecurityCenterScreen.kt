@@ -167,6 +167,7 @@ private fun ThreatCard(
         technicalDetail = threat.technicalDetail,
         evidenceBullets = threat.evidenceBullets,
         recommendation = threat.recommendation,
+        confidenceLabel = threat.confidenceLabel,
         onIgnoreClick = onIgnoreClick,
         onOpenAppInfoClick = onOpenAppInfoClick,
         onUninstallClick = onUninstallClick,

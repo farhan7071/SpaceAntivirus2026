@@ -43,7 +43,17 @@ import javax.inject.Inject
  * confidence downgrade — a category is either a real, positively-
  * identified fact (skip entirely) or it isn't (evaluate normally); there
  * is no middle state where category partially excuses the finding. See
- * ADR 0042.
+ * ADR 0042. Unchanged in Sprint 031 — this reasoning still holds exactly
+ * as written.
+ *
+ * Sprint 031 (ADR 0045): for apps that DON'T declare VIDEO/SOCIAL and so
+ * still reach a real Detection (e.g. a ride-sharing app with in-trip
+ * safety recording, which may not declare either category even though
+ * the permission combination is entirely expected for what it does),
+ * confidence now goes through ConfidenceModulation for installer trust —
+ * category consistency doesn't apply a second time here, since VIDEO/
+ * SOCIAL are already fully suppressed above; only installer trust is
+ * left as a real, additional legitimacy signal for whatever remains.
  *
  * System apps excluded entirely, same reasoning as every prior analyzer.
  */
@@ -83,7 +93,11 @@ class SurveillanceCombinationAnalyzer @Inject constructor() : ThreatAnalyzer {
             evidenceDescription = "Camera, microphone, and internet access together — can record " +
                 "and transmit media. Expected for camera or communication apps.",
             riskLevel = RiskLevel.ATTENTION,
-            confidence = Confidence.MODERATE,
+            confidence = ConfidenceModulation.modulate(
+                base = Confidence.MODERATE,
+                app = app,
+                categoryIsConsistent = false,
+            ),
         )
 
         return AppResult.Success(AnalysisOutcome.Flagged(targetIdentifier, listOf(detection)))
