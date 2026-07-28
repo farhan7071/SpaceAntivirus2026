@@ -13,12 +13,13 @@ import com.space.antivirus.domain.reporting.ThreatDescriptionProvider
 import com.space.antivirus.domain.usecase.AddTrustedItemParams
 import com.space.antivirus.domain.usecase.AddTrustedItemUseCase
 import com.space.antivirus.domain.usecase.ObserveScanHistoryUseCase
+import com.space.antivirus.domain.usecase.ObserveTrustedItemsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -37,11 +38,6 @@ import kotlinx.coroutines.launch
  * exactly the additional detail Sprint 019's brief asked this screen to
  * add without duplicating what Home already shows.
  *
- * Trusted items are deliberately NOT shown here (unlike Home) — that
- * summary already lives on Home, and repeating it here wouldn't add any
- * security-specific value; this screen's distinct purpose is threat
- * detail, not a second home-page.
- *
  * Sprint 030: gained AddTrustedItemUseCase and a real onIgnoreClick
  * handler — "Ignore" reuses AddTrustedItemUseCase (Sprint 008), never
  * previously wired to any UI anywhere in this project. Not a new
@@ -52,34 +48,62 @@ import kotlinx.coroutines.launch
  * launches those directly via LocalContext.current, the same separation
  * every prior screen in this project has kept between ViewModel state
  * and Android-framework-specific UI actions.
+ *
+ * Sprint 32.1 hotfix — real root cause, not a guess: uiState was built
+ * from observeScanHistory() alone. That Flow (SecurityRepositoryImpl,
+ * ADR 0024) is backed by a Room @Query scoped to the scan_sessions/
+ * threats/detections tables — Room only invalidates and re-emits a Flow
+ * when a table IT actually reads from changes. Writing a new row to the
+ * completely separate trusted_items table (AddTrustedItemUseCase ->
+ * TrustedItemRepositoryImpl -> TrustedItemDao.insert) has zero effect on
+ * it — confirmed by reading SecurityRepositoryImpl.observeScanHistory's
+ * real Room query before writing any fix, not assumed. So "Ignore"
+ * always persisted correctly (confirmed separately, by diagnostic
+ * logging reaching TrustedItemRepositoryImpl and returning Success) but
+ * the Security Center list had no way to ever learn about it and never
+ * updated. Fixed by also observing ObserveTrustedItemsUseCase (Sprint
+ * 008, already existed, never previously used here) and filtering
+ * threats whose targetIdentifier now has a matching trusted item before
+ * building the displayed list — reusing existing infrastructure, adding
+ * no new persistence mechanism, and touching neither Room schema nor the
+ * ignore system's own write path (both fully unchanged). Trusted items
+ * summary/display are deliberately still not shown on this screen (the
+ * KDoc line to that effect was removed only because it became stale, not
+ * because that design choice changed) — only their effect on which
+ * threats remain visible.
  */
 @HiltViewModel
 class SecurityCenterViewModel @Inject constructor(
     observeScanHistory: ObserveScanHistoryUseCase,
+    observeTrustedItems: ObserveTrustedItemsUseCase,
     private val descriptionProvider: ThreatDescriptionProvider,
     private val addTrustedItem: AddTrustedItemUseCase,
 ) : ViewModel() {
 
-    val uiState: StateFlow<SecurityCenterUiState> = observeScanHistory()
-        .map { scanHistory ->
-            val lastScan = scanHistory.firstOrNull()
-            // Cast to the sealed supertype explicitly — same reason as
-            // HomeViewModel (ADR 0030): without it, this lambda's
-            // inferred return type is Loaded specifically, and the
-            // .catch{} below (emitting a sibling Error) would not
-            // type-check against a Flow<Loaded>.
-            val loaded = SecurityCenterUiState.Loaded(
-                protectionStatus = protectionStatusFor(lastScan),
-                lastScanCompletedAtEpochMillis = lastScan?.session?.completedAtEpochMillis,
-                threats = lastScan?.threats.orEmpty().map { it.toSummary() },
-            )
-            // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
-            Log.d(
-                "OverflowMenuDiag",
-                "UI state refresh: threats=${loaded.threats.size}, protectionStatus=${loaded.protectionStatus}",
-            )
-            loaded as SecurityCenterUiState
-        }
+    val uiState: StateFlow<SecurityCenterUiState> = combine(
+        observeScanHistory(),
+        observeTrustedItems(),
+    ) { scanHistory, trustedItems ->
+        val trustedIdentifiers = trustedItems.map { it.identifier }.toSet()
+        val lastScan = scanHistory.firstOrNull()
+        val visibleThreats = lastScan?.threats.orEmpty().filterNot { it.targetIdentifier in trustedIdentifiers }
+        // Cast to the sealed supertype explicitly — same reason as
+        // HomeViewModel (ADR 0030): without it, this lambda's inferred
+        // return type is Loaded specifically, and the .catch{} below
+        // (emitting a sibling Error) would not type-check against a
+        // Flow<Loaded>.
+        val loaded = SecurityCenterUiState.Loaded(
+            protectionStatus = protectionStatusFor(lastScan, visibleThreats),
+            lastScanCompletedAtEpochMillis = lastScan?.session?.completedAtEpochMillis,
+            threats = visibleThreats.map { it.toSummary() },
+        )
+        // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+        Log.d(
+            "OverflowMenuDiag",
+            "UI state refresh: threats=${loaded.threats.size}, protectionStatus=${loaded.protectionStatus}",
+        )
+        loaded as SecurityCenterUiState
+    }
         .catch { error ->
             emit(
                 SecurityCenterUiState.Error(
@@ -124,13 +148,21 @@ class SecurityCenterViewModel @Inject constructor(
         }
     }
 
-    private fun protectionStatusFor(lastScan: ScanResult?): ProtectionStatus = when {
+    /**
+     * Sprint 32.1: now derives protection status from the already-
+     * filtered visible threat list, not lastScan.isClean — isClean
+     * reflects the scan as it was AT SCAN TIME, before any ignoring
+     * happened since; a scan that found one threat which the user then
+     * ignores should read as PROTECTED, not still NEEDS_ATTENTION for a
+     * threat no longer shown anywhere on this screen.
+     */
+    private fun protectionStatusFor(lastScan: ScanResult?, visibleThreats: List<Threat>): ProtectionStatus = when {
         lastScan == null -> ProtectionStatus.UNKNOWN
         // Same defensive check as HomeViewModel (ADR 0030) — the real
         // repository's query already filters to COMPLETED only (Sprint
         // 010), but ScanResult's type doesn't itself guarantee that.
         lastScan.session.state != ScanSessionState.COMPLETED -> ProtectionStatus.UNKNOWN
-        lastScan.isClean -> ProtectionStatus.PROTECTED
+        visibleThreats.isEmpty() -> ProtectionStatus.PROTECTED
         else -> ProtectionStatus.NEEDS_ATTENTION
     }
 

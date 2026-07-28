@@ -200,10 +200,30 @@ private fun openAppInfo(context: Context, packageName: String) {
 }
 
 private fun requestUninstall(context: Context, packageName: String) {
-    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release. Logs
+    // the actual runtime type of context, not just that it's non-null —
+    // if this ever prints something other than an Activity subclass, the
+    // FLAG_ACTIVITY_NEW_TASK fix below may not be the whole story, and
+    // that's worth knowing before assuming this fix is complete.
+    Log.d("OverflowMenuDiag", "Uninstall: context runtime type=${context::class.qualifiedName}")
     Log.d("OverflowMenuDiag", "Uninstall: creating intent, package=$packageName")
     val intent = Intent(Intent.ACTION_DELETE).apply {
         data = Uri.fromParts("package", packageName, null)
+        // Best-reasoned fix, not a fully confirmed root cause the way
+        // the Ignore fix was — flagged explicitly as such. The reported
+        // symptom (startActivity() returns normally, no exception, but
+        // the system uninstall confirmation screen never appears) is a
+        // known, documented pattern when a foreground-launched Intent
+        // targets a separate task/activity (here, the system package
+        // installer, a different app entirely) without this flag —
+        // Android can silently decline to bring the new activity forward
+        // rather than throwing. This project's MainActivity is a plain,
+        // unwrapped ComponentActivity (verified directly, not assumed)
+        // so a missing task flag — not a wrapped or invalid Context — is
+        // the most likely explanation matching the exact symptom
+        // reported. If this alone doesn't resolve it, the context
+        // runtime type logged above is the next thing to check.
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
     // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release. This
     // project's existing uninstall mechanism is a plain startActivity()

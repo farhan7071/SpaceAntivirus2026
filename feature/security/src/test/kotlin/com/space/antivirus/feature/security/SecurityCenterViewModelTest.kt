@@ -23,6 +23,7 @@ import com.space.antivirus.domain.repository.SecurityRepository
 import com.space.antivirus.domain.repository.TrustedItemRepository
 import com.space.antivirus.domain.usecase.AddTrustedItemUseCase
 import com.space.antivirus.domain.usecase.ObserveScanHistoryUseCase
+import com.space.antivirus.domain.usecase.ObserveTrustedItemsUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -84,9 +85,14 @@ class SecurityCenterViewModelTest {
     private fun buildViewModel(): SecurityCenterViewModel {
         every { descriptionProvider.shortSummaryFor(any()) } returns "test short summary"
         every { descriptionProvider.recommendationFor(any(), any(), any()) } returns "test recommendation"
+        // Default: no trusted items, matching every existing test's
+        // prior behavior exactly. Sprint 32.1's own tests override this
+        // per-test where a trusted item needs to actually be present.
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
         val addTrustedItem = AddTrustedItemUseCase(trustedItemRepository, StandardTestDispatcher())
         return SecurityCenterViewModel(
             ObserveScanHistoryUseCase(securityRepository),
+            ObserveTrustedItemsUseCase(trustedItemRepository),
             descriptionProvider,
             addTrustedItem,
         )
@@ -303,6 +309,83 @@ class SecurityCenterViewModelTest {
             assertThat(state).isInstanceOf(SecurityCenterUiState.Error::class.java)
         }
     }
+
+    // --- Sprint 32.1 hotfix: a trusted item's threat disappears from the visible list ---
+
+    @Test
+    fun `a threat whose package is already trusted is filtered out of the visible list`() = runTest {
+        val threats = listOf(threat("t1", packageName = "com.example.trusted"))
+        every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(threats)))
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(
+            listOf(
+                TrustedItem(
+                    id = "trust-1",
+                    identifier = "com.example.trusted",
+                    type = TrustedItemType.APPLICATION,
+                    addedAtEpochMillis = 0L,
+                ),
+            ),
+        )
+
+        buildViewModel().uiState.test {
+            assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+            val state = awaitItem() as SecurityCenterUiState.Loaded
+            // The real root cause this hotfix addresses: before this
+            // fix, uiState had no way to know a trusted item existed at
+            // all, and this threat would still be visible here.
+            assertThat(state.threats).isEmpty()
+        }
+    }
+
+    @Test
+    fun `when the only threat is trusted, protection status reads PROTECTED, not NEEDS_ATTENTION`() = runTest {
+        val threats = listOf(threat("t1", packageName = "com.example.trusted"))
+        every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(threats)))
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(
+            listOf(
+                TrustedItem(
+                    id = "trust-1",
+                    identifier = "com.example.trusted",
+                    type = TrustedItemType.APPLICATION,
+                    addedAtEpochMillis = 0L,
+                ),
+            ),
+        )
+
+        buildViewModel().uiState.test {
+            assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+            val state = awaitItem() as SecurityCenterUiState.Loaded
+            assertThat(state.protectionStatus).isEqualTo(ProtectionStatus.PROTECTED)
+        }
+    }
+
+    @Test
+    fun `trusting one of two threats leaves the other one visible, protection status still NEEDS_ATTENTION`() =
+        runTest {
+            val threats = listOf(
+                threat("t1", packageName = "com.example.trusted"),
+                threat("t2", packageName = "com.example.stillsuspicious"),
+            )
+            every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(threats)))
+            every { trustedItemRepository.observeTrustedItems() } returns flowOf(
+                listOf(
+                    TrustedItem(
+                        id = "trust-1",
+                        identifier = "com.example.trusted",
+                        type = TrustedItemType.APPLICATION,
+                        addedAtEpochMillis = 0L,
+                    ),
+                ),
+            )
+
+            buildViewModel().uiState.test {
+                assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+                val state = awaitItem() as SecurityCenterUiState.Loaded
+                assertThat(state.threats).hasSize(1)
+                assertThat(state.threats.single().packageName).isEqualTo("com.example.stillsuspicious")
+                assertThat(state.protectionStatus).isEqualTo(ProtectionStatus.NEEDS_ATTENTION)
+            }
+        }
 
     // --- onIgnoreClick: Sprint 030, the real "Ignore" action ---
 
