@@ -1,5 +1,6 @@
 package com.space.antivirus.core.ui.component
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -191,6 +192,8 @@ private fun IdentityRow(
                 DropdownMenuItem(
                     text = { Text("Ignore") },
                     onClick = {
+                        // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+                        Log.d("OverflowMenuDiag", "Ignore: DropdownMenu click")
                         onMenuExpandedChange(false)
                         onIgnoreClick()
                     },
@@ -198,6 +201,8 @@ private fun IdentityRow(
                 DropdownMenuItem(
                     text = { Text("Open app info") },
                     onClick = {
+                        // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+                        Log.d("OverflowMenuDiag", "OpenAppInfo: menu click")
                         onMenuExpandedChange(false)
                         onOpenAppInfoClick()
                     },
@@ -205,6 +210,8 @@ private fun IdentityRow(
                 DropdownMenuItem(
                     text = { Text("Uninstall") },
                     onClick = {
+                        // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+                        Log.d("OverflowMenuDiag", "Uninstall: menu click")
                         onMenuExpandedChange(false)
                         onUninstallClick()
                     },

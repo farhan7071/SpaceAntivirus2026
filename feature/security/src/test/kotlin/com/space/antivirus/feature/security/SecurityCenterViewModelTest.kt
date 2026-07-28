@@ -1,5 +1,6 @@
 package com.space.antivirus.feature.security
 
+import android.util.Log
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.common.AppError
@@ -26,11 +27,15 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -55,6 +60,26 @@ class SecurityCenterViewModelTest {
     private val securityRepository = mockk<SecurityRepository>()
     private val descriptionProvider = mockk<ThreatDescriptionProvider>()
     private val trustedItemRepository = mockk<TrustedItemRepository>()
+
+    // DIAGNOSTIC (Sprint 32.1) — temporary, remove together with the
+    // Log.d() calls this mocks for. android.util.Log throws
+    // "not mocked" when actually invoked on the plain JVM (this test
+    // runs here, not on a real Android runtime, and this project has no
+    // testOptions.unitTests.isReturnDefaultValues configured anywhere) —
+    // SecurityCenterViewModel.onIgnoreClick and its uiState mapping both
+    // now call Log.d() directly, so every test below that exercises
+    // either would otherwise fail on an unrelated, unmocked platform
+    // call rather than the behavior actually being tested.
+    @Before
+    fun mockAndroidLog() {
+        mockkStatic(Log::class)
+        every { Log.d(any(), any()) } returns 0
+    }
+
+    @After
+    fun unmockAndroidLog() {
+        unmockkStatic(Log::class)
+    }
 
     private fun buildViewModel(): SecurityCenterViewModel {
         every { descriptionProvider.shortSummaryFor(any()) } returns "test short summary"

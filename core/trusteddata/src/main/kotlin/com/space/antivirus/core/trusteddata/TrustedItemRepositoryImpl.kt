@@ -1,5 +1,6 @@
 package com.space.antivirus.core.trusteddata
 
+import android.util.Log
 import com.space.antivirus.core.common.AppError
 import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.database.dao.TrustedItemDao
@@ -30,9 +31,14 @@ class TrustedItemRepositoryImpl @Inject constructor(
         type: TrustedItemType,
         reason: String?,
     ): AppResult<TrustedItem> = safeCall {
+        // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+        Log.d("OverflowMenuDiag", "Ignore: repository write, identifier=$identifier, type=$type")
+
         // Idempotency (ADR 0021's contract requirement): check first,
         // return the existing item rather than creating a duplicate row.
         trustedItemDao.findByIdentifierAndType(identifier, type.name)?.let {
+            // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+            Log.d("OverflowMenuDiag", "Ignore: already trusted, returning existing item, id=${it.id}")
             return@safeCall AppResult.Success(it.toDomain())
         }
 
@@ -43,7 +49,11 @@ class TrustedItemRepositoryImpl @Inject constructor(
             addedAtEpochMillis = System.currentTimeMillis(),
             reason = reason,
         )
+        // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+        Log.d("OverflowMenuDiag", "Ignore: DAO insert, id=${item.id}")
         trustedItemDao.insert(item.toEntity())
+        // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+        Log.d("OverflowMenuDiag", "Ignore: DAO insert completed, id=${item.id}")
         AppResult.Success(item)
     }
 

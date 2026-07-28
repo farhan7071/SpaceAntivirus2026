@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -133,7 +134,14 @@ private fun SecurityCenterLoaded(
                     items(state.threats) { threat ->
                         ThreatCard(
                             threat = threat,
-                            onIgnoreClick = { onIgnoreClick(threat.packageName) },
+                            onIgnoreClick = {
+                                // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+                                Log.d(
+                                    "OverflowMenuDiag",
+                                    "Ignore: onIgnoreClick callback, package=${threat.packageName}",
+                                )
+                                onIgnoreClick(threat.packageName)
+                            },
                             onOpenAppInfoClick = { openAppInfo(context, threat.packageName) },
                             onUninstallClick = { requestUninstall(context, threat.packageName) },
                         )
@@ -181,15 +189,26 @@ private fun RiskLevel.toSeverity(): Severity = when (this) {
 }
 
 private fun openAppInfo(context: Context, packageName: String) {
+    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+    Log.d("OverflowMenuDiag", "OpenAppInfo: creating intent, package=$packageName")
     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
         data = Uri.fromParts("package", packageName, null)
     }
+    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+    Log.d("OverflowMenuDiag", "OpenAppInfo: calling startActivity()")
     context.startActivity(intent)
 }
 
 private fun requestUninstall(context: Context, packageName: String) {
+    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
+    Log.d("OverflowMenuDiag", "Uninstall: creating intent, package=$packageName")
     val intent = Intent(Intent.ACTION_DELETE).apply {
         data = Uri.fromParts("package", packageName, null)
     }
+    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release. This
+    // project's existing uninstall mechanism is a plain startActivity()
+    // call, not an ActivityResultLauncher — there is no launcher to log
+    // separately here; this is the one, real invocation point.
+    Log.d("OverflowMenuDiag", "Uninstall: calling startActivity() (existing mechanism, not an ActivityResultLauncher)")
     context.startActivity(intent)
 }
