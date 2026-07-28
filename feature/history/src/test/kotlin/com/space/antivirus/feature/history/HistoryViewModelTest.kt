@@ -2,6 +2,8 @@ package com.space.antivirus.feature.history
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.space.antivirus.core.common.AppError
+import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalyzerId
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
@@ -12,13 +14,22 @@ import com.space.antivirus.core.model.ScanStatistics
 import com.space.antivirus.core.model.ScanType
 import com.space.antivirus.core.model.Threat
 import com.space.antivirus.core.model.ThreatType
+import com.space.antivirus.core.model.TrustedItem
+import com.space.antivirus.core.model.TrustedItemType
 import com.space.antivirus.core.testing.MainDispatcherRule
+import com.space.antivirus.domain.reporting.ThreatDescriptionProvider
 import com.space.antivirus.domain.repository.SecurityRepository
+import com.space.antivirus.domain.repository.TrustedItemRepository
+import com.space.antivirus.domain.usecase.AddTrustedItemUseCase
 import com.space.antivirus.domain.usecase.ObserveScanHistoryUseCase
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -27,6 +38,10 @@ import org.junit.Test
  * Same proportionate testing choice as every prior ViewModel test in
  * this project: mockk on SecurityRepository, stubbed only for the one
  * method actually called, fed into a real ObserveScanHistoryUseCase.
+ *
+ * Sprint 030: descriptionProvider and trustedItemRepository added,
+ * mirroring SecurityCenterViewModelTest's identical additions — see that
+ * file for the full reasoning behind each mocking choice.
  */
 class HistoryViewModelTest {
 
@@ -34,9 +49,15 @@ class HistoryViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val securityRepository = mockk<SecurityRepository>()
+    private val descriptionProvider = mockk<ThreatDescriptionProvider>()
+    private val trustedItemRepository = mockk<TrustedItemRepository>()
 
-    private fun buildViewModel(): HistoryViewModel =
-        HistoryViewModel(ObserveScanHistoryUseCase(securityRepository))
+    private fun buildViewModel(): HistoryViewModel {
+        every { descriptionProvider.shortSummaryFor(any()) } returns "test short summary"
+        every { descriptionProvider.recommendationFor(any(), any(), any()) } returns "test recommendation"
+        val addTrustedItem = AddTrustedItemUseCase(trustedItemRepository, StandardTestDispatcher())
+        return HistoryViewModel(ObserveScanHistoryUseCase(securityRepository), descriptionProvider, addTrustedItem)
+    }
 
     private fun completedSession(id: String, completedAt: Long) = ScanSession(
         id = id,
@@ -85,6 +106,7 @@ class HistoryViewModelTest {
                     ),
                 ),
                 discoveredAtEpochMillis = completedAt,
+                appLabel = "App $index",
             )
         },
     )
@@ -131,7 +153,7 @@ class HistoryViewModelTest {
     }
 
     @Test
-    fun `a flagged scan entry carries the real threat titles, descriptions, and risk levels`() = runTest {
+    fun `a flagged scan entry carries the real appLabel, packageName, and risk levels`() = runTest {
         every { securityRepository.observeScanHistory() } returns
             flowOf(listOf(flaggedScanResult("s1", completedAt = 1_000L, threatCount = 2)))
 
@@ -140,10 +162,29 @@ class HistoryViewModelTest {
             val entry = (awaitItem() as HistoryUiState.Loaded).entries.single()
             assertThat(entry.isClean).isFalse()
             assertThat(entry.threats).hasSize(2)
-            assertThat(entry.threats.first().title).isEqualTo("Unusual permission combination")
+            assertThat(entry.threats.first().appLabel).isEqualTo("App 0")
+            assertThat(entry.threats.first().packageName).isEqualTo("com.example.app0")
             assertThat(entry.threats.first().riskLevel).isEqualTo(RiskLevel.ATTENTION)
         }
     }
+
+    @Test
+    fun `a flagged scan entry's threats carry shortSummary, technicalDetail, evidenceBullets, and recommendation`() =
+        runTest {
+            every { descriptionProvider.shortSummaryFor(any()) } returns "Can access SMS and internet."
+            every { descriptionProvider.recommendationFor(any(), any(), any()) } returns "Review if unexpected."
+            every { securityRepository.observeScanHistory() } returns
+                flowOf(listOf(flaggedScanResult("s1", completedAt = 1_000L, threatCount = 1)))
+
+            buildViewModel().uiState.test {
+                assertThat(awaitItem()).isEqualTo(HistoryUiState.Loading)
+                val threat = (awaitItem() as HistoryUiState.Loaded).entries.single().threats.single()
+                assertThat(threat.shortSummary).isEqualTo("Can access SMS and internet.")
+                assertThat(threat.technicalDetail).isEqualTo("test description 0")
+                assertThat(threat.evidenceBullets).containsExactly("test evidence")
+                assertThat(threat.recommendation).isEqualTo("Review if unexpected.")
+            }
+        }
 
     @Test
     fun `scan metadata - duration and itemsScanned - is carried through from ScanStatistics`() = runTest {
@@ -167,5 +208,40 @@ class HistoryViewModelTest {
             val state = awaitItem()
             assertThat(state).isInstanceOf(HistoryUiState.Error::class.java)
         }
+    }
+
+    @Test
+    fun `onIgnoreClick adds the package as a trusted APPLICATION item`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        coEvery { trustedItemRepository.addTrustedItem(any(), any(), any()) } returns
+            AppResult.Success(
+                TrustedItem(
+                    id = "generated",
+                    identifier = "com.example.ignored",
+                    type = TrustedItemType.APPLICATION,
+                    addedAtEpochMillis = 0L,
+                ),
+            )
+        val viewModel = buildViewModel()
+
+        viewModel.onIgnoreClick("com.example.ignored")
+        runCurrent()
+
+        coVerify(exactly = 1) {
+            trustedItemRepository.addTrustedItem("com.example.ignored", TrustedItemType.APPLICATION, any())
+        }
+    }
+
+    @Test
+    fun `onIgnoreClick does not crash the ViewModel if the underlying repository call fails`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        coEvery { trustedItemRepository.addTrustedItem(any(), any(), any()) } returns
+            AppResult.Failure(AppError.Unexpected(null))
+        val viewModel = buildViewModel()
+
+        viewModel.onIgnoreClick("com.example.ignored")
+        runCurrent()
+
+        // Fire-and-forget by design — reaching this line is the assertion.
     }
 }

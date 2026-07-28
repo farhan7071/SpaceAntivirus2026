@@ -2,6 +2,8 @@ package com.space.antivirus.feature.security
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.space.antivirus.core.common.AppError
+import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalyzerId
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
@@ -12,14 +14,22 @@ import com.space.antivirus.core.model.ScanStatistics
 import com.space.antivirus.core.model.ScanType
 import com.space.antivirus.core.model.Threat
 import com.space.antivirus.core.model.ThreatType
+import com.space.antivirus.core.model.TrustedItem
+import com.space.antivirus.core.model.TrustedItemType
 import com.space.antivirus.core.testing.MainDispatcherRule
 import com.space.antivirus.domain.reporting.ThreatDescriptionProvider
 import com.space.antivirus.domain.repository.SecurityRepository
+import com.space.antivirus.domain.repository.TrustedItemRepository
+import com.space.antivirus.domain.usecase.AddTrustedItemUseCase
 import com.space.antivirus.domain.usecase.ObserveScanHistoryUseCase
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -31,10 +41,11 @@ import org.junit.Test
  * local Fake covering all 14 SecurityRepository methods this ViewModel
  * never touches.
  *
- * Sprint 029: descriptionProvider is also mocked — needed for
- * recommendationFor(threatType), stubbed to a fixed value per test since
- * the ViewModel's own job is calling it, not what it returns (that's
- * ProductionThreatDescriptionProvider's own test's job).
+ * Sprint 030: descriptionProvider is mocked for shortSummaryFor and the
+ * new three-argument recommendationFor. addTrustedItem is also mocked —
+ * built from a real AddTrustedItemUseCase fed a mocked TrustedItemRepository,
+ * the same "mock the repository, use the real UseCase" pattern as
+ * securityRepository above, not a hand-rolled fake UseCase.
  */
 class SecurityCenterViewModelTest {
 
@@ -43,10 +54,17 @@ class SecurityCenterViewModelTest {
 
     private val securityRepository = mockk<SecurityRepository>()
     private val descriptionProvider = mockk<ThreatDescriptionProvider>()
+    private val trustedItemRepository = mockk<TrustedItemRepository>()
 
     private fun buildViewModel(): SecurityCenterViewModel {
-        every { descriptionProvider.recommendationFor(any()) } returns "test recommendation"
-        return SecurityCenterViewModel(ObserveScanHistoryUseCase(securityRepository), descriptionProvider)
+        every { descriptionProvider.shortSummaryFor(any()) } returns "test short summary"
+        every { descriptionProvider.recommendationFor(any(), any(), any()) } returns "test recommendation"
+        val addTrustedItem = AddTrustedItemUseCase(trustedItemRepository, StandardTestDispatcher())
+        return SecurityCenterViewModel(
+            ObserveScanHistoryUseCase(securityRepository),
+            descriptionProvider,
+            addTrustedItem,
+        )
     }
 
     private fun completedSession(id: String = "s1") = ScanSession(
@@ -153,10 +171,12 @@ class SecurityCenterViewModelTest {
         }
 
     @Test
-    fun `each ThreatSummary carries appLabel, packageName, riskLevel, reasons, and recommendation`() =
+    fun `each ThreatSummary carries appLabel, packageName, riskLevel, shortSummary, technicalDetail, evidenceBullets, and recommendation`() =
         runTest {
-            every { descriptionProvider.recommendationFor(ThreatType.SUSPICIOUS_PERMISSION_USAGE) } returns
-                "Review if unexpected."
+            every { descriptionProvider.shortSummaryFor(any()) } returns "Can access SMS and internet."
+            every {
+                descriptionProvider.recommendationFor(ThreatType.SUSPICIOUS_PERMISSION_USAGE, any(), RiskLevel.ATTENTION)
+            } returns "Review if unexpected."
             val realThreat = threat(
                 "t1",
                 appLabel = "Suspicious App",
@@ -174,13 +194,15 @@ class SecurityCenterViewModelTest {
                 assertThat(summary.appLabel).isEqualTo("Suspicious App")
                 assertThat(summary.packageName).isEqualTo("com.example.suspicious")
                 assertThat(summary.riskLevel).isEqualTo(RiskLevel.ATTENTION)
-                assertThat(summary.reasons).containsExactly("SMS access with INTERNET access")
+                assertThat(summary.shortSummary).isEqualTo("Can access SMS and internet.")
+                assertThat(summary.technicalDetail).isEqualTo("legacy description t1")
+                assertThat(summary.evidenceBullets).containsExactly("SMS access with INTERNET access")
                 assertThat(summary.recommendation).isEqualTo("Review if unexpected.")
             }
         }
 
     @Test
-    fun `a Threat with multiple Detections maps to multiple reasons, one bullet per Detection`() = runTest {
+    fun `a Threat with multiple Detections maps to multiple evidenceBullets, one per Detection`() = runTest {
         val multiDetectionThreat = Threat(
             id = "t1",
             targetIdentifier = "com.example.app",
@@ -214,7 +236,7 @@ class SecurityCenterViewModelTest {
             assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
             val state = awaitItem() as SecurityCenterUiState.Loaded
             val summary = state.threats.single()
-            assertThat(summary.reasons).containsExactly("Overlay reason", "Surveillance reason")
+            assertThat(summary.evidenceBullets).containsExactly("Overlay reason", "Surveillance reason")
         }
     }
 
@@ -255,5 +277,44 @@ class SecurityCenterViewModelTest {
             val state = awaitItem()
             assertThat(state).isInstanceOf(SecurityCenterUiState.Error::class.java)
         }
+    }
+
+    // --- onIgnoreClick: Sprint 030, the real "Ignore" action ---
+
+    @Test
+    fun `onIgnoreClick adds the package as a trusted APPLICATION item`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        coEvery { trustedItemRepository.addTrustedItem(any(), any(), any()) } returns
+            AppResult.Success(
+                TrustedItem(
+                    id = "generated",
+                    identifier = "com.example.ignored",
+                    type = TrustedItemType.APPLICATION,
+                    addedAtEpochMillis = 0L,
+                ),
+            )
+        val viewModel = buildViewModel()
+
+        viewModel.onIgnoreClick("com.example.ignored")
+        runCurrent()
+
+        coVerify(exactly = 1) {
+            trustedItemRepository.addTrustedItem("com.example.ignored", TrustedItemType.APPLICATION, any())
+        }
+    }
+
+    @Test
+    fun `onIgnoreClick does not crash the ViewModel if the underlying repository call fails`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        coEvery { trustedItemRepository.addTrustedItem(any(), any(), any()) } returns
+            AppResult.Failure(AppError.Unexpected(null))
+        val viewModel = buildViewModel()
+
+        viewModel.onIgnoreClick("com.example.ignored")
+        runCurrent()
+
+        // Fire-and-forget by design (see the ViewModel's own KDoc) — a
+        // failure here should not throw or crash the calling coroutine.
+        // Reaching this line at all is the assertion.
     }
 }

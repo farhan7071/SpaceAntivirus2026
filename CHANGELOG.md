@@ -6,6 +6,50 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 030 — Security Center UI/UX Modernization
+
+Rebuilds the Security Center and History screens into a polished,
+card-based design — inspired by AVG Protection's layout, implemented as
+an original Material 3 design, not a copy. No detection logic, scan
+engine, or analyzer changed.
+
+### Added
+
+- **`ThreatSummaryCard`** (`core:ui`), the shared component behind both
+  screens: severity-colored accent edge, real app icon (loaded via
+  `PackageManager` at display time, with a letter fallback for
+  uninstalled apps), app identity shown before any explanation, a
+  compact evidence-icon row, a collapsed-by-default short summary, and
+  an expandable section (technical explanation, full evidence list,
+  recommendation) behind a "View details" toggle.
+- **Real actions on every card**: "Ignore" now genuinely marks the app
+  trusted (`AddTrustedItemUseCase`, existing since Sprint 008, never
+  previously connected to any UI); "Open app info" and "Uninstall" both
+  launch real, standard, permission-free Android system intents.
+- **Contextual recommendations and short summaries**, based on which
+  evidence is actually present and how severe the finding is — not
+  identical text for every app.
+
+### Fixed
+
+- **The severity chip that looked clickable but did nothing.** It was a
+  Material3 `AssistChip` with an empty `onClick` — inherently
+  interactive regardless of the lambda's content. Rewritten as a
+  component with no `onClick` parameter at all.
+- History now shares the same card design as Security Center, instead
+  of its own older, plainer layout.
+
+### Not changed
+
+- No new `Detection`/`Threat` fields, no Room schema change. Evidence
+  icons and contextual copy both infer from evidence text this project
+  already controls the wording of; app icons load fresh rather than
+  being persisted.
+
+See ADR 0044 for full reasoning, including the one area not verified
+against a real compiler in this sandbox (exact extended Material icon
+names — isolated to a single file if any need correcting).
+
 ## Sprint 029 — Report Quality & Deduplication
 
 Real-device testing reported the scan report looking harder to read than

@@ -1,6 +1,7 @@
 package com.space.antivirus.domain.reporting
 
 import com.space.antivirus.core.model.Detection
+import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ThreatType
 
 /**
@@ -17,15 +18,30 @@ import com.space.antivirus.core.model.ThreatType
  * copy reviewed against Sprint 002.75 before shipping it. `domain` only
  * defines the seam.
  *
- * `recommendationFor` was added in Sprint 029 — a short, actionable,
+ * `recommendationFor` was added in Sprint 029 as a short, actionable,
  * threatType-keyed recommendation, distinct from `descriptionFor`'s
- * longer prose. Deliberately NOT persisted on Threat: it's purely a
- * function of threatType, which is already persisted, so recomputing it
- * at display time avoids a Room schema change for data that's entirely
- * derivable from a field that already exists.
+ * longer prose. Sprint 030 extended its signature to also take
+ * `detections` and `riskLevel` — threatType alone is too coarse for
+ * genuinely contextual recommendations (every permission-combination
+ * analyzer shares SUSPICIOUS_PERMISSION_USAGE, for instance); the real
+ * evidence and severity already available at every call site let a
+ * camera+microphone finding read differently from an overlay finding,
+ * and an ACTION_NEEDED finding read more urgently than an INFO one,
+ * without inventing any new persisted data. Deliberately NOT persisted
+ * on Threat: it's derived entirely from fields Threat already carries
+ * (threatType, riskLevel) plus detections it already has a full list of,
+ * so recomputing it at display time needs no Room schema change.
+ *
+ * `shortSummaryFor` was added in Sprint 030 — a single, compact sentence
+ * for a card's always-visible collapsed state, distinct from both
+ * `descriptionFor`'s long-form prose (kept for the expanded "technical
+ * explanation" section) and `recommendationFor`'s action-oriented text.
+ * Same reasoning: derived from detections already available, not a new
+ * persisted field.
  */
 interface ThreatDescriptionProvider {
     fun titleFor(threatType: ThreatType, detections: List<Detection>): String
     fun descriptionFor(threatType: ThreatType, detections: List<Detection>): String
-    fun recommendationFor(threatType: ThreatType): String
+    fun recommendationFor(threatType: ThreatType, detections: List<Detection>, riskLevel: RiskLevel): String
+    fun shortSummaryFor(detections: List<Detection>): String
 }

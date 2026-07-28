@@ -2,6 +2,7 @@ package com.space.antivirus.feature.security
 
 import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -14,22 +15,54 @@ import org.junit.Test
 /**
  * Tests the stateless SecurityCenterScreen directly with hand-built
  * SecurityCenterUiState, same pattern HomeScreenTest/OnboardingScreenTest
- * established (ADR 0030) — no Hilt test infrastructure needed. Updated in
- * Sprint 021 for the new onViewHistoryClick callback (History's only
- * entry point in the real app).
+ * established (ADR 0030) — no Hilt test infrastructure needed.
+ *
+ * Sprint 030 (ADR 0044): rewritten for ThreatSummaryCard's collapsed/
+ * expanded structure — evidenceBullets and recommendation now only
+ * render after "View details" is tapped, matching the real component's
+ * own behavior (ThreatSummaryCardTest, core:ui, covers that expand
+ * mechanism directly; this file focuses on this screen's own wiring:
+ * which UiState renders what, and that onIgnoreClick/history navigation
+ * reach the right callback with the right argument).
  */
 class SecurityCenterScreenTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    private fun setScreen(uiState: SecurityCenterUiState, onViewHistoryClick: () -> Unit = {}) {
+    private fun setScreen(
+        uiState: SecurityCenterUiState,
+        onViewHistoryClick: () -> Unit = {},
+        onIgnoreClick: (String) -> Unit = {},
+    ) {
         composeTestRule.setContent {
             SpaceAntivirusTheme {
-                SecurityCenterScreen(uiState = uiState, onViewHistoryClick = onViewHistoryClick)
+                SecurityCenterScreen(
+                    uiState = uiState,
+                    onViewHistoryClick = onViewHistoryClick,
+                    onIgnoreClick = onIgnoreClick,
+                )
             }
         }
     }
+
+    private fun threatSummary(
+        appLabel: String = "Example App",
+        packageName: String = "com.example.app",
+        riskLevel: RiskLevel = RiskLevel.ATTENTION,
+        shortSummary: String = "A short summary.",
+        technicalDetail: String = "The full technical explanation.",
+        evidenceBullets: List<String> = listOf("Some reason"),
+        recommendation: String = "Review if unexpected.",
+    ) = ThreatSummary(
+        appLabel = appLabel,
+        packageName = packageName,
+        riskLevel = riskLevel,
+        shortSummary = shortSummary,
+        technicalDetail = technicalDetail,
+        evidenceBullets = evidenceBullets,
+        recommendation = recommendation,
+    )
 
     @Test
     fun unknownStatus_showsTheNoScanYetMessage() {
@@ -74,20 +107,8 @@ class SecurityCenterScreenTest {
                 protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
                 lastScanCompletedAtEpochMillis = 2_000L,
                 threats = listOf(
-                    ThreatSummary(
-                        appLabel = "Chrome",
-                        packageName = "com.android.chrome",
-                        riskLevel = RiskLevel.ATTENTION,
-                        reasons = listOf("SMS access with INTERNET access"),
-                        recommendation = "Review if unexpected.",
-                    ),
-                    ThreatSummary(
-                        appLabel = "WhatsApp",
-                        packageName = "com.definitely.not.whatsapp",
-                        riskLevel = RiskLevel.ATTENTION,
-                        reasons = listOf("Package doesn't match the real app"),
-                        recommendation = "Verify the official listing.",
-                    ),
+                    threatSummary(appLabel = "Chrome", packageName = "com.android.chrome"),
+                    threatSummary(appLabel = "WhatsApp", packageName = "com.definitely.not.whatsapp"),
                 ),
             ),
         )
@@ -99,47 +120,41 @@ class SecurityCenterScreenTest {
     }
 
     @Test
-    fun aThreatWithMultipleReasons_showsEveryReasonAsItsOwnBullet() {
+    fun shortSummaryIsAlwaysVisible_withoutExpanding() {
+        setScreen(
+            SecurityCenterUiState.Loaded(
+                protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
+                lastScanCompletedAtEpochMillis = 2_000L,
+                threats = listOf(threatSummary(shortSummary = "Can record and transmit media.")),
+            ),
+        )
+
+        composeTestRule.onNodeWithText("Can record and transmit media.").assertExists()
+    }
+
+    @Test
+    fun evidenceBulletsAndRecommendation_onlyAppearAfterExpanding() {
         setScreen(
             SecurityCenterUiState.Loaded(
                 protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
                 lastScanCompletedAtEpochMillis = 2_000L,
                 threats = listOf(
-                    ThreatSummary(
-                        appLabel = "Example App",
-                        packageName = "com.example.app",
-                        riskLevel = RiskLevel.ACTION_NEEDED,
-                        reasons = listOf("Overlay reason", "Surveillance reason", "Installer reason"),
+                    threatSummary(
+                        evidenceBullets = listOf("Overlay reason", "Surveillance reason"),
                         recommendation = "Review these findings.",
                     ),
                 ),
             ),
         )
 
+        composeTestRule.onNodeWithText("\u2022 Overlay reason").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Review these findings.").assertDoesNotExist()
+
+        composeTestRule.onNodeWithText("View details").performClick()
+
         composeTestRule.onNodeWithText("\u2022 Overlay reason").assertExists()
         composeTestRule.onNodeWithText("\u2022 Surveillance reason").assertExists()
-        composeTestRule.onNodeWithText("\u2022 Installer reason").assertExists()
-    }
-
-    @Test
-    fun aThreatCard_showsARecommendation() {
-        setScreen(
-            SecurityCenterUiState.Loaded(
-                protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
-                lastScanCompletedAtEpochMillis = 2_000L,
-                threats = listOf(
-                    ThreatSummary(
-                        appLabel = "Example App",
-                        packageName = "com.example.app",
-                        riskLevel = RiskLevel.ATTENTION,
-                        reasons = listOf("Some reason"),
-                        recommendation = "Review if unexpected.",
-                    ),
-                ),
-            ),
-        )
-
-        composeTestRule.onNodeWithText("Review if unexpected.").assertExists()
+        composeTestRule.onNodeWithText("Review these findings.").assertExists()
     }
 
     @Test
@@ -186,5 +201,23 @@ class SecurityCenterScreenTest {
         composeTestRule.onNodeWithText("View full history").performClick()
 
         assertThat(clicked).isTrue()
+    }
+
+    @Test
+    fun ignoringACard_invokesOnIgnoreClickWithThatCardsPackageName() {
+        var ignoredPackageName: String? = null
+        setScreen(
+            uiState = SecurityCenterUiState.Loaded(
+                protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
+                lastScanCompletedAtEpochMillis = 2_000L,
+                threats = listOf(threatSummary(packageName = "com.example.suspicious")),
+            ),
+            onIgnoreClick = { ignoredPackageName = it },
+        )
+
+        composeTestRule.onNode(hasContentDescription("More actions")).performClick()
+        composeTestRule.onNodeWithText("Ignore").performClick()
+
+        assertThat(ignoredPackageName).isEqualTo("com.example.suspicious")
     }
 }

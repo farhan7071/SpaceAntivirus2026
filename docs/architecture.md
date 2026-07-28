@@ -1246,6 +1246,53 @@ mistake made and corrected during this sprint's own implementation: a
 stale local clone initially led to Sprint 028's fixes being incorrectly
 assumed missing.
 
+### Security Center UI/UX Modernization (Sprint 030)
+
+Rebuilds the Security Center and History screens into a card-based
+design, inspired by AVG Protection's layout but an original Material 3
+implementation. The shared component this depends on:
+
+```
+ThreatSummaryCard (core:ui)
+  ├─ colored severity accent edge (SeverityColors — defined since early
+  │  in this project, first actually wired into anything here)
+  ├─ AppIcon (PackageManager lookup at display time, letter fallback)
+  ├─ app name + package name (identity always shown first)
+  ├─ StatusChip (Sprint 030 fix — was a fake-interactive AssistChip)
+  ├─ EvidenceIcon row (keyword-inferred from evidenceDescription text)
+  ├─ short summary (always visible, collapsed state)
+  └─ [View details] → expands:
+       ├─ technical explanation (Threat.description, preserved
+       │  unused since Sprint 029 specifically for this)
+       ├─ evidence bullets (Detection.evidenceDescription, one per line)
+       └─ recommendation (contextual — keyword + riskLevel based,
+          not just threatType)
+  overflow menu: Ignore (→ AddTrustedItemUseCase, Sprint 008,
+    never wired to any UI before now) · Open App Info · Uninstall
+    (both real, permission-free Android Intents, launched from the
+    screen, never the ViewModel)
+```
+
+Both `SecurityCenterScreen` and the History screen render this same
+component — `feature:security` and `feature:history` still don't depend
+on each other; the shared piece lives in `core:ui`, already
+automatically available to both via the feature convention plugin.
+
+No new fields were added to `Detection` or `Threat` for any of this.
+Evidence icons and contextual recommendations both infer from evidence
+text this project already controls the wording of, rather than paying
+for another Room migration; app icons load fresh at display time from
+the package name already available, rather than being persisted.
+
+Uninstall is offered unconditionally on every card with no `isSystemApp`
+check needed — every analyzer already excludes system apps before ever
+producing a `Detection`, so any app a card exists for is already
+guaranteed non-system.
+
+See ADR 0044 for full reasoning, including the one area of this sprint
+(exact extended Material icon names) not verified against a real
+compiler in this sandbox.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

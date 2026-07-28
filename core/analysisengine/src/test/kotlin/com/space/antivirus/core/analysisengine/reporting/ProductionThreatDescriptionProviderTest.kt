@@ -153,4 +153,129 @@ class ProductionThreatDescriptionProviderTest {
 
         assertThat(first).isEqualTo(second)
     }
+
+    // --- recommendationFor: Sprint 030 contextual behavior ---
+
+    @Test
+    fun `ACTION_NEEDED always recommends reviewing immediately, regardless of evidence content`() {
+        val detections = listOf(detection(evidenceDescription = "camera, microphone, and internet access"))
+
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            detections,
+            RiskLevel.ACTION_NEEDED,
+        )
+
+        assertThat(recommendation).isEqualTo("Review immediately.")
+    }
+
+    @Test
+    fun `camera or microphone evidence gets a media-specific recommendation, not the generic default`() {
+        val detections = listOf(detection(evidenceDescription = "camera, microphone, and internet access"))
+
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            detections,
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).contains("calls or media")
+    }
+
+    @Test
+    fun `overlay evidence gets an overlay-specific recommendation`() {
+        val detections = listOf(detection(evidenceDescription = "can draw over other apps with internet access"))
+
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            detections,
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).contains("overlay access")
+    }
+
+    @Test
+    fun `sms evidence gets an sms-specific recommendation`() {
+        val detections = listOf(detection(evidenceDescription = "sms access with internet access"))
+
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            detections,
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).contains("SMS access")
+    }
+
+    @Test
+    fun `evidence matching no known keyword falls back to the threatType default`() {
+        val detections = listOf(detection(evidenceDescription = "built as debuggable"))
+
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_APP_CONFIGURATION,
+            detections,
+            RiskLevel.INFO,
+        )
+
+        assertThat(recommendation).contains("development, testing, or alternative app stores")
+    }
+
+    @Test
+    fun `two different findings produce two different recommendations - not identical text for every app`() {
+        // Directly the sprint's own requirement: "avoid repeating
+        // identical text for every app."
+        val cameraRecommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            listOf(detection(evidenceDescription = "camera and microphone access")),
+            RiskLevel.ATTENTION,
+        )
+        val overlayRecommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            listOf(detection(evidenceDescription = "can draw over other apps")),
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(cameraRecommendation).isNotEqualTo(overlayRecommendation)
+    }
+
+    // --- shortSummaryFor: Sprint 030 ---
+
+    @Test
+    fun `camera and microphone evidence gets the media-capture short summary`() {
+        val detections = listOf(detection(evidenceDescription = "camera, microphone, and internet access"))
+
+        assertThat(provider.shortSummaryFor(detections)).isEqualTo("Can record and transmit media.")
+    }
+
+    @Test
+    fun `overlay evidence gets the overlay short summary`() {
+        val detections = listOf(detection(evidenceDescription = "can draw over other apps"))
+
+        assertThat(provider.shortSummaryFor(detections)).isEqualTo("Can display content over other apps.")
+    }
+
+    @Test
+    fun `unmatched evidence falls back to the first detection's own evidence text, not a placeholder`() {
+        val detections = listOf(detection(evidenceDescription = "a genuinely novel piece of evidence text"))
+
+        assertThat(provider.shortSummaryFor(detections)).isEqualTo("a genuinely novel piece of evidence text")
+    }
+
+    @Test
+    fun `rejects an empty detections list`() {
+        val exception = runCatching { provider.shortSummaryFor(emptyList()) }.exceptionOrNull()
+
+        assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `short summaries are deterministic`() {
+        val detections = listOf(detection(evidenceDescription = "sms access with internet access"))
+
+        val first = provider.shortSummaryFor(detections)
+        val second = provider.shortSummaryFor(detections)
+
+        assertThat(first).isEqualTo(second)
+    }
 }
