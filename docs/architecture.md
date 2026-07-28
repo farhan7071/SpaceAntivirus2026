@@ -1354,6 +1354,60 @@ deliberately excluded from confidence modulation and why, and an honest
 note on the one area (the Samsung Galaxy Store package name) not
 verified against a live device in this sandbox.
 
+### Context-Aware Detection Intelligence (Sprint 032)
+
+The brief named three classes to review — `PermissionCombinationAnalyzer`,
+`OverlayBehaviorAnalyzer`, `SmsBehaviorAnalyzer` — none of which exist
+under those names. Verified against a fresh clone before any other
+work, per the brief's own "do not assume anything" instruction; mapped
+to the real classes (`SuspiciousPermissionPatternAnalyzer`,
+`OverlayPermissionAnalyzer`, `SurveillanceCombinationAnalyzer` — there
+is no separate SMS-only analyzer) and documented explicitly in ADR 0046
+rather than silently guessed at.
+
+Two real, already-collected `AppCategory` values (`AUDIO`, `MAPS` —
+mirroring Android's own taxonomy exactly, ADR 0042) were sitting unused
+by any analyzer. `OverlayPermissionAnalyzer` now recognizes both:
+`AUDIO` for floating media controls, `MAPS` (Android's real "Maps &
+Navigation" category) for navigation/ride-sharing overlay use.
+`SurveillanceCombinationAnalyzer` gained `IMAGE` as a confidence-
+downgrade signal (not a suppression like its existing `VIDEO`/`SOCIAL`
+handling) for camera apps and photo editors — a photo editor doesn't
+inherently need `RECORD_AUDIO` the way a video-calling app does, so
+this is deliberately a weaker signal than outright suppression.
+
+Banking, wearable-companion, and smart-home apps — also named in the
+brief — have no corresponding Android category at all; `AppCategory`
+mirrors the platform's real taxonomy on purpose, so this is a genuine,
+documented limitation rather than an invented category. Installer trust
+remains the only applicable signal for those app types.
+
+`CumulativeRiskScorer` needed no change — "cross-analyzer reasoning" is
+satisfied by the same Sprint 031 mechanism doing more useful work now
+that more analyzers correctly recognize more categories: each finding
+still drops below the escalation threshold independently, with no
+analyzer aware of any other's decision.
+
+`ThreatDescriptionProvider.recommendationFor`'s three branches now each
+name several plausible legitimate app types instead of one — the method
+only ever sees evidence text and a confidence value, so naming multiple
+real possibilities is the honest version of specificity available at
+that layer, rather than inventing certainty ("this is definitely a
+banking app") the method doesn't have.
+
+Regression proven both structurally and behaviorally: `AppIdentityImpersonationAnalyzer`
+and `HighRiskPackageNameAnalyzer`'s main files are untouched this
+sprint, and new tests confirm both report their original, unmodified
+confidence even from a trusted app store. `ThreatBuildingPipelineIntegrationTest.kt`
+and `CumulativeRiskScorer.kt` are also untouched — the existing test
+proving a genuinely suspicious app with no legitimacy signal still
+escalates continues to pass unmodified.
+
+See ADR 0046 for full reasoning, including the exact `PermissionCombinationAnalyzer`/
+`OverlayBehaviorAnalyzer`/`SmsBehaviorAnalyzer` naming discrepancy and
+why Android's real category taxonomy sets a hard limit on what this
+sprint could recognize.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

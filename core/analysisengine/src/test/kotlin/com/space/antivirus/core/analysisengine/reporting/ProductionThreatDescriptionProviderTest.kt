@@ -242,6 +242,56 @@ class ProductionThreatDescriptionProviderTest {
         assertThat(cameraRecommendation).isNotEqualTo(overlayRecommendation)
     }
 
+    // --- recommendationFor: Sprint 032, broadened contextual wording ---
+
+    @Test
+    fun `camera-microphone recommendation names several plausible legitimate app types, not just one`() {
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            listOf(detection(evidenceDescription = "camera and microphone access")),
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).contains("calls or media")
+        assertThat(recommendation).contains("ride-sharing")
+    }
+
+    @Test
+    fun `overlay recommendation names several plausible legitimate app types, not just one`() {
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            listOf(detection(evidenceDescription = "can draw over other apps")),
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).contains("overlay access")
+        assertThat(recommendation).contains("navigation")
+    }
+
+    @Test
+    fun `sms recommendation names banking authentication as an expected use, not just messaging`() {
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            listOf(detection(evidenceDescription = "sms access with internet access")),
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).contains("SMS access")
+        assertThat(recommendation).contains("banking authentication")
+    }
+
+    @Test
+    fun `broadened wording still combines correctly with the LOW-confidence legitimacy sentence`() {
+        val recommendation = provider.recommendationFor(
+            ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+            listOf(detection(evidenceDescription = "sms access with internet access", confidence = Confidence.LOW)),
+            RiskLevel.ATTENTION,
+        )
+
+        assertThat(recommendation).contains("banking authentication")
+        assertThat(recommendation).contains("more likely expected behavior")
+    }
+
     // --- shortSummaryFor: Sprint 030 ---
 
     @Test

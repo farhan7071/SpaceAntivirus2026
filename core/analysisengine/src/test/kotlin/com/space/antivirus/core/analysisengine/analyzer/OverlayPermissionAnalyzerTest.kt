@@ -116,4 +116,22 @@ class OverlayPermissionAnalyzerTest {
             val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
             assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.MODERATE)
         }
+
+    // --- Sprint 032: two more real, already-populated categories added ---
+
+    @Test
+    fun `AUDIO category downgrades confidence - floating media controls are expected on music apps`() = runTest {
+        val result = analyzer.analyze(appTarget(permissions = overlayPlusInternet, category = AppCategory.AUDIO))
+
+        val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+        assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.LOW)
+    }
+
+    @Test
+    fun `MAPS category downgrades confidence - navigation directions overlay is expected`() = runTest {
+        val result = analyzer.analyze(appTarget(permissions = overlayPlusInternet, category = AppCategory.MAPS))
+
+        val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+        assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.LOW)
+    }
 }

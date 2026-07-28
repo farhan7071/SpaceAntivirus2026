@@ -55,6 +55,18 @@ import javax.inject.Inject
  * SOCIAL are already fully suppressed above; only installer trust is
  * left as a real, additional legitimacy signal for whatever remains.
  *
+ * Sprint 032: category consistency DOES now apply once more, narrowly —
+ * apps declaring AppCategory.IMAGE (camera apps, photo editors) get the
+ * same confidence-downgrade treatment as installer trust, not
+ * suppression. This is deliberately NOT added to the suppression set
+ * above: a pure photo editor doesn't inherently need RECORD_AUDIO the
+ * way a video-calling app inherently needs it, so "camera app requests
+ * camera+microphone+internet" is a weaker, not zero, legitimacy signal —
+ * exactly the distinction a confidence downgrade exists to express that
+ * an outright suppression can't. The VIDEO/SOCIAL suppression itself is
+ * completely unchanged — that reasoning was already sound and stays
+ * exactly as written above. See ADR 0046.
+ *
  * System apps excluded entirely, same reasoning as every prior analyzer.
  */
 class SurveillanceCombinationAnalyzer @Inject constructor() : ThreatAnalyzer {
@@ -96,7 +108,7 @@ class SurveillanceCombinationAnalyzer @Inject constructor() : ThreatAnalyzer {
             confidence = ConfidenceModulation.modulate(
                 base = Confidence.MODERATE,
                 app = app,
-                categoryIsConsistent = false,
+                categoryIsConsistent = app.category == AppCategory.IMAGE,
             ),
         )
 

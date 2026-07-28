@@ -6,6 +6,57 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 032 — Context-Aware Detection Intelligence
+
+The brief named three classes to review before making changes —
+`PermissionCombinationAnalyzer`, `OverlayBehaviorAnalyzer`,
+`SmsBehaviorAnalyzer` — none of which exist under those names in this
+codebase. Verified against a fresh clone before any other work, per the
+brief's own "do not assume anything" instruction, and mapped explicitly
+onto the real classes (`SuspiciousPermissionPatternAnalyzer`,
+`OverlayPermissionAnalyzer`, `SurveillanceCombinationAnalyzer`) rather
+than guessed at silently. See ADR 0046.
+
+### Improved
+
+- **`OverlayPermissionAnalyzer`** now recognizes two more real,
+  already-collected app categories as legitimacy signals: `AUDIO`
+  (floating media-playback controls) and `MAPS` — Android's actual
+  "Maps & Navigation" category — for navigation and ride-sharing apps
+  showing turn-by-turn directions as an overlay.
+- **`SurveillanceCombinationAnalyzer`** now treats `IMAGE`-category apps
+  (camera apps, photo editors) as a confidence-downgrade signal —
+  deliberately *not* added to its existing `VIDEO`/`SOCIAL` suppression:
+  a photo editor doesn't inherently need microphone access the way a
+  video-calling app does, so this is a genuinely weaker signal.
+- **Recommendations** for camera/microphone, overlay, and SMS findings
+  now each name several plausible legitimate app types (ride-sharing
+  verification, navigation, banking authentication, and others) instead
+  of one generic phrase — honestly, since the engine has no way to know
+  which one specifically applies from evidence text alone.
+
+### Not changed, deliberately
+
+- No new analyzers, no UI changes, no Room schema changes.
+- `CumulativeRiskScorer` needed no change — cross-analyzer reasoning is
+  satisfied by the existing Sprint 031 escalation mechanism doing more
+  useful work now that more analyzers recognize more categories
+  correctly, not a new mechanism.
+- `AppIdentityImpersonationAnalyzer` and `HighRiskPackageNameAnalyzer`
+  are completely untouched — confirmed both structurally (their main
+  files weren't modified) and behaviorally (new tests prove both still
+  report their original, unmodified confidence even from a trusted app
+  store).
+- Banking, wearable-companion, and smart-home apps — also named in this
+  sprint's brief — have no corresponding category in Android's own
+  taxonomy, which `AppCategory` deliberately mirrors exactly rather than
+  inventing categories the OS doesn't provide. Installer trust remains
+  the only applicable signal for those app types; documented as a
+  genuine platform limitation, not worked around.
+
+See ADR 0046 for full reasoning, including the exact class-naming
+discrepancy found before any code was touched.
+
 ## Sprint 031 — Detection Intelligence & Confidence Engine v2
 
 Physical-device testing reported well-known, feature-rich apps

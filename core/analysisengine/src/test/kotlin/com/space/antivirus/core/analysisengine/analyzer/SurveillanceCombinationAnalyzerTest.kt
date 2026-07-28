@@ -128,15 +128,29 @@ class SurveillanceCombinationAnalyzerTest {
     }
 
     @Test
-    fun `PRODUCTIVITY category alone does not downgrade confidence - category consistency is not reused here`() =
+    fun `PRODUCTIVITY category does not downgrade confidence - only IMAGE is consistent for this analyzer`() =
         runTest {
-            // Confirms categoryIsConsistent is deliberately false for this
-            // analyzer's ConfidenceModulation call - VIDEO/SOCIAL are
-            // already fully suppressed above, so no category should be
-            // able to ALSO trigger a downgrade at the confidence stage.
+            // Sprint 032 added AppCategory.IMAGE as the one category this
+            // analyzer treats as consistent (camera apps, photo editors).
+            // PRODUCTIVITY isn't IMAGE, so this confirms the check is
+            // exact, not a broad "any declared category helps" rule -
+            // VIDEO/SOCIAL are handled separately, by suppression, above.
             val result = analyzer.analyze(appTarget(permissions = allThree, category = AppCategory.PRODUCTIVITY))
 
             val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
             assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.MODERATE)
+        }
+
+    @Test
+    fun `IMAGE category downgrades confidence - camera apps and photo editors are expected, not suppressed`() =
+        runTest {
+            // Sprint 032: deliberately a downgrade, not a suppression like
+            // VIDEO/SOCIAL above - a pure photo editor doesn't inherently
+            // need RECORD_AUDIO the way a video-calling app does, so this
+            // is a weaker, not zero, legitimacy signal.
+            val result = analyzer.analyze(appTarget(permissions = allThree, category = AppCategory.IMAGE))
+
+            val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+            assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.LOW)
         }
 }

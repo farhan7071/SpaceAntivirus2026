@@ -3,7 +3,9 @@ package com.space.antivirus.core.analysisengine.analyzer
 import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalysisOutcome
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.InstalledApplicationInfo
+import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -12,7 +14,11 @@ class HighRiskPackageNameAnalyzerTest {
 
     private val analyzer = HighRiskPackageNameAnalyzer()
 
-    private fun appTarget(packageName: String, isSystemApp: Boolean = false) = ScanTarget.ApplicationTarget(
+    private fun appTarget(
+        packageName: String,
+        isSystemApp: Boolean = false,
+        installerPackageName: String? = null,
+    ) = ScanTarget.ApplicationTarget(
         InstalledApplicationInfo(
             packageName = packageName,
             appLabel = "Example",
@@ -22,6 +28,7 @@ class HighRiskPackageNameAnalyzerTest {
             isSystemApp = isSystemApp,
             apkPath = "/data/app/example.apk",
             requestedPermissions = emptyList(),
+            installerPackageName = installerPackageName,
         ),
     )
 
@@ -85,4 +92,25 @@ class HighRiskPackageNameAnalyzerTest {
         assertThat(evidence).contains("com.android.fakesystemupdate")
         assertThat(evidence).contains("com.android.")
     }
+
+    // --- Sprint 032 regression: namespace-impersonation detection is unaffected by ConfidenceModulation ---
+
+    @Test
+    fun `confidence stays HIGH even from a trusted app store - not downgraded like the permission-behavior analyzers`() =
+        runTest {
+            // Same reasoning as AppIdentityImpersonationAnalyzer's identical
+            // regression test: a non-system app squatting a reserved
+            // system namespace has no legitimate excuse regardless of
+            // which store it came from.
+            val result = analyzer.analyze(
+                appTarget(
+                    packageName = "com.android.fakesystemupdate",
+                    installerPackageName = "com.android.vending",
+                ),
+            )
+
+            val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+            assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.HIGH)
+            assertThat(outcome.detections.single().riskLevel).isEqualTo(RiskLevel.ATTENTION)
+        }
 }

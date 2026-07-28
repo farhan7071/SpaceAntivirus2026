@@ -6,8 +6,10 @@ import com.space.antivirus.core.common.AppResult
 import com.space.antivirus.core.model.AnalysisOutcome
 import com.space.antivirus.core.model.AnalyzerCapability
 import com.space.antivirus.core.model.AnalyzerId
+import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.FileMetadata
 import com.space.antivirus.core.model.InstalledApplicationInfo
+import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.core.model.ThreatType
 import kotlinx.coroutines.test.runTest
@@ -21,6 +23,7 @@ class AppIdentityImpersonationAnalyzerTest {
         appLabel: String,
         packageName: String,
         isSystemApp: Boolean = false,
+        installerPackageName: String? = null,
     ) = ScanTarget.ApplicationTarget(
         InstalledApplicationInfo(
             packageName = packageName,
@@ -31,6 +34,7 @@ class AppIdentityImpersonationAnalyzerTest {
             isSystemApp = isSystemApp,
             apkPath = "/data/app/example.apk",
             requestedPermissions = emptyList(),
+            installerPackageName = installerPackageName,
         ),
     )
 
@@ -156,4 +160,32 @@ class AppIdentityImpersonationAnalyzerTest {
         assertThat(result).isInstanceOf(AppResult.Failure::class.java)
         assertThat((result as AppResult.Failure).error).isInstanceOf(AppError.InvalidScanConfiguration::class.java)
     }
+
+    // --- Sprint 032 regression: impersonation detection is unaffected by ConfidenceModulation ---
+
+    @Test
+    fun `impersonation confidence stays MODERATE even from a trusted app store - not downgraded like the permission-behavior analyzers`() =
+        runTest {
+            // Directly what this sprint's brief asks to be proven
+            // unchanged: an app claiming to be Instagram but installed
+            // "through the Play Store" is exactly as suspicious as one
+            // from anywhere else - a genuine app has no reason to lie
+            // about its identity regardless of distribution channel.
+            // ConfidenceModulation is deliberately never called from this
+            // analyzer at all (confirmed by this analyzer's own file
+            // having no dependency on it) - this test proves that
+            // omission holds at the behavioral level, not just in the
+            // source code.
+            val result = analyzer.analyze(
+                appTarget(
+                    appLabel = "Instagram",
+                    packageName = "com.fake.instagram.clone",
+                    installerPackageName = "com.android.vending",
+                ),
+            )
+
+            val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+            assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.MODERATE)
+            assertThat(outcome.detections.single().riskLevel).isEqualTo(RiskLevel.ATTENTION)
+        }
 }

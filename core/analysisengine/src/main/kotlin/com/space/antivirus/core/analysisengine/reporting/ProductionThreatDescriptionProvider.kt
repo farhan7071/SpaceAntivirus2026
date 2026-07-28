@@ -88,6 +88,17 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
      * has no way to distinguish the two without ConfidenceModulation
      * itself returning more than a Confidence value, which would be a
      * larger, unwarranted change for what this sentence needs to say.
+     *
+     * Sprint 032: each branch now names several plausible legitimate app
+     * types, not just one — deliberately, not as an attempt to guess
+     * which one actually applies. This method only ever receives
+     * evidenceDescription text and a Confidence value; it has no more
+     * specific signal (declared category, installer) than that to work
+     * from, and inventing a false sense of specificity ("this is
+     * definitely a banking app") would be exactly the kind of
+     * unsupported, absolute statement this project avoids. Naming
+     * several real categories the pattern is expected for is the honest
+     * version of "balanced explanation" available at this layer.
      */
     override fun recommendationFor(
         threatType: ThreatType,
@@ -101,11 +112,15 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
         val evidence = combinedEvidenceLowercase(detections)
         val baseRecommendation = when {
             "camera" in evidence || "microphone" in evidence ->
-                "Expected if you actively use this application for calls or media."
+                "Expected if you actively use this application for calls or media — common for " +
+                    "camera apps, video calling, ride-sharing verification, or other communication apps."
             "draw over other apps" in evidence ->
-                "Verify this application is trusted before allowing overlay access."
+                "Often expected for floating media controls, picture-in-picture, navigation " +
+                    "directions, or chat heads. Verify this application is trusted before allowing " +
+                    "overlay access if you don't recognize why it needs this."
             "sms" in evidence ->
-                "Review why this app needs SMS access if you don't expect it to."
+                "Often expected for one-time codes in messaging or banking authentication. Review " +
+                    "why this app needs SMS access if you don't expect it to."
             else -> defaultRecommendationFor(threatType)
         }
 

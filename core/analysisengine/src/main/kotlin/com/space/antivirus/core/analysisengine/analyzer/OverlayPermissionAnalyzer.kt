@@ -41,6 +41,23 @@ import javax.inject.Inject
  * downgrade via ConfidenceModulation, not a suppression — the finding
  * still surfaces, just no longer able to co-escalate a Threat to
  * ACTION_NEEDED on its own when a genuine legitimacy signal is present.
+ *
+ * Sprint 032: two more real, already-populated AppCategory values added
+ * to this set — AUDIO (floating media-playback controls, a real and
+ * common overlay use on music apps) and MAPS (Android's actual "Maps &
+ * Navigation" Play Console category — a real, on-device signal for
+ * navigation and ride-sharing apps, which commonly show turn-by-turn
+ * directions as an overlay while the user is in another app). Neither
+ * required new data collection; both are existing AppCategory values
+ * this analyzer simply wasn't checking yet. "Banking," "wearable
+ * companion," and "smart-home" apps — also named in this sprint's
+ * brief — have no corresponding AppCategory value to check at all:
+ * Android's own category taxonomy (which AppCategory mirrors exactly,
+ * ADR 0042) has no finance, wearable, or smart-home category. That's a
+ * genuine limitation of the platform data available, not something this
+ * analyzer can work around — installer trust (ConfidenceModulation's
+ * other signal) remains the only applicable legitimacy signal for those
+ * app types. See ADR 0046.
  */
 class OverlayPermissionAnalyzer @Inject constructor() : ThreatAnalyzer {
 
@@ -96,6 +113,8 @@ class OverlayPermissionAnalyzer @Inject constructor() : ThreatAnalyzer {
             AppCategory.VIDEO,
             AppCategory.PRODUCTIVITY,
             AppCategory.GAME,
+            AppCategory.AUDIO,
+            AppCategory.MAPS,
         )
     }
 }
