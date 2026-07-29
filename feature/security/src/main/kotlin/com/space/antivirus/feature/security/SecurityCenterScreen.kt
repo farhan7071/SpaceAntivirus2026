@@ -2,6 +2,7 @@ package com.space.antivirus.feature.security
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import android.util.Log
@@ -225,6 +226,49 @@ private fun requestUninstall(context: Context, packageName: String) {
         // runtime type logged above is the next thing to check.
         flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
+
+    // DIAGNOSTIC (Sprint 32.3) — temporary, remove before release. Added
+    // specifically to compare a working package against a failing one,
+    // per real-device testing that showed FLAG_ACTIVITY_NEW_TASK alone
+    // (Sprint 32.1) does not resolve this for every package. Every
+    // PackageManager call here is purely read-only diagnostic
+    // information gathering — none of it affects packageName, intent, or
+    // the existing startActivity() call below in any way, and each is
+    // independently try/caught so a failure gathering ONE diagnostic
+    // (e.g. the target package genuinely not being installed) can never
+    // prevent the real, unchanged uninstall flow underneath this logging
+    // from running exactly as it already does.
+    val packageManager = context.packageManager
+
+    try {
+        val appInfo = packageManager.getApplicationInfo(packageName, 0)
+        Log.d("OverflowMenuDiag", "Uninstall: getApplicationInfo() succeeded for package=$packageName")
+        Log.d(
+            "OverflowMenuDiag",
+            "Uninstall: applicationInfo.flags=${appInfo.flags} (0x${appInfo.flags.toString(16)})",
+        )
+        Log.d("OverflowMenuDiag", "Uninstall: applicationInfo.enabled=${appInfo.enabled}")
+        Log.d("OverflowMenuDiag", "Uninstall: applicationInfo.sourceDir=${appInfo.sourceDir}")
+    } catch (e: PackageManager.NameNotFoundException) {
+        Log.d(
+            "OverflowMenuDiag",
+            "Uninstall: getApplicationInfo() threw NameNotFoundException for package=$packageName",
+        )
+    }
+
+    try {
+        @Suppress("DEPRECATION")
+        val installerPackageName = packageManager.getInstallerPackageName(packageName)
+        Log.d("OverflowMenuDiag", "Uninstall: installer package=$installerPackageName")
+    } catch (e: IllegalArgumentException) {
+        Log.d("OverflowMenuDiag", "Uninstall: getInstallerPackageName() threw IllegalArgumentException")
+    }
+
+    val resolvedActivity = intent.resolveActivity(packageManager)
+    Log.d("OverflowMenuDiag", "Uninstall: intent.resolveActivity()=$resolvedActivity")
+
+    Log.d("OverflowMenuDiag", "Uninstall: complete intent URI=${intent.toUri(Intent.URI_INTENT_SCHEME)}")
+
     // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release. This
     // project's existing uninstall mechanism is a plain startActivity()
     // call, not an ActivityResultLauncher — there is no launcher to log
