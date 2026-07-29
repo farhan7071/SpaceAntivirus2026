@@ -269,10 +269,28 @@ private fun requestUninstall(context: Context, packageName: String) {
 
     Log.d("OverflowMenuDiag", "Uninstall: complete intent URI=${intent.toUri(Intent.URI_INTENT_SCHEME)}")
 
-    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release. This
-    // project's existing uninstall mechanism is a plain startActivity()
-    // call, not an ActivityResultLauncher — there is no launcher to log
-    // separately here; this is the one, real invocation point.
+    // DIAGNOSTIC (Sprint 32.4) — temporary, remove before release. The
+    // existing startActivity() call itself was already known not to
+    // throw (Sprint 32.1's own diagnostic logging already confirmed the
+    // line after it always ran) — this makes that explicit and
+    // permanent-until-removed rather than inferred from "the next log
+    // line appeared." Catching the broad Exception type here, not a
+    // narrower one, is deliberate: the goal is visibility into whatever
+    // startActivity() actually does, not a guess at which specific
+    // exception type it might throw. Behavior is otherwise completely
+    // unchanged — nothing about the actual uninstall request changes
+    // based on which branch runs; both branches are pure logging.
     Log.d("OverflowMenuDiag", "Uninstall: calling startActivity() (existing mechanism, not an ActivityResultLauncher)")
-    context.startActivity(intent)
+    try {
+        context.startActivity(intent)
+        Log.d("OverflowMenuDiag", "Uninstall: startActivity returned normally")
+        // Tiny, deliberate addition: a distinct line immediately after,
+        // making the Logcat sequence unambiguous to read at a glance —
+        // "calling startActivity()" -> "startActivity returned
+        // normally" -> "Returned from startActivity()" -> whichever
+        // MainActivity lifecycle callbacks fire next (or don't).
+        Log.d("Uninstall", "Returned from startActivity()")
+    } catch (e: Exception) {
+        Log.e("OverflowMenuDiag", "Uninstall: startActivity failed", e)
+    }
 }
