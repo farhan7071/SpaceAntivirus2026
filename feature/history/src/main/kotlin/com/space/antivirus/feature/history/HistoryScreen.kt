@@ -7,12 +7,15 @@ import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -26,8 +29,8 @@ import com.space.antivirus.core.ui.component.AppCard
 import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
 import com.space.antivirus.core.ui.component.EvidenceIcon
+import com.space.antivirus.core.ui.component.ScanResultBadge
 import com.space.antivirus.core.ui.component.Severity
-import com.space.antivirus.core.ui.component.StatusChip
 import com.space.antivirus.core.ui.component.ThreatSummaryCard
 import java.text.DateFormat
 import java.util.Date
@@ -116,27 +119,58 @@ private fun HistoryLoaded(
     }
 }
 
+/**
+ * Sprint 034 (Part 7 — "Each scan session should become its own card...
+ * Display: Scan date, Scan time, Apps scanned, Security findings,
+ * Highest severity, Duration. Use a colored badge indicating overall
+ * scan result"): redesigned from one cramped supportingText line
+ * ("467 apps scanned in 2.3s · 42 item(s) found") into the fields shown
+ * separately, plus ScanResultBadge (core:ui, new this sprint) replacing
+ * the previous StatusChip(Severity.INFO) misuse for clean sessions —
+ * see that component's own KDoc for why that was a real, pre-existing
+ * bug, not a style choice. Highest severity is the highest Severity
+ * among this session's own threats, the same purely UI-layer
+ * aggregation ScanSummaryCard's severity breakdown already performs in
+ * SecurityCenterScreen.kt — no new business logic, ScanHistoryEntry
+ * itself unchanged.
+ */
 @Composable
 private fun ScanHistoryEntryCard(entry: ScanHistoryEntry, onIgnoreClick: (String) -> Unit) {
     val spacing = LocalSpacing.current
     val context = LocalContext.current
     val formattedDate = DateFormat.getDateTimeInstance().format(Date(entry.completedAtEpochMillis))
     val durationSeconds = entry.durationMillis / 1000.0
-    val resultText = if (entry.isClean) {
-        "No threats found"
-    } else {
-        "${entry.threats.size} item(s) found"
-    }
-    val supportingText = "${entry.itemsScanned} apps scanned in ${"%.1f".format(durationSeconds)}s \u00B7 $resultText"
+    val highestSeverity = entry.threats.maxByOrNull { it.riskLevel.ordinal }?.riskLevel?.toSeverity()
+        ?: Severity.INFO
 
-    AppCard(headline = formattedDate, supportingText = supportingText) {
+    AppCard(headline = formattedDate) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacing.small),
         ) {
-            if (entry.isClean) {
-                StatusChip(Severity.INFO)
-            } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ScanResultBadge(isClean = entry.isClean, highestSeverity = highestSeverity)
+            }
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "${entry.itemsScanned} apps scanned",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "${entry.threats.size} findings",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "${"%.1f".format(durationSeconds)}s",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (!entry.isClean) {
                 entry.threats.forEach { threat ->
                     ThreatSummaryCard(
                         appLabel = threat.appLabel,

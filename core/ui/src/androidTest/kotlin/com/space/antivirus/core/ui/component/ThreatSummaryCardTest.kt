@@ -68,10 +68,10 @@ class ThreatSummaryCardTest {
 
     @Test
     fun collapsedByDefault_technicalDetailAndEvidenceBulletsNotShown() {
-        setCard(technicalDetail = "The full technical explanation")
+        setCard(technicalDetail = "The full technical explanation", evidenceBullets = listOf("Camera access"))
 
         composeTestRule.onNodeWithText("The full technical explanation").assertDoesNotExist()
-        composeTestRule.onNodeWithText("\u2022 Camera access").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Camera access").assertDoesNotExist()
     }
 
     @Test
@@ -94,8 +94,14 @@ class ThreatSummaryCardTest {
 
         composeTestRule.onNodeWithText("Threat Category: Permission Usage").assertExists()
         composeTestRule.onNodeWithText("The full technical explanation").assertExists()
-        composeTestRule.onNodeWithText("\u2022 Camera access").assertExists()
-        composeTestRule.onNodeWithText("\u2022 Microphone access").assertExists()
+        // Sprint 034 (Part 4): each evidence bullet is now a row with a
+        // short icon title above its own full text, not a "• text"
+        // bullet line — both the inferred title and the bullet's own
+        // unmodified text are checked.
+        composeTestRule.onNodeWithText("Camera").assertExists()
+        composeTestRule.onNodeWithText("Camera access").assertExists()
+        composeTestRule.onNodeWithText("Microphone").assertExists()
+        composeTestRule.onNodeWithText("Microphone access").assertExists()
         composeTestRule.onNodeWithText("Review if unexpected.").assertExists()
     }
 
@@ -174,5 +180,28 @@ class ThreatSummaryCardTest {
         setCard(evidenceIcons = emptySet())
 
         composeTestRule.onNodeWithText("Example App").assertExists()
+    }
+
+    @Test
+    fun theRecommendationSection_stillShowsItsOwnTitle_inTheRedesignedCard() {
+        setCard(recommendation = "Verify this is expected.")
+
+        composeTestRule.onNodeWithText("View details").performClick()
+
+        composeTestRule.onNodeWithText("Recommendation").assertExists()
+        composeTestRule.onNodeWithText("Verify this is expected.").assertExists()
+    }
+
+    @Test
+    fun anEvidenceBulletMatchingNoKnownKeyword_fallsBackToThePermissionTitle() {
+        setCard(evidenceBullets = listOf("Requests an unusual configuration."))
+
+        composeTestRule.onNodeWithText("View details").performClick()
+
+        // EvidenceIcon.OTHER's title (Sprint 034) — the same fallback
+        // EvidenceIcon.inferFrom already used for its icon before this
+        // sprint added titles to the enum.
+        composeTestRule.onNodeWithText("Permission").assertExists()
+        composeTestRule.onNodeWithText("Requests an unusual configuration.").assertExists()
     }
 }

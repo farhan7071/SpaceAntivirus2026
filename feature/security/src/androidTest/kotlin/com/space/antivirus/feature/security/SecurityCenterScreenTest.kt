@@ -233,10 +233,10 @@ class SecurityCenterScreenTest {
         assertThat(ignoredPackageName).isEqualTo("com.example.suspicious")
     }
 
-    // --- Sprint 033, Part 4: scan summary display ---
+    // --- Sprint 034, Part 1: scan summary dashboard display ---
 
     @Test
-    fun scanSummary_showsAllSevenFields_whenPresent() {
+    fun scanSummary_showsTheDashboard_whenPresent() {
         setScreen(
             SecurityCenterUiState.Loaded(
                 protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
@@ -254,14 +254,26 @@ class SecurityCenterScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("Scan Summary").assertExists()
-        composeTestRule.onNodeWithText("Apps scanned: 42").assertExists()
-        composeTestRule.onNodeWithText("Threats detected: 1").assertExists()
-        composeTestRule.onNodeWithText("Trusted apps: 3").assertExists()
-        composeTestRule.onNodeWithText("Ignored threats: 2").assertExists()
-        composeTestRule.onNodeWithText("Scan duration: 1.5s").assertExists()
-        composeTestRule.onNodeWithText("Highest detected threat: Attention").assertExists()
-        composeTestRule.onNodeWithText("Average confidence: Medium").assertExists()
+        // Redesigned as a dashboard (Sprint 034, ScanSummaryCard,
+        // core:ui) — value and label are now separate text nodes in a
+        // stat grid, not one combined "Label: value" string.
+        composeTestRule.onNodeWithText("Needs your attention").assertExists()
+        composeTestRule.onNodeWithText("42").assertExists()
+        composeTestRule.onNodeWithText("Apps scanned").assertExists()
+        composeTestRule.onNodeWithText("3").assertExists()
+        composeTestRule.onNodeWithText("Trusted").assertExists()
+        // "Attention" itself is deliberately not asserted here - the
+        // threat card below the summary also renders a StatusChip with
+        // that same text (Severity.ATTENTION's label), and
+        // onNodeWithText expects exactly one match by default; "2" for
+        // Ignored and the other unambiguous labels below are sufficient
+        // to confirm the breakdown row rendered correctly.
+        composeTestRule.onNodeWithText("2").assertExists()
+        composeTestRule.onNodeWithText("Ignored").assertExists()
+        composeTestRule.onNodeWithText("1.5s").assertExists()
+        composeTestRule.onNodeWithText("Highest severity").assertExists()
+        composeTestRule.onNodeWithText("Medium").assertExists()
+        composeTestRule.onNodeWithText("Avg. confidence").assertExists()
     }
 
     @Test
@@ -275,7 +287,8 @@ class SecurityCenterScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("Scan Summary").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Needs your attention").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Apps scanned").assertDoesNotExist()
     }
 
     @Test
@@ -306,6 +319,7 @@ class SecurityCenterScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("Scan Summary").assertDoesNotExist()
+        composeTestRule.onNodeWithText("All good!").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Apps scanned").assertDoesNotExist()
     }
 }

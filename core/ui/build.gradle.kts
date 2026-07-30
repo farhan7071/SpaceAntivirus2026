@@ -17,6 +17,12 @@ android {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(libs.compose.material.icons.extended)
+    // Sprint 034 (Part 8 — expand/collapse animation on ThreatSummaryCard).
+    // Not covered by AndroidLibraryComposeConventionPlugin's default set
+    // (compose-ui/material3/graphics only) — added here, specific to the
+    // one module that actually needs it, rather than in the convention
+    // plugin shared by every Compose module in this project.
+    implementation(libs.compose.animation)
 
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)

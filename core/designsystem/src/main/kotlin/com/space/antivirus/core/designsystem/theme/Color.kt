@@ -32,13 +32,25 @@ val md_theme_dark_onSurface = Color(0xFFE0E3E2)
  * Semantic severity colors — mapped onto (not replacing) M3 roles, per
  * Sprint 002.75 §4: severity is communicated by icon + text label first,
  * color second. Only three tiers exist by design (Sprint 002.5 §17).
+ *
+ * Sprint 034: Safe added alongside the three severity colors, but
+ * deliberately NOT a fourth severity tier — Severity (core:ui) still
+ * has exactly three values. Safe represents the absence of any finding
+ * (a clean scan session, zero threats), a genuinely different concept
+ * from "how severe is this specific finding," which is what Severity's
+ * three tiers actually measure. Used by ScanResultBadge (core:ui) for
+ * History's per-session result badge and ScanSummaryCard's protected
+ * status — never by StatusChip, which stays scoped to Severity's three
+ * values exactly as before.
  */
 object SeverityColors {
     val InfoLight = Color(0xFF3D6373)
     val AttentionLight = Color(0xFF7B5800)
     val ActionNeededLight = Color(0xFFBA1A1A)
+    val SafeLight = Color(0xFF2E7D32)
 
     val InfoDark = Color(0xFFA6CBE0)
     val AttentionDark = Color(0xFFF6BD3F)
     val ActionNeededDark = Color(0xFFFFB4AB)
+    val SafeDark = Color(0xFF8BD08F)
 }

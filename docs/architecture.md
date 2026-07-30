@@ -1463,6 +1463,61 @@ specific reasoning for each of the seven named apps and a real mistake
 caught and corrected during implementation (an automated test-fixing
 script that initially handled only 3 of 8 construction sites correctly).
 
+### Final Security Center UI Polish (Sprint 034)
+
+UI/UX only, against a provided design mockup used as inspiration, not a
+spec to copy exactly. Every change confirmed via exact diff scope to
+stay within core:ui, core:designsystem, and the two screens' own UI
+layer — no analyzer, scorer, repository, or Room file touched.
+
+The mockup's 5-tier badge system was deliberately not adopted — Severity
+stays exactly three tiers, per its own long-standing "deliberately not a
+5-tier scale" KDoc. Inventing a fourth/fifth tier with no real signal
+behind it would have been presentation dishonesty. "Trusted"/green is
+handled as a separate concept (absence of any finding, ScanResultBadge)
+rather than a fourth severity value.
+
+```
+ScanSummaryCard (core:ui, new) - dashboard: status icon + message,
+  last scan time, stat grid (apps scanned/findings/trusted, then
+  Info/Attention/High Risk breakdown - a pure UI-layer aggregation of
+  state.threats, not a new ViewModel computation - then duration/
+  highest severity/avg confidence)
+
+ScanResultBadge (core:ui, new) - a scan session's own result badge;
+  fixes a real, pre-existing bug where clean sessions were rendered via
+  StatusChip(Severity.INFO), "Informational" being pressed into service
+  for a concept ("found nothing") it was never meant to cover
+
+EvidenceRow (ThreatSummaryCard) - each evidence bullet is now an icon +
+  short title + description row, using EvidenceIcon's new title field -
+  no analyzer or evidence text changed
+
+Recommendation section - light background surface + icon, replacing the
+  earlier divider-separated plain text
+
+Expand/collapse - now animates via AnimatedVisibility, needing an
+  explicit compose-animation dependency added to core:ui (not assumed
+  transitively available)
+```
+
+Two real bugs found and fixed while implementing this, unrelated to the
+UI work itself but necessary for any of it to compile or read correctly:
+`SecurityCenterScreen.kt` and `HistoryScreen.kt` were both missing the
+required `threatCategory` parameter to `ThreatSummaryCard` (a genuine
+Sprint 033 compile-breaking bug that slipped past that sprint's own
+verification), and `HistoryScreen.kt`'s clean-session badge used the
+wrong severity label entirely, as above.
+
+A mid-sprint architectural correction: the dashboard was initially built
+directly in `SecurityCenterScreen.kt` using extended Material icons
+before discovering `feature:security` has no
+compose-material-icons-extended dependency (unlike core:ui, which
+already carries it for exactly this reason, ADR 0031). Reverted cleanly
+and rebuilt as a shared core:ui component instead.
+
+See ADR 0048 for full reasoning across all eight parts.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

@@ -32,14 +32,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
  * out wrong, this is an isolated, one-line compatibility fix in this
  * file only — nothing else in this sprint depends on which exact icon
  * renders.
+ *
+ * Sprint 034 (Part 4 — "rows containing: Icon, Evidence title, Short
+ * description"): gained `title`, a short noun label ("Camera") distinct
+ * from the full evidenceDescription sentence a Detection actually
+ * carries ("Camera, microphone, and internet access together — can
+ * record and transmit media."). The full sentence still appears — as
+ * the row's own description text — this only adds a short heading above
+ * it; no analyzer's evidenceDescription text changed, and no new data
+ * was collected to build this. OTHER's title is deliberately generic
+ * ("Permission") rather than naming a specific permission this project
+ * has no confident icon for.
  */
-enum class EvidenceIcon(val imageVector: ImageVector) {
-    CAMERA(Icons.Filled.PhotoCamera),
-    MICROPHONE(Icons.Filled.Mic),
-    INTERNET(Icons.Filled.Wifi),
-    SMS(Icons.Filled.Sms),
-    OVERLAY(Icons.Filled.Layers),
-    OTHER(Icons.Filled.Warning),
+enum class EvidenceIcon(val imageVector: ImageVector, val title: String) {
+    CAMERA(Icons.Filled.PhotoCamera, "Camera"),
+    MICROPHONE(Icons.Filled.Mic, "Microphone"),
+    INTERNET(Icons.Filled.Wifi, "Internet Access"),
+    SMS(Icons.Filled.Sms, "SMS"),
+    OVERLAY(Icons.Filled.Layers, "Overlay"),
+    OTHER(Icons.Filled.Warning, "Permission"),
     ;
 
     companion object {

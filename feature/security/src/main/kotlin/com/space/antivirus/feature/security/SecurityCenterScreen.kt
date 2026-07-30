@@ -15,8 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -26,13 +24,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
 import com.space.antivirus.core.model.RiskLevel
-import com.space.antivirus.core.ui.component.AppCard
 import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
 import com.space.antivirus.core.ui.component.AppTextButton
 import com.space.antivirus.core.ui.component.EvidenceIcon
+import com.space.antivirus.core.ui.component.ScanSummaryCard
 import com.space.antivirus.core.ui.component.Severity
 import com.space.antivirus.core.ui.component.ThreatSummaryCard
+import java.text.DateFormat
+import java.util.Date
 
 /**
  * Follows ADR 0030's stateful/stateless split exactly, same as Home
@@ -136,7 +136,24 @@ private fun SecurityCenterLoaded(
                     verticalArrangement = Arrangement.spacedBy(spacing.medium),
                 ) {
                     state.scanSummary?.let { summary ->
-                        item { ScanSummaryCard(summary) }
+                        item {
+                            ScanSummaryCard(
+                                isProtected = state.protectionStatus == ProtectionStatus.PROTECTED,
+                                lastScanText = state.lastScanCompletedAtEpochMillis
+                                    ?.let { DateFormat.getDateTimeInstance().format(Date(it)) }
+                                    ?: "Unknown",
+                                appsScanned = summary.appsScanned,
+                                findingsCount = summary.threatsDetected,
+                                trustedCount = summary.trustedApps,
+                                infoCount = state.threats.count { it.riskLevel == RiskLevel.INFO },
+                                attentionCount = state.threats.count { it.riskLevel == RiskLevel.ATTENTION },
+                                highRiskCount = state.threats.count { it.riskLevel == RiskLevel.ACTION_NEEDED },
+                                ignoredCount = summary.ignoredThreats,
+                                scanDurationLabel = "${"%.1f".format(summary.scanDurationMillis / 1000.0)}s",
+                                highestSeverityLabel = summary.highestThreatLabel,
+                                averageConfidenceLabel = summary.averageConfidenceLabel,
+                            )
+                        }
                     }
                     items(state.threats) { threat ->
                         ThreatCard(
@@ -163,42 +180,6 @@ private fun SecurityCenterLoaded(
                 .fillMaxWidth()
                 .padding(spacing.medium),
         )
-    }
-}
-
-/**
- * Sprint 033, Part 4 — the professional scan summary, shown above the
- * threat list (not the empty/unknown states, which have nothing to
- * summarize by definition). Uses AppCard (Sprint 002.5 §9's single base
- * Card component) rather than a new bespoke card — this is exactly the
- * simple headline/content shape AppCard already exists for, unlike
- * ThreatSummaryCard's genuinely different structural needs (ADR 0044).
- * A grid of labeled fields, each a short "Label: value" line — "evidence
- * grouped cleanly... avoid clutter" (Part 5), the same LabeledField-style
- * approach ThreatSummaryCard already uses for Threat Category and
- * Confidence.
- */
-@Composable
-private fun ScanSummaryCard(summary: ScanSummary) {
-    val spacing = LocalSpacing.current
-    val durationSeconds = summary.scanDurationMillis / 1000.0
-
-    AppCard(headline = "Scan Summary") {
-        Column(verticalArrangement = Arrangement.spacedBy(spacing.tight)) {
-            Text("Apps scanned: ${summary.appsScanned}", style = MaterialTheme.typography.bodySmall)
-            Text("Threats detected: ${summary.threatsDetected}", style = MaterialTheme.typography.bodySmall)
-            Text("Trusted apps: ${summary.trustedApps}", style = MaterialTheme.typography.bodySmall)
-            Text("Ignored threats: ${summary.ignoredThreats}", style = MaterialTheme.typography.bodySmall)
-            Text(
-                "Scan duration: ${"%.1f".format(durationSeconds)}s",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text("Highest detected threat: ${summary.highestThreatLabel}", style = MaterialTheme.typography.bodySmall)
-            Text(
-                "Average confidence: ${summary.averageConfidenceLabel}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
     }
 }
 

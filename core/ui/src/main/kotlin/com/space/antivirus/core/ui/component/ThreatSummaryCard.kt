@@ -1,6 +1,11 @@
 package com.space.antivirus.core.ui.component
 
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
@@ -22,7 +28,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -92,6 +97,22 @@ import com.space.antivirus.core.designsystem.theme.SeverityColors
  * changed from three tiers to four (Very High / High / Medium / Low)
  * upstream in ThreatDescriptionProvider — this component's own display
  * of it is unchanged, since it was always just a String.
+ *
+ * Sprint 034 (Parts 2/4/5/8 — final Security Center UI polish):
+ * expand/collapse now animates (AnimatedVisibility — Part 8's own
+ * "Animation... Expand/collapse transitions" request, previously an
+ * abrupt if(expanded) toggle) — needed adding compose-animation as an
+ * explicit core:ui dependency, since AndroidLibraryComposeConventionPlugin's
+ * default set (compose-ui/material3/graphics only) doesn't include it.
+ * The expanded evidence section now renders each bullet as an icon +
+ * short title + description row (EvidenceRow, below) instead of plain
+ * "• text" bullets — Part 4's own request, reusing EvidenceIcon's title
+ * field (Sprint 034) rather than inventing new evidence-category data;
+ * no analyzer's evidenceDescription text changed. The recommendation
+ * section gained a light background surface and icon — Part 5's own
+ * "light background, recommendation icon, clear title" request,
+ * replacing the plain-text block a HorizontalDivider used to separate
+ * from evidence above it.
  */
 @Composable
 fun ThreatSummaryCard(
@@ -123,6 +144,7 @@ fun ThreatSummaryCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(spacing.small),
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(
@@ -154,7 +176,11 @@ fun ThreatSummaryCard(
 
                 Text(text = shortSummary, style = MaterialTheme.typography.bodyMedium)
 
-                if (expanded) {
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
                     ExpandedDetail(
                         threatCategory = threatCategory,
                         technicalDetail = technicalDetail,
@@ -267,11 +293,13 @@ private fun ExpandedDetail(
             Text(text = technicalDetail, style = MaterialTheme.typography.bodySmall)
         }
 
-        // Part 5 (Sprint 033) — evidence grouped in its own visually
-        // distinct block (a subtle background surface), separated from
-        // the reasoning text above and the recommendation below, rather
-        // than all three running together as one undifferentiated list
-        // of Text composables — "evidence grouped cleanly."
+        // Part 4 (Sprint 034) — "Instead of plain bullets, use rows
+        // containing: Icon, Evidence title, Short description." Each
+        // bullet is still exactly the same evidenceDescription text a
+        // Detection already carries (Sprint 029) — this only adds an
+        // icon and a short heading above it, both derived at the UI
+        // layer via EvidenceIcon.inferFrom (Sprint 030) and its title
+        // field (Sprint 034); no analyzer or evidence text changed.
         if (evidenceBullets.isNotEmpty()) {
             Column(
                 modifier = Modifier
@@ -279,23 +307,47 @@ private fun ExpandedDetail(
                     .clip(RoundedCornerShape(spacing.small))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(spacing.small),
-                verticalArrangement = Arrangement.spacedBy(spacing.tight),
+                verticalArrangement = Arrangement.spacedBy(spacing.small),
             ) {
                 Text(text = "Evidence", style = MaterialTheme.typography.labelLarge)
-                evidenceBullets.forEach { bullet ->
-                    Text(text = "\u2022 $bullet", style = MaterialTheme.typography.bodySmall)
-                }
+                evidenceBullets.forEach { bullet -> EvidenceRow(bullet) }
             }
         }
 
-        // Part 5 — recommendation visually separated with a
-        // HorizontalDivider above it, distinguishing "what was found"
-        // from "what to do about it."
-        HorizontalDivider()
-
-        Column(verticalArrangement = Arrangement.spacedBy(spacing.tight)) {
-            Text(text = "Recommendation", style = MaterialTheme.typography.titleSmall)
-            Text(text = recommendation, style = MaterialTheme.typography.bodySmall)
+        // Part 5 (Sprint 034) — "Use: Light background, Recommendation
+        // icon, Clear title, Readable spacing." Replaces the earlier
+        // HorizontalDivider-separated plain-text block (Sprint 033) with
+        // a genuinely distinct surface, matching the same visual
+        // treatment the evidence block above already uses, so the two
+        // read as clearly separate "what was found" / "what to do"
+        // sections rather than one continuous column of text.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(spacing.small))
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(spacing.small),
+            verticalArrangement = Arrangement.spacedBy(spacing.tight),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = "Recommendation",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(start = spacing.tight),
+                )
+            }
+            Text(
+                text = recommendation,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
         }
 
         // Sprint 031 (ADR 0045, goal #6 — confidence transparency), now
@@ -304,6 +356,38 @@ private fun ExpandedDetail(
         // this is about how sure the ENGINE is overall, not a property
         // of any one piece of evidence.
         LabeledField(label = "Confidence", value = confidenceLabel)
+    }
+}
+
+/**
+ * Sprint 034 (Part 4) — one evidence bullet, shown as an icon + short
+ * title + the bullet's own full text, rather than a plain "• text"
+ * line. Uses the FIRST icon EvidenceIcon.inferFrom infers for this
+ * specific bullet — a single bullet can reasonably imply more than one
+ * icon (e.g. a surveillance finding mentions both camera and
+ * microphone), but this row shows one representative icon/title per
+ * bullet rather than stacking several, keeping each row visually simple
+ * per Part 4's own "avoid clutter" framing; the bullet's own full text
+ * still names everything explicitly regardless of which single icon is
+ * shown above it.
+ */
+@Composable
+private fun EvidenceRow(bulletText: String) {
+    val spacing = LocalSpacing.current
+    val icon = EvidenceIcon.inferFrom(bulletText).first()
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(
+            imageVector = icon.imageVector,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(top = spacing.tight)
+                .size(18.dp),
+        )
+        Column(modifier = Modifier.padding(start = spacing.small)) {
+            Text(text = icon.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text(text = bulletText, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 

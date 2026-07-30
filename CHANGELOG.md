@@ -6,6 +6,47 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 034 — Final Security Center UI Polish
+
+UI/UX only, against a provided design mockup used as inspiration. No
+scanning engine, analyzer, repository, or Room file touched — confirmed
+via exact diff scope.
+
+### Added
+
+- **Scan Summary dashboard** — large status icon and message, last scan
+  time, and a stat grid (apps scanned, findings, trusted, a severity
+  breakdown, duration, highest severity, average confidence) replacing
+  the previous plain labeled-field list.
+- **Evidence rows** — each finding's evidence now shows as an icon,
+  short title, and description, instead of a plain bullet list.
+- **Recommendation card** — a light-background surface with an icon,
+  replacing plain divider-separated text.
+- **Animated expand/collapse** on threat cards.
+- **A dedicated result badge for scan sessions** ("Safe," green) in
+  History, distinct from the severity system.
+
+### Fixed
+
+- **Severity chips now carry an icon alongside their label**, and were
+  relabeled to be clearer ("Informational," "High Risk").
+- **Two real, pre-existing bugs found while doing this UI work**: both
+  Security Center and History were missing a required parameter to the
+  shared threat card component (a Sprint 033 regression that had gone
+  unnoticed), and History's clean-scan badge was incorrectly reusing an
+  "Informational" label for sessions with zero findings — now shows
+  "Safe" correctly.
+
+### Not changed, deliberately
+
+- The reference design showed five severity colors; this app still uses
+  exactly three. A fourth or fifth tier with no real underlying signal
+  to justify it would be inventing distinctions the detection engine
+  doesn't actually make.
+- No new analyzer, scorer, or business logic anywhere in this sprint.
+
+See ADR 0048 for full reasoning across all eight parts of this sprint.
+
 ## Sprint 033 — Professional Threat Report & Detection Quality
 
 Five parts, all sharing one principle: everything derived at display

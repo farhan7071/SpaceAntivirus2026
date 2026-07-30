@@ -75,7 +75,7 @@ class HistoryScreenTest {
     }
 
     @Test
-    fun aCleanScanEntry_showsNoThreatsFoundAndTheScanMetadata() {
+    fun aCleanScanEntry_showsSafeBadgeAndTheScanMetadata() {
         setScreen(
             HistoryUiState.Loaded(
                 entries = listOf(
@@ -91,7 +91,14 @@ class HistoryScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("20 apps scanned in 1.5s \u00B7 No threats found").assertExists()
+        // Sprint 034 (Part 7): ScanResultBadge (core:ui) replaces the
+        // previous StatusChip(Severity.INFO) misuse for clean sessions;
+        // fields are now separate text nodes rather than one combined
+        // "20 apps scanned in 1.5s · No threats found" string.
+        composeTestRule.onNodeWithText("Safe").assertExists()
+        composeTestRule.onNodeWithText("20 apps scanned").assertExists()
+        composeTestRule.onNodeWithText("0 findings").assertExists()
+        composeTestRule.onNodeWithText("1.5s").assertExists()
     }
 
     @Test
@@ -117,7 +124,8 @@ class HistoryScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("10 apps scanned in 0.8s \u00B7 1 item(s) found").assertExists()
+        composeTestRule.onNodeWithText("10 apps scanned").assertExists()
+        composeTestRule.onNodeWithText("1 findings").assertExists()
         composeTestRule.onNodeWithText("Suspicious App").assertExists()
         composeTestRule.onNodeWithText("com.example.suspicious").assertExists()
         composeTestRule.onNodeWithText("Can access SMS and internet.").assertExists()
@@ -145,11 +153,15 @@ class HistoryScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("\u2022 SMS access with INTERNET access").assertDoesNotExist()
+        composeTestRule.onNodeWithText("SMS access with INTERNET access").assertDoesNotExist()
 
         composeTestRule.onNodeWithText("View details").performClick()
 
-        composeTestRule.onNodeWithText("\u2022 SMS access with INTERNET access").assertExists()
+        // "INTERNET" is checked before "SMS" in EvidenceIcon.inferFrom
+        // (Sprint 030) - for text containing both, Internet Access wins
+        // as the representative title (EvidenceRow, Sprint 034).
+        composeTestRule.onNodeWithText("Internet Access").assertExists()
+        composeTestRule.onNodeWithText("SMS access with INTERNET access").assertExists()
         composeTestRule.onNodeWithText("Review if unexpected.").assertExists()
     }
 
@@ -178,8 +190,10 @@ class HistoryScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("5 apps scanned in 0.5s \u00B7 No threats found").assertExists()
-        composeTestRule.onNodeWithText("12 apps scanned in 0.9s \u00B7 No threats found").assertExists()
+        composeTestRule.onNodeWithText("5 apps scanned").assertExists()
+        composeTestRule.onNodeWithText("0.5s").assertExists()
+        composeTestRule.onNodeWithText("12 apps scanned").assertExists()
+        composeTestRule.onNodeWithText("0.9s").assertExists()
     }
 
     @Test
