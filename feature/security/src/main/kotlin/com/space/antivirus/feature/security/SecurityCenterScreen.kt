@@ -214,6 +214,7 @@ private fun ThreatCard(
         packageName = threat.packageName,
         severity = threat.riskLevel.toSeverity(),
         evidenceIcons = threat.evidenceBullets.flatMap { EvidenceIcon.inferFrom(it) }.toSet(),
+        threatCategory = threat.threatCategory,
         shortSummary = threat.shortSummary,
         technicalDetail = threat.technicalDetail,
         evidenceBullets = threat.evidenceBullets,

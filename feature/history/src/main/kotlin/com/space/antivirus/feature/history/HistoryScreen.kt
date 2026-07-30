@@ -142,6 +142,7 @@ private fun ScanHistoryEntryCard(entry: ScanHistoryEntry, onIgnoreClick: (String
                         appLabel = threat.appLabel,
                         packageName = threat.packageName,
                         severity = threat.riskLevel.toSeverity(),
+                        threat.threatCategory,
                         evidenceIcons = threat.evidenceBullets.flatMap { EvidenceIcon.inferFrom(it) }.toSet(),
                         shortSummary = threat.shortSummary,
                         technicalDetail = threat.technicalDetail,
