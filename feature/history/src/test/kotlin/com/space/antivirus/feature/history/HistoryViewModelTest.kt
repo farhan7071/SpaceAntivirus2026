@@ -55,6 +55,8 @@ class HistoryViewModelTest {
     private fun buildViewModel(): HistoryViewModel {
         every { descriptionProvider.shortSummaryFor(any()) } returns "test short summary"
         every { descriptionProvider.recommendationFor(any(), any(), any()) } returns "test recommendation"
+        every { descriptionProvider.categoryFor(any()) } returns "test category"
+        every { descriptionProvider.confidenceLevelFor(any(), any()) } returns "test confidence level"
         val addTrustedItem = AddTrustedItemUseCase(trustedItemRepository, StandardTestDispatcher())
         return HistoryViewModel(ObserveScanHistoryUseCase(securityRepository), descriptionProvider, addTrustedItem)
     }
@@ -169,20 +171,24 @@ class HistoryViewModelTest {
     }
 
     @Test
-    fun `a flagged scan entry's threats carry shortSummary, technicalDetail, evidenceBullets, and recommendation`() =
+    fun `a flagged scan entry's threats carry all fields, including threatCategory and confidenceLabel`() =
         runTest {
             every { descriptionProvider.shortSummaryFor(any()) } returns "Can access SMS and internet."
             every { descriptionProvider.recommendationFor(any(), any(), any()) } returns "Review if unexpected."
+            every { descriptionProvider.categoryFor(any()) } returns "Permission Usage"
+            every { descriptionProvider.confidenceLevelFor(any(), any()) } returns "Medium"
             every { securityRepository.observeScanHistory() } returns
                 flowOf(listOf(flaggedScanResult("s1", completedAt = 1_000L, threatCount = 1)))
 
             buildViewModel().uiState.test {
                 assertThat(awaitItem()).isEqualTo(HistoryUiState.Loading)
                 val threat = (awaitItem() as HistoryUiState.Loaded).entries.single().threats.single()
+                assertThat(threat.threatCategory).isEqualTo("Permission Usage")
                 assertThat(threat.shortSummary).isEqualTo("Can access SMS and internet.")
                 assertThat(threat.technicalDetail).isEqualTo("test description 0")
                 assertThat(threat.evidenceBullets).containsExactly("test evidence")
                 assertThat(threat.recommendation).isEqualTo("Review if unexpected.")
+                assertThat(threat.confidenceLabel).isEqualTo("Medium")
             }
         }
 

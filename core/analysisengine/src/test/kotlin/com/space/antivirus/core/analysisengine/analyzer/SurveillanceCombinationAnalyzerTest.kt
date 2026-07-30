@@ -128,14 +128,26 @@ class SurveillanceCombinationAnalyzerTest {
     }
 
     @Test
-    fun `PRODUCTIVITY category does not downgrade confidence - only IMAGE is consistent for this analyzer`() =
+    fun `PRODUCTIVITY category downgrades confidence - Sprint 033, AI-assistant apps commonly declare this`() =
         runTest {
-            // Sprint 032 added AppCategory.IMAGE as the one category this
-            // analyzer treats as consistent (camera apps, photo editors).
-            // PRODUCTIVITY isn't IMAGE, so this confirms the check is
-            // exact, not a broad "any declared category helps" rule -
-            // VIDEO/SOCIAL are handled separately, by suppression, above.
+            // AI-assistant apps (voice/vision-enabled chat apps) most
+            // plausibly declare PRODUCTIVITY rather than VIDEO/SOCIAL/
+            // IMAGE - their primary function isn't video calling or photo
+            // editing, but camera+microphone is still entirely expected.
             val result = analyzer.analyze(appTarget(permissions = allThree, category = AppCategory.PRODUCTIVITY))
+
+            val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+            assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.LOW)
+        }
+
+    @Test
+    fun `NEWS category does not downgrade confidence - not every category is treated as consistent`() =
+        runTest {
+            // Confirms the check is still exact, not a broad "any
+            // declared category helps" rule - only IMAGE and PRODUCTIVITY
+            // are consistent for this analyzer; VIDEO/SOCIAL are handled
+            // separately, by suppression, above.
+            val result = analyzer.analyze(appTarget(permissions = allThree, category = AppCategory.NEWS))
 
             val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
             assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.MODERATE)

@@ -67,6 +67,17 @@ import javax.inject.Inject
  * completely unchanged — that reasoning was already sound and stays
  * exactly as written above. See ADR 0046.
  *
+ * Sprint 033: AppCategory.PRODUCTIVITY added alongside IMAGE in the
+ * confidence-downgrade set, after real-device testing found AI-assistant
+ * apps (voice/vision-enabled chat apps, most plausibly declaring
+ * PRODUCTIVITY rather than VIDEO/SOCIAL/IMAGE — their primary function
+ * isn't video calling or photo editing) reaching full, undowngraded
+ * confidence despite camera+microphone being an entirely expected
+ * combination for that kind of app. Same downgrade-not-suppress
+ * reasoning as IMAGE: not every productivity app needs a camera and
+ * microphone together, so this is real but not unambiguous evidence of
+ * legitimacy, unlike VIDEO/SOCIAL's outright suppression above.
+ *
  * System apps excluded entirely, same reasoning as every prior analyzer.
  */
 class SurveillanceCombinationAnalyzer @Inject constructor() : ThreatAnalyzer {
@@ -108,7 +119,7 @@ class SurveillanceCombinationAnalyzer @Inject constructor() : ThreatAnalyzer {
             confidence = ConfidenceModulation.modulate(
                 base = Confidence.MODERATE,
                 app = app,
-                categoryIsConsistent = app.category == AppCategory.IMAGE,
+                categoryIsConsistent = app.category in CATEGORIES_CONSISTENT_WITH_SURVEILLANCE,
             ),
         )
 
@@ -122,5 +133,6 @@ class SurveillanceCombinationAnalyzer @Inject constructor() : ThreatAnalyzer {
             "android.permission.INTERNET",
         )
         val EXPECTED_CATEGORIES = setOf(AppCategory.VIDEO, AppCategory.SOCIAL)
+        val CATEGORIES_CONSISTENT_WITH_SURVEILLANCE = setOf(AppCategory.IMAGE, AppCategory.PRODUCTIVITY)
     }
 }

@@ -56,6 +56,17 @@ class ConfidenceModulationTest {
     }
 
     @Test
+    fun `Xiaomi's app store installer also lowers MODERATE to LOW`() {
+        val result = ConfidenceModulation.modulate(
+            base = Confidence.MODERATE,
+            app = app(installerPackageName = "com.xiaomi.mipicks"),
+            categoryIsConsistent = false,
+        )
+
+        assertThat(result).isEqualTo(Confidence.LOW)
+    }
+
+    @Test
     fun `an unrecognized installer does not lower confidence on its own`() {
         val result = ConfidenceModulation.modulate(
             base = Confidence.MODERATE,

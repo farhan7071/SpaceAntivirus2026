@@ -26,12 +26,13 @@ class ThreatSummaryCardTest {
         appLabel: String = "Example App",
         packageName: String = "com.example.app",
         severity: Severity = Severity.ATTENTION,
+        threatCategory: String = "Permission Usage",
         evidenceIcons: Set<EvidenceIcon> = setOf(EvidenceIcon.CAMERA),
         shortSummary: String = "Can record and transmit media.",
         technicalDetail: String = "Full technical explanation goes here.",
         evidenceBullets: List<String> = listOf("Camera access", "Microphone access"),
         recommendation: String = "Review if unexpected.",
-        confidenceLabel: String = "Moderate",
+        confidenceLabel: String = "Medium",
         onIgnoreClick: () -> Unit = {},
         onOpenAppInfoClick: () -> Unit = {},
         onUninstallClick: () -> Unit = {},
@@ -42,6 +43,7 @@ class ThreatSummaryCardTest {
                     appLabel = appLabel,
                     packageName = packageName,
                     severity = severity,
+                    threatCategory = threatCategory,
                     evidenceIcons = evidenceIcons,
                     shortSummary = shortSummary,
                     technicalDetail = technicalDetail,
@@ -82,6 +84,7 @@ class ThreatSummaryCardTest {
     @Test
     fun tappingViewDetails_expandsToShowTechnicalDetailEvidenceAndRecommendation() {
         setCard(
+            threatCategory = "Permission Usage",
             technicalDetail = "The full technical explanation",
             evidenceBullets = listOf("Camera access", "Microphone access"),
             recommendation = "Review if unexpected.",
@@ -89,10 +92,22 @@ class ThreatSummaryCardTest {
 
         composeTestRule.onNodeWithText("View details").performClick()
 
+        composeTestRule.onNodeWithText("Threat Category: Permission Usage").assertExists()
         composeTestRule.onNodeWithText("The full technical explanation").assertExists()
         composeTestRule.onNodeWithText("\u2022 Camera access").assertExists()
         composeTestRule.onNodeWithText("\u2022 Microphone access").assertExists()
         composeTestRule.onNodeWithText("Review if unexpected.").assertExists()
+    }
+
+    @Test
+    fun theThreatCategory_onlyAppearsAfterExpanding_sameAsTheRestOfTheExpandedDetail() {
+        setCard(threatCategory = "Malware")
+
+        composeTestRule.onNodeWithText("Threat Category: Malware").assertDoesNotExist()
+
+        composeTestRule.onNodeWithText("View details").performClick()
+
+        composeTestRule.onNodeWithText("Threat Category: Malware").assertExists()
     }
 
     @Test

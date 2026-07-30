@@ -38,10 +38,36 @@ import com.space.antivirus.core.model.ThreatType
  * explanation" section) and `recommendationFor`'s action-oriented text.
  * Same reasoning: derived from detections already available, not a new
  * persisted field.
+ *
+ * `categoryFor` was added in Sprint 033 — a short, user-facing label for
+ * threatType (e.g. "Permission Usage" rather than the enum constant
+ * SUSPICIOUS_PERMISSION_USAGE), for the professional threat report's
+ * "Threat Category" field. Purely a display mapping of a field Threat
+ * already carries — no new data.
+ *
+ * `confidenceLevelFor` was added in Sprint 033 — a four-tier label (Very
+ * High / High / Medium / Low), replacing the three-tier Confidence enum
+ * value as what's actually shown to users. Deliberately NOT a change to
+ * the underlying Confidence enum itself (still three tiers internally —
+ * LOW/MODERATE/HIGH, ADR 0045's "no numeric/inflated scores" discipline
+ * unchanged) — this method derives the four-tier label from the
+ * *combination* of riskLevel and detections, exactly the "confidence
+ * derived from combined analyzer output" this sprint's brief asked for:
+ * "Very High" specifically means CumulativeRiskScorer already escalated
+ * this Threat from two or more independent, meaningful signals agreeing
+ * (ADR 0041) — a stronger, more specific statement than any single
+ * detection's own confidence could make on its own. Extending the
+ * Confidence enum itself to four tiers was considered and rejected: it
+ * would touch every analyzer, ConfidenceModulation, and Room persistence
+ * for what is fundamentally a presentation concern, exactly the kind of
+ * large, risky change this project prefers to avoid when a display-layer
+ * computation from already-available data works instead.
  */
 interface ThreatDescriptionProvider {
     fun titleFor(threatType: ThreatType, detections: List<Detection>): String
     fun descriptionFor(threatType: ThreatType, detections: List<Detection>): String
     fun recommendationFor(threatType: ThreatType, detections: List<Detection>, riskLevel: RiskLevel): String
     fun shortSummaryFor(detections: List<Detection>): String
+    fun categoryFor(threatType: ThreatType): String
+    fun confidenceLevelFor(riskLevel: RiskLevel, detections: List<Detection>): String
 }

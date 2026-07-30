@@ -45,21 +45,36 @@ import com.space.antivirus.core.model.InstalledApplicationInfo
  * additive facts:
  *
  * 1. Installed from a known, established app store. installerPackageName
- *    (Sprint 027) already carries this — no new data collected. Two
+ *    (Sprint 027) already carries this — no new data collected. Three
  *    real, well-known distribution channels are recognized: Google Play
- *    Store (com.android.vending) and Samsung Galaxy Store
- *    (com.sec.android.app.samsungapps, the second store this heuristic
- *    was specifically motivated to recognize — see the "Samsung
- *    applications" case in the physical-device findings ADR 0045
- *    documents). This is provenance, not a reputation service — no
- *    external call, no app-specific allowlist, exactly the same kind of
- *    on-device signal UnknownInstallerSourceAnalyzer (Sprint 027)
- *    already reasons about in the opposite direction. A store listing
- *    isn't a guarantee of safety (Play Store review isn't perfect), so
- *    this only ever lowers confidence one tier, never suppresses a
- *    finding outright the way Sprint 028's category suppression does
- *    for the one case (video-calling apps) that was unambiguous enough
- *    to warrant it.
+ *    Store (com.android.vending), Samsung Galaxy Store
+ *    (com.sec.android.app.samsungapps), and Xiaomi's own app store
+ *    (com.xiaomi.mipicks, "GetApps" — Sprint 033, added after
+ *    physical-device testing on Xiaomi hardware showed Xiaomi's own
+ *    first-party apps, e.g. Xiaomi Home and Mi Store, reaching full,
+ *    undowngraded confidence: they have no consistent AppCategory to
+ *    match against — Android's taxonomy has no "smart-home" category,
+ *    the same gap ADR 0046 already documented for banking apps — and
+ *    when installed or updated through Xiaomi's own store rather than
+ *    Play Store, neither existing installer entry applied either,
+ *    leaving both legitimacy signals unavailable at once). This is
+ *    provenance, not a reputation service — no external call, no
+ *    app-specific allowlist, exactly the same kind of on-device signal
+ *    UnknownInstallerSourceAnalyzer (Sprint 027) already reasons about
+ *    in the opposite direction. A store listing isn't a guarantee of
+ *    safety (no app store's review is perfect), so this only ever
+ *    lowers confidence one tier, never suppresses a finding outright
+ *    the way Sprint 028's category suppression does for the one case
+ *    (video-calling apps) that was unambiguous enough to warrant it.
+ *
+ *    com.xiaomi.mipicks is Xiaomi's current package name for this app
+ *    (formerly com.xiaomi.market, renamed by Xiaomi at least once) —
+ *    included with the same moderate-not-full confidence ADR 0045 was
+ *    explicit about for the Samsung Galaxy Store package name: not
+ *    verified against a live device or official Xiaomi documentation in
+ *    this sandbox. If this exact package name has changed again, this
+ *    is an isolated, one-line fix here — nothing else in this project
+ *    depends on it being exactly right.
  *
  * 2. The app's own declared category is consistent with the specific
  *    finding. Each analyzer decides for itself which categories are
@@ -81,6 +96,7 @@ object ConfidenceModulation {
     private val TRUSTED_INSTALLERS = setOf(
         "com.android.vending",
         "com.sec.android.app.samsungapps",
+        "com.xiaomi.mipicks",
     )
 
     fun modulate(base: Confidence, app: InstalledApplicationInfo, categoryIsConsistent: Boolean): Confidence {

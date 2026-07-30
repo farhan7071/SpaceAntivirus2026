@@ -6,6 +6,54 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 033 — Professional Threat Report & Detection Quality
+
+Five parts, all sharing one principle: everything derived at display
+time from data already collected — no new persistence, no Room changes,
+`CumulativeRiskScorer` unchanged, uninstall functionality untouched
+(confirmed via full-file re-read, per this sprint's own "treat
+uninstall as frozen" instruction).
+
+### Added
+
+- **Professional threat report format**: each finding now shows a
+  Threat Category (`ThreatDescriptionProvider.categoryFor`) alongside
+  its existing evidence, reason, and recommendation.
+- **Four-tier confidence** (Very High / High / Medium / Low), replacing
+  the raw three-tier internal value as what's shown to users. "Very
+  High" specifically means two or more independent analyzers already
+  agreed strongly enough to escalate the finding — a real, derived
+  signal, not just a relabeling of one detection's own confidence.
+- **Scan summary**: apps scanned, threats detected, trusted apps,
+  ignored threats, scan duration, highest detected threat, and average
+  confidence, shown above the threat list. Trusted apps and ignored
+  threats are deliberately different numbers — apps skipped from
+  analysis versus threats found and later marked trusted are genuinely
+  different events.
+
+### Improved (false-positive reduction)
+
+- `SurveillanceCombinationAnalyzer` now recognizes `PRODUCTIVITY`-category
+  apps (AI-assistant apps like ChatGPT) as a confidence-downgrade signal.
+- `SuspiciousPermissionPatternAnalyzer`'s SMS rule now recognizes
+  `VIDEO`-category apps (TikTok-style short-form video apps).
+- A third trusted app store recognized: Xiaomi's own GetApps
+  (`com.xiaomi.mipicks`) — Xiaomi Home and Mi Store previously had
+  neither installer trust nor a matching category available.
+
+### Not changed, deliberately
+
+- No new analyzers. `CumulativeRiskScorer` untouched — every fix stays
+  at the confidence-modulation layer established in Sprint 031.
+- "Dynamic Code Loading" and "accessibility abuse" detection were not
+  attempted — both require capabilities (bytecode analysis, service-level
+  manifest inspection) this project genuinely doesn't have; treated as
+  an honest scope boundary, not a silent gap.
+- Binance's false-positive case remains the same "no Android finance
+  category exists" limitation already documented for banking apps.
+
+See ADR 0047 for full reasoning across all five parts.
+
 ## Sprint 032 — Context-Aware Detection Intelligence
 
 The brief named three classes to review before making changes —

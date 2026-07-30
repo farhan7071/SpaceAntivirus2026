@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -21,6 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
@@ -80,12 +83,22 @@ import com.space.antivirus.core.designsystem.theme.SeverityColors
  * recommendation. A plain String, not core:model's Confidence type —
  * consistent with this component's existing zero-dependency-on-domain
  * shape; the mapping happens in each screen's ViewModel.
+ *
+ * Sprint 033 (Part 2 — professional threat report): gained
+ * threatCategory, shown at the top of the expanded state — a short,
+ * user-facing label (e.g. "Permission Usage") distinct from the
+ * severity chip (how concerning) and shortSummary (what was found);
+ * this answers what kind of finding it is. confidenceLabel's own values
+ * changed from three tiers to four (Very High / High / Medium / Low)
+ * upstream in ThreatDescriptionProvider — this component's own display
+ * of it is unchanged, since it was always just a String.
  */
 @Composable
 fun ThreatSummaryCard(
     appLabel: String,
     packageName: String,
     severity: Severity,
+    threatCategory: String,
     evidenceIcons: Set<EvidenceIcon>,
     shortSummary: String,
     technicalDetail: String,
@@ -143,6 +156,7 @@ fun ThreatSummaryCard(
 
                 if (expanded) {
                     ExpandedDetail(
+                        threatCategory = threatCategory,
                         technicalDetail = technicalDetail,
                         evidenceBullets = evidenceBullets,
                         recommendation = recommendation,
@@ -238,33 +252,68 @@ private fun EvidenceIconRow(icons: Set<EvidenceIcon>) {
 
 @Composable
 private fun ExpandedDetail(
+    threatCategory: String,
     technicalDetail: String,
     evidenceBullets: List<String>,
     recommendation: String,
     confidenceLabel: String,
 ) {
     val spacing = LocalSpacing.current
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-        Text(text = "Why it was flagged", style = MaterialTheme.typography.titleSmall)
-        Text(text = technicalDetail, style = MaterialTheme.typography.bodySmall)
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.medium)) {
+        LabeledField(label = "Threat Category", value = threatCategory)
 
-        evidenceBullets.forEach { bullet ->
-            Text(text = "\u2022 $bullet", style = MaterialTheme.typography.bodySmall)
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+            Text(text = "Why it was flagged", style = MaterialTheme.typography.titleSmall)
+            Text(text = technicalDetail, style = MaterialTheme.typography.bodySmall)
         }
 
-        Text(text = "Recommendation", style = MaterialTheme.typography.titleSmall)
-        Text(text = recommendation, style = MaterialTheme.typography.bodySmall)
+        // Part 5 (Sprint 033) — evidence grouped in its own visually
+        // distinct block (a subtle background surface), separated from
+        // the reasoning text above and the recommendation below, rather
+        // than all three running together as one undifferentiated list
+        // of Text composables — "evidence grouped cleanly."
+        if (evidenceBullets.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(spacing.small))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(spacing.small),
+                verticalArrangement = Arrangement.spacedBy(spacing.tight),
+            ) {
+                Text(text = "Evidence", style = MaterialTheme.typography.labelLarge)
+                evidenceBullets.forEach { bullet ->
+                    Text(text = "\u2022 $bullet", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
 
-        // Sprint 031 (ADR 0045, goal #6 — confidence transparency):
+        // Part 5 — recommendation visually separated with a
+        // HorizontalDivider above it, distinguishing "what was found"
+        // from "what to do about it."
+        HorizontalDivider()
+
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.tight)) {
+            Text(text = "Recommendation", style = MaterialTheme.typography.titleSmall)
+            Text(text = recommendation, style = MaterialTheme.typography.bodySmall)
+        }
+
+        // Sprint 031 (ADR 0045, goal #6 — confidence transparency), now
+        // a four-tier label (Sprint 033, Part 3) rather than three —
         // shown alongside the recommendation, not the evidence bullets —
         // this is about how sure the ENGINE is overall, not a property
         // of any one piece of evidence.
-        Text(
-            text = "Confidence: $confidenceLabel",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        LabeledField(label = "Confidence", value = confidenceLabel)
     }
+}
+
+@Composable
+private fun LabeledField(label: String, value: String) {
+    Text(
+        text = "$label: $value",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable

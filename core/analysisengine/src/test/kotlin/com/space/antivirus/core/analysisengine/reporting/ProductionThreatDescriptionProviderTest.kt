@@ -405,4 +405,101 @@ class ProductionThreatDescriptionProviderTest {
 
         assertThat(recommendation).isEqualTo("Review immediately.")
     }
+
+    // --- categoryFor: Sprint 033, Part 2's "Threat Category" report field ---
+
+    @Test
+    fun `every ThreatType has a real, non-blank category label`() {
+        for (threatType in ThreatType.entries) {
+            val category = provider.categoryFor(threatType)
+            assertThat(category).isNotEmpty()
+        }
+    }
+
+    @Test
+    fun `SUSPICIOUS_PERMISSION_USAGE maps to a Permission Usage category`() {
+        assertThat(provider.categoryFor(ThreatType.SUSPICIOUS_PERMISSION_USAGE)).isEqualTo("Permission Usage")
+    }
+
+    @Test
+    fun `different threat types produce different category labels`() {
+        val categories = ThreatType.entries.map { provider.categoryFor(it) }
+
+        assertThat(categories.toSet()).hasSize(ThreatType.entries.size)
+    }
+
+    // --- confidenceLevelFor: Sprint 033, Part 3's four-tier confidence label ---
+
+    @Test
+    fun `ACTION_NEEDED riskLevel always yields Very High, regardless of detection confidence`() {
+        val detections = listOf(detection(confidence = Confidence.LOW))
+
+        val level = provider.confidenceLevelFor(RiskLevel.ACTION_NEEDED, detections)
+
+        assertThat(level).isEqualTo("Very High")
+    }
+
+    @Test
+    fun `a HIGH-confidence detection with non-escalated riskLevel yields High`() {
+        val detections = listOf(detection(confidence = Confidence.HIGH))
+
+        val level = provider.confidenceLevelFor(RiskLevel.ATTENTION, detections)
+
+        assertThat(level).isEqualTo("High")
+    }
+
+    @Test
+    fun `a MODERATE-confidence detection with no HIGH detection yields Medium`() {
+        val detections = listOf(detection(confidence = Confidence.MODERATE))
+
+        val level = provider.confidenceLevelFor(RiskLevel.ATTENTION, detections)
+
+        assertThat(level).isEqualTo("Medium")
+    }
+
+    @Test
+    fun `only LOW-confidence detections yield Low`() {
+        val detections = listOf(
+            detection(confidence = Confidence.LOW, analyzerId = AnalyzerId("analyzer-a")),
+            detection(confidence = Confidence.LOW, analyzerId = AnalyzerId("analyzer-b")),
+        )
+
+        val level = provider.confidenceLevelFor(RiskLevel.ATTENTION, detections)
+
+        assertThat(level).isEqualTo("Low")
+    }
+
+    @Test
+    fun `one HIGH detection among several LOW ones still yields High - the strongest signal wins`() {
+        val detections = listOf(
+            detection(confidence = Confidence.LOW, analyzerId = AnalyzerId("analyzer-a")),
+            detection(confidence = Confidence.HIGH, analyzerId = AnalyzerId("analyzer-b")),
+        )
+
+        val level = provider.confidenceLevelFor(RiskLevel.ATTENTION, detections)
+
+        assertThat(level).isEqualTo("High")
+    }
+
+    @Test
+    fun `Very High takes precedence over any individual detection confidence`() {
+        // Two independent MODERATE+ detections escalating to ACTION_NEEDED
+        // (CumulativeRiskScorer, ADR 0041) is a stronger statement than
+        // either detection's own confidence value alone.
+        val detections = listOf(
+            detection(confidence = Confidence.MODERATE, analyzerId = AnalyzerId("analyzer-a")),
+            detection(confidence = Confidence.MODERATE, analyzerId = AnalyzerId("analyzer-b")),
+        )
+
+        val level = provider.confidenceLevelFor(RiskLevel.ACTION_NEEDED, detections)
+
+        assertThat(level).isEqualTo("Very High")
+    }
+
+    @Test
+    fun `confidenceLevelFor rejects an empty detections list`() {
+        val exception = runCatching { provider.confidenceLevelFor(RiskLevel.ATTENTION, emptyList()) }.exceptionOrNull()
+
+        assertThat(exception).isInstanceOf(IllegalArgumentException::class.java)
+    }
 }

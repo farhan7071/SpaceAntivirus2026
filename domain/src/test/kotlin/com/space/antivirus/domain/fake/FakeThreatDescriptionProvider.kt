@@ -14,6 +14,8 @@ class FakeThreatDescriptionProvider(
     private val description: String = "fake description",
     private val recommendation: String = "fake recommendation",
     private val shortSummary: String = "fake short summary",
+    private val category: String = "fake category",
+    private val confidenceLevel: String = "fake confidence level",
 ) : ThreatDescriptionProvider {
     var lastTitleRequestArgs: Pair<ThreatType, List<Detection>>? = null
         private set
@@ -22,6 +24,10 @@ class FakeThreatDescriptionProvider(
     var lastRecommendationRequestArgs: Triple<ThreatType, List<Detection>, RiskLevel>? = null
         private set
     var lastShortSummaryRequestArg: List<Detection>? = null
+        private set
+    var lastCategoryRequestArg: ThreatType? = null
+        private set
+    var lastConfidenceLevelRequestArgs: Pair<RiskLevel, List<Detection>>? = null
         private set
 
     override fun titleFor(threatType: ThreatType, detections: List<Detection>): String {
@@ -42,5 +48,15 @@ class FakeThreatDescriptionProvider(
     override fun shortSummaryFor(detections: List<Detection>): String {
         lastShortSummaryRequestArg = detections
         return shortSummary
+    }
+
+    override fun categoryFor(threatType: ThreatType): String {
+        lastCategoryRequestArg = threatType
+        return category
+    }
+
+    override fun confidenceLevelFor(riskLevel: RiskLevel, detections: List<Detection>): String {
+        lastConfidenceLevelRequestArgs = riskLevel to detections
+        return confidenceLevel
     }
 }

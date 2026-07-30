@@ -233,7 +233,23 @@ class SuspiciousPermissionPatternAnalyzerTest {
     }
 
     @Test
-    fun `SMS pattern on a PRODUCTIVITY-category app is NOT downgraded - only SOCIAL is consistent for this rule`() =
+    fun `SMS pattern on a VIDEO-category app is also downgraded to LOW confidence - Sprint 033`() = runTest {
+        // Short-form video apps commonly use SMS for account/OTP
+        // verification, the same reason messaging apps need it, but may
+        // declare VIDEO rather than SOCIAL as their category.
+        val result = analyzer.analyze(
+            appTarget(
+                permissions = listOf("android.permission.READ_SMS", "android.permission.INTERNET"),
+                category = AppCategory.VIDEO,
+            ),
+        )
+
+        val outcome = (result as AppResult.Success).data as AnalysisOutcome.Flagged
+        assertThat(outcome.detections.single().confidence).isEqualTo(Confidence.LOW)
+    }
+
+    @Test
+    fun `SMS pattern on a PRODUCTIVITY-category app is NOT downgraded by category`() =
         runTest {
             val result = analyzer.analyze(
                 appTarget(

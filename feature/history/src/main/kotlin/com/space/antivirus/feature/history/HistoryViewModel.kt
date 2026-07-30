@@ -2,7 +2,6 @@ package com.space.antivirus.feature.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.space.antivirus.core.model.Confidence
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.Threat
@@ -87,11 +86,12 @@ class HistoryViewModel @Inject constructor(
         appLabel = appLabel.ifBlank { targetIdentifier },
         packageName = targetIdentifier,
         riskLevel = riskLevel,
+        threatCategory = descriptionProvider.categoryFor(threatType),
         shortSummary = descriptionProvider.shortSummaryFor(detections),
         technicalDetail = description,
         evidenceBullets = detections.map { it.evidenceDescription },
         recommendation = descriptionProvider.recommendationFor(threatType, detections, riskLevel),
-        confidenceLabel = detections.maxOf { it.confidence }.toDisplayLabel(),
+        confidenceLabel = descriptionProvider.confidenceLevelFor(riskLevel, detections),
     )
 
     private companion object {
@@ -120,20 +120,18 @@ data class ScanHistoryEntry(
  *  own KDoc for the full reasoning; this is the identical shape, kept
  *  local rather than shared per the rule-of-three note above.
  *  Sprint 031: gained confidenceLabel, same reasoning as
- *  SecurityCenterViewModel's identical addition. */
+ *  SecurityCenterViewModel's identical addition.
+ *  Sprint 033: gained threatCategory, and confidenceLabel now comes
+ *  from ThreatDescriptionProvider.confidenceLevelFor — same reasoning
+ *  as SecurityCenterViewModel.ThreatSummary's identical change. */
 data class ThreatSummary(
     val appLabel: String,
     val packageName: String,
     val riskLevel: RiskLevel,
+    val threatCategory: String,
     val shortSummary: String,
     val technicalDetail: String,
     val evidenceBullets: List<String>,
     val recommendation: String,
     val confidenceLabel: String,
 )
-
-private fun Confidence.toDisplayLabel(): String = when (this) {
-    Confidence.LOW -> "Low"
-    Confidence.MODERATE -> "Moderate"
-    Confidence.HIGH -> "High"
-}

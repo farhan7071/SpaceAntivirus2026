@@ -1408,6 +1408,61 @@ See ADR 0046 for full reasoning, including the exact `PermissionCombinationAnaly
 why Android's real category taxonomy sets a hard limit on what this
 sprint could recognize.
 
+### Professional Threat Report & Detection Quality (Sprint 033)
+
+Five parts, all sharing one principle: everything is derived at display
+time from data already collected, no new persistence anywhere.
+
+```
+ThreatDescriptionProvider (domain)
+  categoryFor(threatType)              -> "Threat Category" report field
+  confidenceLevelFor(riskLevel, dets)  -> Very High / High / Medium / Low
+                                           "Very High" specifically means
+                                           CumulativeRiskScorer already
+                                           escalated (ADR 0041) - a
+                                           stronger statement than any
+                                           single detection's confidence
+
+ConfidenceModulation gained a third trusted installer (Xiaomi's
+  com.xiaomi.mipicks) after real-device testing found Xiaomi Home/Mi
+  Store apps had neither installer trust nor a matching AppCategory
+  available - the same "no smart-home category exists" gap ADR 0046
+  already documented for banking apps, compounded by a missing
+  installer entry.
+SurveillanceCombinationAnalyzer gained PRODUCTIVITY (downgrade, not
+  suppression - ChatGPT-style AI assistants)
+SuspiciousPermissionPatternAnalyzer's SMS rule gained VIDEO (TikTok-
+  style short-form video apps)
+
+ScanSummary (feature:security) - all 7 fields from ScanStatistics +
+  the visible/ignored threat split already established by the Sprint
+  32.1 fix. trustedApps (itemsTrusted, skipped from analysis) and
+  ignoredThreats (threats found, later marked trusted) are deliberately
+  different numbers. highestThreatLabel/averageConfidenceLabel are
+  qualitative labels only - RiskLevel and Confidence's own KDocs are
+  both explicit that this project shows no raw numeric scores to users,
+  even though averageConfidenceLabel's own internal computation is
+  numeric (ordinal averaging, rounded to the nearest tier).
+```
+
+`CumulativeRiskScorer` is unchanged again this sprint, confirmed via
+exact diff scope - every fix stays at the confidence-modulation layer
+ADR 0045 established. Uninstall functionality (`requestUninstall`,
+`openAppInfo`) is confirmed present and unmodified via full-file
+re-read, per this sprint's own explicit "treat uninstall as frozen"
+instruction.
+
+`ThreatSummaryCard`'s expanded state now shows Threat Category and has
+its evidence visually grouped in its own block with a divider before
+the recommendation - Part 5's polish requirements, satisfied as a
+natural consequence of Part 2/3's restructuring rather than separate
+work.
+
+See ADR 0047 for full reasoning across all five parts, including the
+specific reasoning for each of the seven named apps and a real mistake
+caught and corrected during implementation (an automated test-fixing
+script that initially handled only 3 of 8 construction sites correctly).
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

@@ -50,15 +50,17 @@ class SecurityCenterScreenTest {
         appLabel: String = "Example App",
         packageName: String = "com.example.app",
         riskLevel: RiskLevel = RiskLevel.ATTENTION,
+        threatCategory: String = "Permission Usage",
         shortSummary: String = "A short summary.",
         technicalDetail: String = "The full technical explanation.",
         evidenceBullets: List<String> = listOf("Some reason"),
         recommendation: String = "Review if unexpected.",
-        confidenceLabel: String = "Moderate",
+        confidenceLabel: String = "Medium",
     ) = ThreatSummary(
         appLabel = appLabel,
         packageName = packageName,
         riskLevel = riskLevel,
+        threatCategory = threatCategory,
         shortSummary = shortSummary,
         technicalDetail = technicalDetail,
         evidenceBullets = evidenceBullets,
@@ -73,6 +75,7 @@ class SecurityCenterScreenTest {
                 protectionStatus = ProtectionStatus.UNKNOWN,
                 lastScanCompletedAtEpochMillis = null,
                 threats = emptyList(),
+                scanSummary = null,
             ),
         )
 
@@ -88,6 +91,7 @@ class SecurityCenterScreenTest {
                 protectionStatus = ProtectionStatus.PROTECTED,
                 lastScanCompletedAtEpochMillis = 2_000L,
                 threats = emptyList(),
+                scanSummary = null,
             ),
         )
 
@@ -112,6 +116,7 @@ class SecurityCenterScreenTest {
                     threatSummary(appLabel = "Chrome", packageName = "com.android.chrome"),
                     threatSummary(appLabel = "WhatsApp", packageName = "com.definitely.not.whatsapp"),
                 ),
+                scanSummary = null,
             ),
         )
 
@@ -128,6 +133,7 @@ class SecurityCenterScreenTest {
                 protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
                 lastScanCompletedAtEpochMillis = 2_000L,
                 threats = listOf(threatSummary(shortSummary = "Can record and transmit media.")),
+                scanSummary = null,
             ),
         )
 
@@ -146,6 +152,7 @@ class SecurityCenterScreenTest {
                         recommendation = "Review these findings.",
                     ),
                 ),
+                scanSummary = null,
             ),
         )
 
@@ -182,6 +189,7 @@ class SecurityCenterScreenTest {
                 protectionStatus = ProtectionStatus.UNKNOWN,
                 lastScanCompletedAtEpochMillis = null,
                 threats = emptyList(),
+                scanSummary = null,
             ),
         )
 
@@ -196,6 +204,7 @@ class SecurityCenterScreenTest {
                 protectionStatus = ProtectionStatus.PROTECTED,
                 lastScanCompletedAtEpochMillis = 2_000L,
                 threats = emptyList(),
+                scanSummary = null,
             ),
             onViewHistoryClick = { clicked = true },
         )
@@ -213,6 +222,7 @@ class SecurityCenterScreenTest {
                 protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
                 lastScanCompletedAtEpochMillis = 2_000L,
                 threats = listOf(threatSummary(packageName = "com.example.suspicious")),
+                scanSummary = null,
             ),
             onIgnoreClick = { ignoredPackageName = it },
         )
@@ -221,5 +231,81 @@ class SecurityCenterScreenTest {
         composeTestRule.onNodeWithText("Ignore").performClick()
 
         assertThat(ignoredPackageName).isEqualTo("com.example.suspicious")
+    }
+
+    // --- Sprint 033, Part 4: scan summary display ---
+
+    @Test
+    fun scanSummary_showsAllSevenFields_whenPresent() {
+        setScreen(
+            SecurityCenterUiState.Loaded(
+                protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
+                lastScanCompletedAtEpochMillis = 2_000L,
+                threats = listOf(threatSummary()),
+                scanSummary = ScanSummary(
+                    appsScanned = 42,
+                    threatsDetected = 1,
+                    trustedApps = 3,
+                    ignoredThreats = 2,
+                    scanDurationMillis = 1_500L,
+                    highestThreatLabel = "Attention",
+                    averageConfidenceLabel = "Medium",
+                ),
+            ),
+        )
+
+        composeTestRule.onNodeWithText("Scan Summary").assertExists()
+        composeTestRule.onNodeWithText("Apps scanned: 42").assertExists()
+        composeTestRule.onNodeWithText("Threats detected: 1").assertExists()
+        composeTestRule.onNodeWithText("Trusted apps: 3").assertExists()
+        composeTestRule.onNodeWithText("Ignored threats: 2").assertExists()
+        composeTestRule.onNodeWithText("Scan duration: 1.5s").assertExists()
+        composeTestRule.onNodeWithText("Highest detected threat: Attention").assertExists()
+        composeTestRule.onNodeWithText("Average confidence: Medium").assertExists()
+    }
+
+    @Test
+    fun scanSummary_isNotShown_whenNull() {
+        setScreen(
+            SecurityCenterUiState.Loaded(
+                protectionStatus = ProtectionStatus.NEEDS_ATTENTION,
+                lastScanCompletedAtEpochMillis = 2_000L,
+                threats = listOf(threatSummary()),
+                scanSummary = null,
+            ),
+        )
+
+        composeTestRule.onNodeWithText("Scan Summary").assertDoesNotExist()
+    }
+
+    @Test
+    fun scanSummary_isNotShown_inTheEmptyOrUnknownStates_evenIfSomehowNonNull() {
+        // Defensive coverage: SecurityCenterLoaded only ever renders the
+        // scan summary inside the threat-list branch of its own when{}
+        // (protectionStatus == UNKNOWN and threats.isEmpty() both take
+        // the empty-state branches instead) - this confirms that holds
+        // even if a caller passed a non-null scanSummary alongside an
+        // empty threats list, which the real ViewModel would never do
+        // (scanSummary is only computed from a real lastScan, same as
+        // threats), but this test doesn't rely on that ViewModel
+        // invariant to pass.
+        setScreen(
+            SecurityCenterUiState.Loaded(
+                protectionStatus = ProtectionStatus.PROTECTED,
+                lastScanCompletedAtEpochMillis = 2_000L,
+                threats = emptyList(),
+                scanSummary = ScanSummary(
+                    appsScanned = 10,
+                    threatsDetected = 0,
+                    trustedApps = 0,
+                    ignoredThreats = 0,
+                    scanDurationMillis = 500L,
+                    highestThreatLabel = "None",
+                    averageConfidenceLabel = "None",
+                ),
+            ),
+        )
+
+        composeTestRule.onNodeWithText("Scan Summary").assertDoesNotExist()
     }
 }

@@ -85,6 +85,8 @@ class SecurityCenterViewModelTest {
     private fun buildViewModel(): SecurityCenterViewModel {
         every { descriptionProvider.shortSummaryFor(any()) } returns "test short summary"
         every { descriptionProvider.recommendationFor(any(), any(), any()) } returns "test recommendation"
+        every { descriptionProvider.categoryFor(any()) } returns "test category"
+        every { descriptionProvider.confidenceLevelFor(any(), any()) } returns "test confidence level"
         // Default: no trusted items, matching every existing test's
         // prior behavior exactly. Sprint 32.1's own tests override this
         // per-test where a trusted item needs to actually be present.
@@ -144,14 +146,19 @@ class SecurityCenterViewModelTest {
         appLabel = appLabel,
     )
 
-    private fun flaggedScanResult(threats: List<Threat>) = ScanResult(
+    private fun flaggedScanResult(
+        threats: List<Threat>,
+        itemsScanned: Int = 10,
+        itemsTrusted: Int = 0,
+        durationMillis: Long = 500,
+    ) = ScanResult(
         session = completedSession(),
         statistics = ScanStatistics(
-            itemsScanned = 10,
+            itemsScanned = itemsScanned,
             threatsFound = threats.size,
             itemsInconclusive = 0,
-            itemsTrusted = 0,
-            durationMillis = 500,
+            itemsTrusted = itemsTrusted,
+            durationMillis = durationMillis,
         ),
         threats = threats,
     )
@@ -202,12 +209,22 @@ class SecurityCenterViewModelTest {
         }
 
     @Test
-    fun `each ThreatSummary carries appLabel, packageName, riskLevel, shortSummary, technicalDetail, evidenceBullets, and recommendation`() =
+    fun `each ThreatSummary carries all its fields correctly, including threatCategory and confidenceLabel`() =
         runTest {
             every { descriptionProvider.shortSummaryFor(any()) } returns "Can access SMS and internet."
             every {
-                descriptionProvider.recommendationFor(ThreatType.SUSPICIOUS_PERMISSION_USAGE, any(), RiskLevel.ATTENTION)
+                descriptionProvider.recommendationFor(
+                    ThreatType.SUSPICIOUS_PERMISSION_USAGE,
+                    any(),
+                    RiskLevel.ATTENTION,
+                )
             } returns "Review if unexpected."
+            every {
+                descriptionProvider.categoryFor(ThreatType.SUSPICIOUS_PERMISSION_USAGE)
+            } returns "Permission Usage"
+            every {
+                descriptionProvider.confidenceLevelFor(RiskLevel.ATTENTION, any())
+            } returns "Medium"
             val realThreat = threat(
                 "t1",
                 appLabel = "Suspicious App",
@@ -225,10 +242,12 @@ class SecurityCenterViewModelTest {
                 assertThat(summary.appLabel).isEqualTo("Suspicious App")
                 assertThat(summary.packageName).isEqualTo("com.example.suspicious")
                 assertThat(summary.riskLevel).isEqualTo(RiskLevel.ATTENTION)
+                assertThat(summary.threatCategory).isEqualTo("Permission Usage")
                 assertThat(summary.shortSummary).isEqualTo("Can access SMS and internet.")
                 assertThat(summary.technicalDetail).isEqualTo("legacy description t1")
                 assertThat(summary.evidenceBullets).containsExactly("SMS access with INTERNET access")
                 assertThat(summary.recommendation).isEqualTo("Review if unexpected.")
+                assertThat(summary.confidenceLabel).isEqualTo("Medium")
             }
         }
 
@@ -424,5 +443,151 @@ class SecurityCenterViewModelTest {
         // Fire-and-forget by design (see the ViewModel's own KDoc) — a
         // failure here should not throw or crash the calling coroutine.
         // Reaching this line at all is the assertion.
+    }
+
+    // --- Sprint 033, Part 4: scanSummary ---
+
+    @Test
+    fun `scanSummary is null when there is no scan yet`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+
+        buildViewModel().uiState.test {
+            assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+            val state = awaitItem() as SecurityCenterUiState.Loaded
+            assertThat(state.scanSummary).isNull()
+        }
+    }
+
+    @Test
+    fun `scanSummary's appsScanned, trustedApps, and scanDurationMillis come directly from ScanStatistics`() =
+        runTest {
+            every { securityRepository.observeScanHistory() } returns flowOf(
+                listOf(flaggedScanResult(emptyList(), itemsScanned = 42, itemsTrusted = 3, durationMillis = 1_234L)),
+            )
+
+            buildViewModel().uiState.test {
+                assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+                val summary = (awaitItem() as SecurityCenterUiState.Loaded).scanSummary!!
+                assertThat(summary.appsScanned).isEqualTo(42)
+                assertThat(summary.trustedApps).isEqualTo(3)
+                assertThat(summary.scanDurationMillis).isEqualTo(1_234L)
+            }
+        }
+
+    @Test
+    fun `threatsDetected counts only visible threats, not ones already trusted`() = runTest {
+        val threats = listOf(
+            threat("t1", packageName = "com.example.visible"),
+            threat("t2", packageName = "com.example.trusted"),
+        )
+        every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(threats)))
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(
+            listOf(
+                TrustedItem(
+                    id = "trust-1",
+                    identifier = "com.example.trusted",
+                    type = TrustedItemType.APPLICATION,
+                    addedAtEpochMillis = 0L,
+                ),
+            ),
+        )
+
+        buildViewModel().uiState.test {
+            assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+            val summary = (awaitItem() as SecurityCenterUiState.Loaded).scanSummary!!
+            assertThat(summary.threatsDetected).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun `ignoredThreats counts threats trusted after the fact, distinct from trustedApps`() = runTest {
+        // Directly the distinction ADR 0045/scanSummaryFor's own KDoc
+        // makes: itemsTrusted (apps skipped from analysis, from
+        // ScanStatistics) and ignoredThreats (threats this scan actually
+        // found that have since been marked trusted) are different
+        // numbers, even in the same scan.
+        val threats = listOf(threat("t1", packageName = "com.example.trusted"))
+        every { securityRepository.observeScanHistory() } returns flowOf(
+            listOf(flaggedScanResult(threats, itemsTrusted = 0)),
+        )
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(
+            listOf(
+                TrustedItem(
+                    id = "trust-1",
+                    identifier = "com.example.trusted",
+                    type = TrustedItemType.APPLICATION,
+                    addedAtEpochMillis = 0L,
+                ),
+            ),
+        )
+
+        buildViewModel().uiState.test {
+            assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+            val summary = (awaitItem() as SecurityCenterUiState.Loaded).scanSummary!!
+            assertThat(summary.ignoredThreats).isEqualTo(1)
+            assertThat(summary.trustedApps).isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun `highestThreatLabel is None when there are no visible threats`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(emptyList())))
+
+        buildViewModel().uiState.test {
+            assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+            val summary = (awaitItem() as SecurityCenterUiState.Loaded).scanSummary!!
+            assertThat(summary.highestThreatLabel).isEqualTo("None")
+        }
+    }
+
+    @Test
+    fun `highestThreatLabel reflects the most severe visible threat, not the first or last one`() = runTest {
+        val threats = listOf(
+            threat("t1", packageName = "com.example.low", riskLevel = RiskLevel.INFO),
+            threat("t2", packageName = "com.example.high", riskLevel = RiskLevel.ACTION_NEEDED),
+            threat("t3", packageName = "com.example.mid", riskLevel = RiskLevel.ATTENTION),
+        )
+        every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(threats)))
+
+        buildViewModel().uiState.test {
+            assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+            val summary = (awaitItem() as SecurityCenterUiState.Loaded).scanSummary!!
+            assertThat(summary.highestThreatLabel).isEqualTo("Action Needed")
+        }
+    }
+
+    @Test
+    fun `averageConfidenceLabel is None when there are no visible threats`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(emptyList())))
+
+        buildViewModel().uiState.test {
+            assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+            val summary = (awaitItem() as SecurityCenterUiState.Loaded).scanSummary!!
+            assertThat(summary.averageConfidenceLabel).isEqualTo("None")
+        }
+    }
+
+    @Test
+    fun `averageConfidenceLabel rounds to the nearest tier across multiple visible threats`() = runTest {
+        // Low (ordinal 0) and High (ordinal 2) average to 1.0, which
+        // rounds to Medium (ordinal 1) - a genuinely computed average,
+        // not just one of the two input tiers.
+        every {
+            descriptionProvider.confidenceLevelFor(RiskLevel.INFO, any())
+        } returns "Low"
+        every {
+            descriptionProvider.confidenceLevelFor(RiskLevel.ACTION_NEEDED, any())
+        } returns "High"
+        val threats = listOf(
+            threat("t1", packageName = "com.example.low", riskLevel = RiskLevel.INFO),
+            threat("t2", packageName = "com.example.high", riskLevel = RiskLevel.ACTION_NEEDED),
+        )
+        every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(threats)))
+
+        buildViewModel().uiState.test {
+            assertThat(awaitItem()).isEqualTo(SecurityCenterUiState.Loading)
+            val summary = (awaitItem() as SecurityCenterUiState.Loaded).scanSummary!!
+            assertThat(summary.averageConfidenceLabel).isEqualTo("Medium")
+        }
     }
 }

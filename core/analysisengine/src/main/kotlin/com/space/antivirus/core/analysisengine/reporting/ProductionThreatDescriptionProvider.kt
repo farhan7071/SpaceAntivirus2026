@@ -47,6 +47,11 @@ import javax.inject.Inject
  * (ADR 0044) — a deliberate, small duplication across layers rather than
  * a shared dependency, since core:ui has no dependency on domain and
  * shouldn't gain one just for this.
+ *
+ * Sprint 033: categoryFor and confidenceLevelFor added for the
+ * professional threat report's Threat Category and (four-tier)
+ * Confidence fields — see this class's own ThreatDescriptionProvider
+ * interface KDoc for the full reasoning behind each.
  */
 class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescriptionProvider {
 
@@ -162,6 +167,43 @@ class ProductionThreatDescriptionProvider @Inject constructor() : ThreatDescript
 
     private fun combinedEvidenceLowercase(detections: List<Detection>): String =
         detections.joinToString(separator = " ") { it.evidenceDescription }.lowercase()
+
+    /**
+     * Sprint 033 — Part 2's "Threat Category" report field. A short,
+     * user-facing label for threatType — the same category set titleFor
+     * switches on, but phrased as a noun for a labeled report field
+     * ("Threat Category: Permission Usage") rather than a headline
+     * sentence ("Unusual permission combination").
+     */
+    override fun categoryFor(threatType: ThreatType): String = when (threatType) {
+        ThreatType.MALWARE -> "Malware"
+        ThreatType.POTENTIALLY_UNWANTED_APPLICATION -> "App Impersonation"
+        ThreatType.SUSPICIOUS_PERMISSION_USAGE -> "Permission Usage"
+        ThreatType.SUSPICIOUS_APP_CONFIGURATION -> "App Configuration"
+        ThreatType.UNKNOWN -> "Unclassified"
+    }
+
+    /**
+     * Sprint 033 — Part 3's four-tier confidence label, derived from the
+     * combination of riskLevel and detections' own confidence values,
+     * not a new field on either. See this interface's own KDoc for why
+     * "Very High" specifically means CumulativeRiskScorer's escalation
+     * (ADR 0041) rather than any single detection's confidence value —
+     * that distinction is the entire reason this takes riskLevel as a
+     * parameter instead of only inspecting detections.
+     */
+    override fun confidenceLevelFor(riskLevel: RiskLevel, detections: List<Detection>): String {
+        require(detections.isNotEmpty()) {
+            "confidenceLevelFor requires at least one Detection — same reasoning as descriptionFor."
+        }
+
+        return when {
+            riskLevel == RiskLevel.ACTION_NEEDED -> "Very High"
+            detections.any { it.confidence == Confidence.HIGH } -> "High"
+            detections.any { it.confidence == Confidence.MODERATE } -> "Medium"
+            else -> "Low"
+        }
+    }
 
     private fun defaultRecommendationFor(threatType: ThreatType): String = when (threatType) {
         ThreatType.MALWARE ->

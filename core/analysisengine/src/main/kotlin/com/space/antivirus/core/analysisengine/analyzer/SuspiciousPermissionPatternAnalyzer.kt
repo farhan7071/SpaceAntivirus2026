@@ -67,6 +67,13 @@ import javax.inject.Inject
  * required to co-escalate" rule (unchanged, ADR 0041) is what actually
  * benefits from this — a downgraded LOW-confidence finding simply can't
  * contribute toward escalating a Threat to ACTION_NEEDED anymore.
+ *
+ * Sprint 033: AppCategory.VIDEO added alongside SOCIAL for the SMS
+ * rule, after real-device testing found short-form video apps (SMS used
+ * for account/OTP verification, the same reason messaging apps need it)
+ * declaring VIDEO rather than SOCIAL reaching full, undowngraded
+ * confidence. The device-admin rule's own reasoning is unaffected —
+ * still no category applies there, for the same reason as before.
  */
 class SuspiciousPermissionPatternAnalyzer @Inject constructor() : ThreatAnalyzer {
 
@@ -106,7 +113,7 @@ class SuspiciousPermissionPatternAnalyzer @Inject constructor() : ThreatAnalyzer
                 confidence = ConfidenceModulation.modulate(
                     base = Confidence.MODERATE,
                     app = app,
-                    categoryIsConsistent = app.category == AppCategory.SOCIAL,
+                    categoryIsConsistent = app.category in CATEGORIES_CONSISTENT_WITH_SMS,
                 ),
             )
         }
@@ -149,5 +156,6 @@ class SuspiciousPermissionPatternAnalyzer @Inject constructor() : ThreatAnalyzer
             "android.permission.READ_SMS",
             "android.permission.RECEIVE_SMS",
         )
+        val CATEGORIES_CONSISTENT_WITH_SMS = setOf(AppCategory.SOCIAL, AppCategory.VIDEO)
     }
 }
