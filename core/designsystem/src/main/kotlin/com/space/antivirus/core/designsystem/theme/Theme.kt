@@ -20,6 +20,8 @@ private val LightColors = lightColorScheme(
     onBackground = md_theme_light_onBackground,
     surface = md_theme_light_surface,
     onSurface = md_theme_light_onSurface,
+    outline = md_theme_light_outline,
+    surfaceVariant = md_theme_light_surfaceVariant,
 )
 
 private val DarkColors = darkColorScheme(
@@ -31,17 +33,32 @@ private val DarkColors = darkColorScheme(
     onBackground = md_theme_dark_onBackground,
     surface = md_theme_dark_surface,
     onSurface = md_theme_dark_onSurface,
+    outline = md_theme_dark_outline,
+    surfaceVariant = md_theme_dark_surfaceVariant,
 )
 
 /**
- * App-wide theme root. Dynamic color is used by default on Android 12+
- * (Sprint 002.5 §8 "resolves the Sprint 001 unconfirmed gap explicitly").
- * Falls back to the fixed brand palette above on older OS versions.
+ * App-wide theme root.
+ *
+ * Sprint 035 (SDS v1.0, Part 1 — Brand Identity): dynamicColor now
+ * defaults to false, reversing Sprint 002.5 §8's original default. That
+ * default meant this app's actual on-screen colors — on more than half
+ * the Android install base (API 31+) — were never the deliberately
+ * chosen brand teal (Color.kt's own KDoc) at all, but whatever each
+ * user's wallpaper happened to generate. A security app's brand
+ * identity is exactly the kind of thing this sprint asks to be
+ * "professional... trustworthy... premium... memorable" and consistent
+ * across users — dynamic, wallpaper-dependent color works directly
+ * against every one of those, and against Sprint 002.5 §2's own
+ * documented reasoning for choosing a specific, differentiated brand
+ * color in the first place. The parameter itself is untouched — a
+ * caller can still explicitly opt back into dynamic color by passing
+ * `dynamicColor = true` — only the default changed. See ADR 0049.
  */
 @Composable
 fun SpaceAntivirusTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current

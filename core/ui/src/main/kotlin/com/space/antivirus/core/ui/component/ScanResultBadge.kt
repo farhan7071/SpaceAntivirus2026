@@ -5,7 +5,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
@@ -19,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
 import com.space.antivirus.core.designsystem.theme.SeverityColors
+import com.space.antivirus.core.designsystem.theme.ShapeTokens
 
 /**
  * Sprint 034 (Part 7 — "Use a colored badge indicating overall scan
@@ -61,7 +61,7 @@ fun ScanResultBadge(isClean: Boolean, highestSeverity: Severity, modifier: Modif
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .clip(RoundedCornerShape(percent = 50))
+            .clip(ShapeTokens.badge)
             .background(color)
             .padding(horizontal = spacing.small, vertical = spacing.tight),
     ) {

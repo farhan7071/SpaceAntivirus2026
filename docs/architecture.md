@@ -1518,6 +1518,37 @@ and rebuilt as a shared core:ui component instead.
 
 See ADR 0048 for full reasoning across all eight parts.
 
+### Space Design System v1.0 — Token Layer (Sprint 035, Phase 1)
+
+Design-token foundation only — no screen or component redesign. Every
+token lives in `core:designsystem/theme/`, one file per category
+(brand color, semantic color, typography, shape, spacing, layout,
+elevation, motion, icons, component-state guidelines).
+
+Two deliberate brand-identity decisions: the brand primary stays teal
+(not the reference mockup's "Security Green" — teal was already chosen
+specifically to avoid the red/black "hacker aesthetic" every named
+competitor uses, and this sprint's own brief asks for an original
+identity, not a copy of competitors); and dynamic color now defaults to
+off (previously on, meaning the deliberately-chosen brand teal was
+never actually shown on a majority of the current Android install
+base — dynamic, wallpaper-dependent color was overriding it).
+
+`SeverityColors.Suspicious` and `ComponentState` (Loading/Error) are
+both defined without being wired to invented data or duplicate
+platform behavior — same "define the real vocabulary, don't fabricate
+distinctions" discipline as `Severity` staying at exactly three tiers
+(ADR 0048) and `Safe` not becoming a fourth tier (Sprint 034).
+
+`StatusChip` and `ScanResultBadge` were updated to consume
+`ShapeTokens.chip`/`ShapeTokens.badge` instead of each hardcoding
+`RoundedCornerShape(percent = 50)` independently — the one piece of
+component-level work in this sprint, done because it's a direct
+instance of the problem the token layer exists to prevent.
+
+See ADR 0049 for the full token catalog and reasoning behind every
+decision above.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

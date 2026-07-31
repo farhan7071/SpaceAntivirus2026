@@ -6,6 +6,45 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 035 — Space Design System v1.0, Phase 1 (Token Layer)
+
+Design-token foundation only. No screen or component redesign — that's
+scoped to a later phase. No ViewModel, navigation, Room, or business
+logic touched.
+
+### Added
+
+- A complete, separated token layer in `core:designsystem/theme/`:
+  brand colors, semantic colors, typography (full 15-slot M3 scale),
+  shapes (raw scale + semantic component tokens), spacing, layout
+  (screen padding, content max-width, touch targets, list-row heights),
+  elevation (five named tiers), motion (named animation durations),
+  icons (semantic mapping, one icon family), and component-state
+  guidelines (Loading/Error).
+
+### Changed
+
+- **Dynamic color now defaults to off.** Previously on by default,
+  meaning the deliberately-chosen brand color was never actually shown
+  on a majority of the current Android install base.
+- `StatusChip` and `ScanResultBadge` now consume `ShapeTokens.chip`/
+  `ShapeTokens.badge` instead of each hardcoding the same shape
+  independently.
+
+### Not changed, deliberately
+
+- The brand primary color stays teal, not the reference design's
+  "Security Green" — that color was already chosen specifically to
+  differentiate from competitors, and this sprint's own brief asks for
+  an original identity, not a copy of them. Formalized as its own named
+  semantic color instead of discarded.
+- `Severity` stays at exactly three tiers. New color/state tokens
+  (`Suspicious`, `ComponentState`) are defined for real, honest
+  completeness without being wired to signals this project doesn't
+  actually compute.
+
+See ADR 0049 for the full token catalog and reasoning.
+
 ## Sprint 034 — Final Security Center UI Polish
 
 UI/UX only, against a provided design mockup used as inspiration. No

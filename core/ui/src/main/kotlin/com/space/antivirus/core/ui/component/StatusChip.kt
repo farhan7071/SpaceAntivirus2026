@@ -5,7 +5,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
@@ -21,6 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
 import com.space.antivirus.core.designsystem.theme.SeverityColors
+import com.space.antivirus.core.designsystem.theme.ShapeTokens
 
 /**
  * The ONLY three severity tiers this app uses, per Sprint 002.5 §17 and
@@ -100,7 +100,7 @@ fun StatusChip(severity: Severity, modifier: Modifier = Modifier) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .clip(RoundedCornerShape(percent = 50))
+            .clip(ShapeTokens.chip)
             .background(color)
             .padding(horizontal = spacing.small, vertical = spacing.tight),
     ) {
