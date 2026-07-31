@@ -6,6 +6,42 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 036 — Home Screen Redesign (SDS Phase 2)
+
+Presentation-layer only, built on Sprint 035's design system.
+HomeViewModel, ScanViewModel, repositories, and the database were not
+touched.
+
+### Added
+
+- **Hero Security Card** — protection status, last scan, and the scan
+  action merged into one dominant surface, replacing three separate
+  cards.
+- **Security Summary**, **Quick Actions**, and **Recent Activity**
+  sections.
+- **Four real navigation shortcuts** from Home (Security Center,
+  Cleaner, Scan History, Settings) — `HomeRoute` gained four callback
+  parameters, wired in the nav host using the same pattern Security
+  Center's own history callback already established. No new routes, no
+  nav graph changes.
+- **`AppStatCard`** (new, `core:ui`) — extracted from `ScanSummaryCard`'s
+  own private stat-card pattern to avoid duplicating it in `HomeScreen.kt`.
+
+### Not changed, deliberately
+
+- "Apps Scanned" and "Scan Duration," shown in the reference design,
+  are not persistent data anywhere in `HomeUiState`/`ScanUiState` — the
+  Security Summary shows only the two stats that actually, reliably
+  exist (Threats Found, Trusted Items), rather than extending the
+  ViewModel or fabricating values to match a mockup.
+- Recent Activity shows one real event (the last scan), not an invented
+  multi-item feed — this project's architecture doesn't currently
+  distinguish or persist the kind of granular events ("Database
+  Updated," "Threat Removed") the reference design shows as examples.
+
+See ADR 0050 for full reasoning, including both real conflicts between
+the reference design and the actual data model.
+
 ## Sprint 035 — Space Design System v1.0, Phase 1 (Token Layer)
 
 Design-token foundation only. No screen or component redesign — that's

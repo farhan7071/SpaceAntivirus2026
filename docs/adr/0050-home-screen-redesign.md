@@ -1,0 +1,29 @@
+# ADR 0050: Home Screen Redesign (SDS Phase 2)
+
+**Status:** Accepted
+
+## Context
+This sprint redesigns Home using the Space Design System (Sprint 035), presentation-layer only. `HomeViewModel`, `ScanViewModel`, `Repositories`, and the database were not touched — confirmed via exact diff scope. Every visual decision below was made against one governing rule this sprint's own brief stated explicitly: **never fabricate data** — if the reference design implies a stat this project's current architecture doesn't produce, adapt the UI rather than extend the ViewModel.
+
+## Two real conflicts between the reference design and the actual data model
+
+**"Apps Scanned" and "Scan Duration" don't exist as persistent data.** `HomeUiState` only carries `protectionStatus`, `lastScanSummary` (clean/not, threats found, scan time), and `trustedItemsCount`. `ScanUiState.Completed.itemsScanned` exists, but only transiently, in the current session, right after a scan finishes — not as something that survives navigation or an app restart the way this sprint's other stats do. Extending `HomeViewModel` to persist these was considered and rejected, per this sprint's own explicit priority order (correctness over reference-image fidelity). Security Summary shows exactly two stats — Threats Found and Trusted Items — both real, persistent values. Threats Found is further gated on `lastScan != null`, since showing "0" before any scan ever ran would misleadingly imply a clean scan already happened.
+
+**Recent Activity has no multi-event feed to draw from.** The reference design's own examples ("Threat Removed," "Database Updated") aren't events this project's architecture currently persists or distinguishes. Recent Activity shows exactly one, real item — the last scan — with `AppEmptyState` (SDS) for the genuine empty case, rather than a misleadingly-populated-looking list built from data that doesn't exist.
+
+## Navigation: a deliberate, minimal, precedented exception
+"Quick Actions" (Security Center, Cleaner, Scan History, Settings) needed some way to actually navigate. `HomeRoute` previously received zero parameters. Rather than either (a) build non-functional cards that look tappable and aren't — the exact anti-pattern this sprint's own brief explicitly warns against — or (b) silently do nothing, four navigation callback parameters were added to `HomeRoute`/`HomeScreen` (all defaulted to no-op), and `SpaceAntivirusNavHost.kt` wires them to real `navController.navigate(...)` calls using the *exact* pattern `SecurityCenterRoute`'s own `onViewHistoryClick` already established (Sprint 021). No new route, no new destination, no change to the nav graph's structure or back-stack behavior — a second way to reach four already-existing screens, not a navigation redesign.
+
+## Hero Security Card
+Merges what were three separate cards before this sprint (protection status, last scan, and the scan action) into one dominant surface, since the reference design's own insight — these three pieces of information are one decision, not three cards to mentally reassemble — is sound regardless of the specific visual it's shown in. Background tint is a soft, low-opacity wash of `SeverityColors`' own protected/attention colors (never the raw, full-saturation token, which is sized for small chip text, not a large card surface) — falls back to a neutral surface for `UNKNOWN`, since there's nothing yet to grade. Every color, shape, elevation, spacing, and icon reference in this composable is an SDS token — no hardcoded value.
+
+## AppStatCard: extraction over duplication
+`ScanSummaryCard` (Sprint 033/034) already has a private `StatColumn` composable doing the same visual job internally, but it isn't exported and couldn't be reused from Home without either duplicating the pattern or extracting it. `AppStatCard` (new, `core:ui`) is the extraction — this sprint's own SDS Compliance goal ("avoid duplicate design patterns") applied directly, not just stated. `ScanSummaryCard`'s own internal `StatColumn` was deliberately left untouched rather than refactored to delegate to the new component — this sprint's scope is Home, and touching an already-shipped, already-tested Security Center component for no benefit this sprint needs would be unnecessary risk. A future Security Center sprint is the right place to make that consolidation.
+
+## SpaceSectionHeader: acknowledged, not built
+Sprint 035's own SDS Component Catalog documented `SpaceSectionHeader` as a real gap under Planned Components. This sprint's three section headings (Security Summary / Quick Actions / Recent Activity) use a small, private, Home-local `SectionHeading` composable — genuinely reusing SDS's own `titleMedium` type token, but not a public `core:ui` component. Building the catalog's full, generalized version is Phase 1 work, out of this sprint's own scope (a screen redesign), and shouldn't be invented ahead of being asked for just because a screen happened to need something like it.
+
+## Consequences
+- 5 files changed: `HomeScreen.kt` (redesigned), `AppStatCard.kt` (new, `core:ui`), its dedicated test, `HomeScreenTest.kt` (updated for the redesign plus new Quick Actions coverage), and `SpaceAntivirusNavHost.kt` (four callbacks wired).
+- Two real mistakes were made and caught during implementation, not left in: an invented `SemanticColorScheme` import that doesn't exist (the real names are `SeverityColors`/`SpaceColors`), and a broken `heightAtLeast` helper that called `.height()` instead of `.heightIn(min = ...)`, which would have clipped Quick Action cards' actual content.
+- Every existing `HomeScreenTest` assertion was checked against the new implementation individually; two broke (the merged "No scans yet" card's text, and `AppStatCard`'s two-separate-text-node shape versus the old combined "N items trusted" string) and were fixed with the reasoning documented inline in the test file itself.

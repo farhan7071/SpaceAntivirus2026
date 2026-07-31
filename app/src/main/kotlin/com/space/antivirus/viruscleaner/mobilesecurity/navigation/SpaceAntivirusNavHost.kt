@@ -80,7 +80,14 @@ fun SpaceAntivirusNavHost(
                     },
                 )
             }
-            composable(HomeNavigationRoute) { HomeRoute() }
+            composable(HomeNavigationRoute) {
+                HomeRoute(
+                    onNavigateToSecurityCenter = { navController.navigate(SecurityCenterNavigationRoute) },
+                    onNavigateToCleaner = { navController.navigate(CleanNavigationRoute) },
+                    onNavigateToHistory = { navController.navigate(HistoryNavigationRoute) },
+                    onNavigateToSettings = { navController.navigate(SettingsNavigationRoute) },
+                )
+            }
             composable(SecurityCenterNavigationRoute) {
                 SecurityCenterRoute(
                     onViewHistoryClick = { navController.navigate(HistoryNavigationRoute) },

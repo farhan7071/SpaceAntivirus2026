@@ -1549,6 +1549,44 @@ instance of the problem the token layer exists to prevent.
 See ADR 0049 for the full token catalog and reasoning behind every
 decision above.
 
+### Home Screen Redesign (Sprint 036, SDS Phase 2)
+
+Presentation-layer only, built on Sprint 035's design system.
+HomeViewModel/ScanViewModel/repositories/database untouched - confirmed
+via exact diff scope.
+
+```
+Hero Security Card - merges protection status + last scan + scan action
+  into one dominant surface, status-driven SeverityColors tint
+Security Summary - exactly two stats (Threats Found, Trusted Items),
+  both real and persistent - "Apps Scanned"/"Scan Duration" don't exist
+  as persistent HomeUiState data, so they aren't shown rather than
+  being fabricated or requiring a ViewModel change
+Quick Actions - four navigation shortcuts (Security Center, Cleaner,
+  Scan History, Settings), each a real, working navigation callback
+Recent Activity - one real item (the last scan), AppEmptyState for the
+  genuine empty case, not an invented multi-event feed
+```
+
+Navigation exception, deliberate and minimal: HomeRoute gained four
+callback parameters (all defaulted to no-op), wired in
+SpaceAntivirusNavHost.kt using the exact pattern SecurityCenterRoute's
+own onViewHistoryClick already established (Sprint 021) - no new
+routes, no nav graph structure change, just a second way to reach four
+already-existing screens. Chosen specifically because non-functional
+"Quick Action" cards that look tappable but do nothing would be worse
+than this precedented wiring.
+
+AppStatCard (new, core:ui) - extracted from ScanSummaryCard's own
+previously-private StatColumn pattern specifically to avoid duplicating
+it a second time inside HomeScreen.kt. ScanSummaryCard's own internal
+StatColumn was deliberately left untouched - this sprint's scope is
+Home, not Security Center.
+
+See ADR 0050 for the full reasoning, including two real conflicts
+between the reference design and the actual data model and how each
+was resolved by adapting the UI rather than extending the ViewModel.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
