@@ -6,6 +6,41 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 036.5 — Home Screen Visual Polish
+
+Refinement only, on top of Sprint 036's already-correct structure. No
+layout, ViewModel, repository, or navigation change. No text content
+changed anywhere, so `HomeScreenTest.kt` needed zero updates.
+
+### Improved
+
+- **Hero Card icon** — previously appeared twice, disconnected from the
+  text it represented; consolidated into one icon in a soft tonal
+  circular badge, directly grouped with the status label and headline.
+- **Hero Card elevation** raised — now visibly more prominent than the
+  cards beneath it.
+- **Primary "Scan Now" button** — explicit, more generous height
+  (`LayoutTokens.primaryActionHeight`, new token), reading as the one
+  dominant action rather than a standard-weight button.
+- **Security Summary** — stronger numeric emphasis, smaller labels, and
+  a subtle semantic accent color on Threats Found specifically when
+  its value is non-zero.
+- **Quick Actions** — larger, more deliberate icon sizing.
+- **Recent Activity** — fixed two real semantic mismatches found while
+  polishing: the activity icon always showed a checkmark regardless of
+  scan result, and its color was backwards (clean scans got the brand
+  color, threats-found scans got neutral gray). Now shows the correct
+  icon, correctly tinted.
+
+### Not changed, deliberately
+
+- No new statistics, no fabricated data, no layout restructuring — the
+  Hero Card → Security Summary → Quick Actions → Recent Activity order
+  and every section's underlying data are exactly as Sprint 036 left
+  them.
+
+See ADR 0051 for full reasoning.
+
 ## Sprint 036 — Home Screen Redesign (SDS Phase 2)
 
 Presentation-layer only, built on Sprint 035's design system.

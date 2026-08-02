@@ -43,6 +43,19 @@ val AppShapes = Shapes(
 object ShapeTokens {
     val button = RoundedCornerShape(percent = 50)
     val card = AppShapes.medium
+
+    /**
+     * Sprint 036.5 (design-lead review pass) — the Hero Card's own,
+     * deliberately distinct silhouette: AppShapes.large (16dp) rather
+     * than the standard `card` token (medium, 12dp) every other card on
+     * Home uses. "The Hero Card should feel intentional rather than
+     * simply being a large colored rectangle" and "should become the
+     * signature element of Space Antivirus" - a genuinely different
+     * corner radius, not just a different color, is part of what makes
+     * a screenshot of this card recognizable at a glance rather than
+     * reading as one more Material3 card among several identical ones.
+     */
+    val heroCard = AppShapes.large
     val dialog = AppShapes.large
     val bottomSheet = RoundedCornerShape(
         // Matches AppShapes.large's corner radius (16.dp) for its two
@@ -61,4 +74,16 @@ object ShapeTokens {
     val badge = RoundedCornerShape(percent = 50)
     val chip = RoundedCornerShape(percent = 50)
     val navigation = AppShapes.small
+
+    /**
+     * Sprint 036.5 — a decorative circular container behind a large,
+     * prominent icon (e.g. the Hero Card's status icon badge). Shares
+     * badge/chip's exact value (a full 50%-rounded capsule) — same
+     * reasoning as this file's own precedent above: named by its own
+     * semantic role (a decorative icon container, not a StatusChip-style
+     * status badge) rather than reusing `badge` under a name that would
+     * mislead a future reader of the call site into thinking it's the
+     * same StatusChip/ScanResultBadge shape for a different reason.
+     */
+    val iconBadge = RoundedCornerShape(percent = 50)
 }

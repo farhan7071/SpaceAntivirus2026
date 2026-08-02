@@ -1,12 +1,13 @@
 package com.space.antivirus.feature.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -221,6 +222,21 @@ private fun HomeLoaded(
  * elevation value here is an SDS token per this sprint's own SDS
  * Compliance requirement - no hardcoded hex/dp value appears in this
  * function.
+ *
+ * Sprint 036.5 (visual polish, not a redesign — structure, data, and
+ * callbacks are all unchanged from Sprint 036): the status icon
+ * previously appeared twice — once small (16dp) in its own "SECURE"/
+ * "ATTENTION" label row, and again large (48dp) floating on the far
+ * right of the headline row, visually disconnected from both the label
+ * above it and the text beside it. Consolidated into one icon, sized
+ * more deliberately and placed inside a soft, tonal circular badge
+ * (ShapeTokens.iconBadge) directly beside the status label + headline +
+ * supporting text as a single visual group — "the status graphic should
+ * reinforce the message rather than compete with it," this sprint's own
+ * words. Elevation raised from Elevation.card to Elevation.floating —
+ * "the Hero Card is now the product's visual identity," so it should
+ * read as more raised than the plain stat/action cards beneath it, not
+ * matched to their elevation by default.
  */
 @Composable
 private fun HeroSecurityCard(
@@ -242,6 +258,15 @@ private fun HeroSecurityCard(
     val backgroundTint = when (status) {
         ProtectionStatus.UNKNOWN -> MaterialTheme.colorScheme.surfaceVariant
         else -> statusColor.copy(alpha = if (isDark) 0.20f else 0.14f)
+    }
+    // Sprint 036.5: the icon's own circular badge is a visibly stronger
+    // tint than the card's own background wash - a layered surface
+    // (this sprint's own "layered surfaces, subtle tonal variation"
+    // goal) giving the icon real presence rather than floating directly
+    // on the card's already-tinted background with no separation.
+    val iconBadgeTint = when (status) {
+        ProtectionStatus.UNKNOWN -> MaterialTheme.colorScheme.surface
+        else -> statusColor.copy(alpha = if (isDark) 0.32f else 0.20f)
     }
     val statusIcon = when (status) {
         ProtectionStatus.PROTECTED -> IconTokens.security
@@ -265,54 +290,60 @@ private fun HeroSecurityCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = ShapeTokens.card,
-        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card),
+        // Design-lead review pass: ShapeTokens.heroCard (16dp), not the
+        // standard ShapeTokens.card (12dp) every other card on this
+        // screen uses - a deliberately distinct silhouette, not just a
+        // different color, for the one card meant to be recognizable at
+        // a glance.
+        shape = ShapeTokens.heroCard,
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.floating),
         colors = CardDefaults.cardColors(containerColor = backgroundTint),
     ) {
         Column(
             modifier = Modifier.padding(spacing.large),
-            verticalArrangement = Arrangement.spacedBy(spacing.small),
+            verticalArrangement = Arrangement.spacedBy(spacing.medium),
         ) {
-            // Small status-label row ("SECURE"/"ATTENTION"/"UNKNOWN") -
-            // deliberately plain text + icon, not StatusChip: StatusChip
-            // is scoped to Severity's three per-finding tiers (core:ui),
-            // and ProtectionStatus is a different, three-value enum
-            // measuring the same underlying signal at the whole-device
-            // level - reusing StatusChip here would mean either an
-            // incorrect Severity mapping or bypassing its own type
-            // safety with a workaround, neither of which is genuine
-            // reuse.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = statusIcon,
-                    contentDescription = null,
-                    tint = statusColor,
-                    modifier = Modifier.size(16.dp),
-                )
-                Text(
-                    text = statusLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = statusColor,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = spacing.tight),
-                )
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = headline, style = MaterialTheme.typography.headlineSmall)
+            // One cohesive group: icon badge + (status label, headline,
+            // supporting text) - the icon now sits directly beside the
+            // exact text it represents, addressing "the status icon
+            // feels visually detached." Top-aligned, not center-aligned,
+            // so the badge lines up with the status label at the very
+            // top of the text column rather than floating at the
+            // vertical center of three lines of text.
+            Row(verticalAlignment = Alignment.Top) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(ShapeTokens.iconBadge)
+                        .background(iconBadgeTint),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = statusIcon,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+                Column(modifier = Modifier.padding(start = spacing.medium)) {
+                    Text(
+                        text = statusLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = statusColor,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = headline,
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(top = spacing.tight),
+                    )
                     Text(
                         text = supportingText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = spacing.tight),
                     )
                 }
-                Icon(
-                    imageVector = statusIcon,
-                    contentDescription = null,
-                    tint = statusColor,
-                    modifier = Modifier.size(LayoutTokens.minTouchTarget),
-                )
             }
 
             if (lastScan != null) {
@@ -322,8 +353,6 @@ private fun HeroSecurityCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-
-            Spacer(modifier = Modifier.height(spacing.tight))
 
             HeroScanAction(
                 scanState = scanState,
@@ -373,11 +402,18 @@ private fun HeroScanAction(
         if (scanState is ScanUiState.Running) {
             HeroScanProgress(scanState.progress)
         } else {
+            // Sprint 036.5: explicit height via LayoutTokens.primaryActionHeight
+            // (56dp) - Material3's own default Button height is ~40dp,
+            // which reads as a standard, secondary-weight action, not
+            // "the one dominant primary CTA" this sprint's own Button
+            // section asks the Scan Now button to be.
             AppFilledButton(
                 text = "Scan Now",
                 onClick = onScanClick,
                 enabled = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(LayoutTokens.primaryActionHeight),
             )
         }
     }
@@ -438,6 +474,7 @@ private fun HeroScanProgress(progress: ScanProgress?) {
 @Composable
 private fun SecuritySummarySection(lastScan: LastScanSummary?, trustedItemsCount: Int) {
     val spacing = LocalSpacing.current
+    val isDark = isSystemInDarkTheme()
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
         SectionHeading(text = "Security Summary")
         Row(
@@ -445,10 +482,23 @@ private fun SecuritySummarySection(lastScan: LastScanSummary?, trustedItemsCount
             horizontalArrangement = Arrangement.spacedBy(spacing.small),
         ) {
             if (lastScan != null) {
+                // Sprint 036.5: a subtle semantic accent, only when there's
+                // genuinely something to flag - a zero-threats card stays
+                // neutral (this sprint's own "subtle," not "increasing
+                // saturation" everywhere, guidance). Trusted Items is
+                // deliberately left with no accentColor - it's a neutral
+                // count, not inherently good or concerning, so it doesn't
+                // need one.
+                val threatsAccent = if (lastScan.threatsFound > 0) {
+                    if (isDark) SeverityColors.AttentionDark else SeverityColors.AttentionLight
+                } else {
+                    null
+                }
                 AppStatCard(
                     value = "${lastScan.threatsFound}",
                     label = "Threats Found",
                     icon = IconTokens.warning,
+                    accentColor = threatsAccent,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -546,6 +596,11 @@ private fun QuickActionCard(
             // exact size.
             .heightIn(min = LayoutTokens.minTouchTarget)
             .clip(ShapeTokens.card)
+            // Sprint 036.5: .clickable() already provides Compose's own
+            // default ripple via LocalIndication - "ripple feedback"
+            // (this sprint's own Quick Actions goal) needed no change
+            // here, only confirming it was genuinely already correct
+            // rather than assuming so.
             .clickable(onClick = onClick),
         shape = ShapeTokens.card,
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card),
@@ -554,13 +609,31 @@ private fun QuickActionCard(
             modifier = Modifier.padding(spacing.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp),
-            )
-            Column(modifier = Modifier.padding(start = spacing.small)) {
+            // Design-lead review pass: the Hero Card's own icon-badge
+            // motif (a tonal circle behind the icon) extended here, at a
+            // clearly smaller, subordinate scale - LayoutTokens.minTouchTarget
+            // (48dp) versus the Hero Card's 56dp, same proportional
+            // icon-to-badge ratio (roughly half) - so the whole screen
+            // reads as one deliberate, recognizable visual system rather
+            // than the Hero Card being visually isolated from everything
+            // beneath it. Tinted with the brand primary color at low
+            // opacity, not a severity color - Quick Actions aren't
+            // status-driven the way the Hero Card or Recent Activity are.
+            Box(
+                modifier = Modifier
+                    .size(LayoutTokens.minTouchTarget)
+                    .clip(ShapeTokens.iconBadge)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Column(modifier = Modifier.padding(start = spacing.medium)) {
                 Text(text = title, style = MaterialTheme.typography.titleSmall)
                 Text(
                     text = subtitle,
@@ -588,6 +661,7 @@ private fun QuickActionCard(
 @Composable
 private fun RecentActivitySection(lastScan: LastScanSummary?) {
     val spacing = LocalSpacing.current
+    val isDark = isSystemInDarkTheme()
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
         SectionHeading(text = "Recent Activity")
         if (lastScan == null) {
@@ -601,22 +675,49 @@ private fun RecentActivitySection(lastScan: LastScanSummary?) {
             } else {
                 "${lastScan.threatsFound} item(s) found"
             }
+            // Sprint 036.5: fixed a genuine semantic mismatch - this icon
+            // previously always showed a checkmark (IconTokens.trusted),
+            // even when threats were found, tinted with the brand primary
+            // color for a clean result and a flat neutral gray for a
+            // dirty one (backwards - the concerning result read as less
+            // visually significant than the reassuring one). Now shows a
+            // real checkmark tinted Safe-green for clean, or a warning
+            // icon tinted Attention-amber when not - "status icon,
+            // typography, spacing, and alignment should work together,"
+            // this sprint's own words for Recent Activity specifically.
+            val (activityIcon, activityColor) = if (lastScan.isClean) {
+                IconTokens.trusted to (if (isDark) SeverityColors.SafeDark else SeverityColors.SafeLight)
+            } else {
+                IconTokens.warning to (if (isDark) SeverityColors.AttentionDark else SeverityColors.AttentionLight)
+            }
             Card(shape = ShapeTokens.card, elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card)) {
                 Row(
                     modifier = Modifier.padding(spacing.medium),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = IconTokens.trusted,
-                        contentDescription = null,
-                        tint = if (lastScan.isClean) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Column(modifier = Modifier.padding(start = spacing.small)) {
+                    // Design-lead review pass: same icon-badge motif as
+                    // QuickActionCard, tinted with this section's own
+                    // already-computed semantic color (Safe-green or
+                    // Attention-amber) rather than the neutral brand
+                    // primary Quick Actions uses - Recent Activity is
+                    // status-driven the same way the Hero Card is, so
+                    // its badge should carry that same semantic meaning,
+                    // not a decorative one.
+                    Box(
+                        modifier = Modifier
+                            .size(LayoutTokens.minTouchTarget)
+                            .clip(ShapeTokens.iconBadge)
+                            .background(activityColor.copy(alpha = if (isDark) 0.24f else 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = activityIcon,
+                            contentDescription = null,
+                            tint = activityColor,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                    Column(modifier = Modifier.padding(start = spacing.medium)) {
                         Text(text = "Full device scan completed", style = MaterialTheme.typography.titleSmall)
                         Text(
                             text = "${formatScanTime(lastScan.scannedAtEpochMillis)} \u00B7 $resultText",

@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,10 +41,32 @@ import com.space.antivirus.core.designsystem.theme.ShapeTokens
  * needs. A future sprint touching Security Center is the right place to
  * make that consolidation, with that screen's own tests as the safety
  * net.
+ *
+ * Sprint 036.5 (visual polish, not a redesign): value typography
+ * strengthened from titleLarge to headlineSmall ("stronger numeric
+ * emphasis," this sprint's own Security Summary goal) and label
+ * shrunk from bodySmall to labelSmall ("smaller labels") — a clearer
+ * size contrast between the number that matters and the word
+ * explaining it, not a new layout. Gained an optional `accentColor`
+ * (defaults to null, preserving every existing call site's exact prior
+ * appearance unchanged) — when provided, tints both the icon and the
+ * value text with it, for "subtle semantic accents" on specifically
+ * meaningful stats (e.g. a non-zero Threats Found value) without
+ * touching color saturation elsewhere or turning every stat card the
+ * same alarming color regardless of what it's actually reporting.
  */
 @Composable
-fun AppStatCard(value: String, label: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+fun AppStatCard(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    accentColor: Color? = null,
+) {
     val spacing = LocalSpacing.current
+    val valueColor = accentColor ?: MaterialTheme.colorScheme.onSurface
+    val iconColor = accentColor ?: MaterialTheme.colorScheme.onSurfaceVariant
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = ShapeTokens.card,
@@ -57,16 +80,21 @@ fun AppStatCard(value: String, label: String, modifier: Modifier = Modifier, ico
                 Icon(
                     imageVector = it,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = iconColor,
                     modifier = Modifier
                         .size(18.dp)
                         .padding(bottom = spacing.tight),
                 )
             }
-            Text(text = value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                color = valueColor,
+                fontWeight = FontWeight.Bold,
+            )
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

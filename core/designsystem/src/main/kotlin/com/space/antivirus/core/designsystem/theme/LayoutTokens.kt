@@ -59,4 +59,19 @@ object LayoutTokens {
 
     /** A three-line list row's standard height (e.g. title + two-line supporting text). */
     val listItemHeightThreeLine = 88.dp
+
+    /**
+     * Sprint 036.5 — a screen's one dominant, primary call-to-action
+     * (e.g. the Hero Card's "Scan Now") sized more generously than
+     * Material3's own default Button height (~40dp, below
+     * minTouchTarget itself) — a taller primary action reads as more
+     * confident and premium, not just technically tappable. Shares
+     * listItemHeightSingleLine's exact value (56.dp) by coincidence of
+     * both landing in the same "generous touch element" size class, not
+     * by dependency — same documented reasoning this file already uses
+     * for screenHorizontalPadding vs. Spacing.medium above; a future
+     * change to one for its own reason shouldn't silently change the
+     * other's meaning.
+     */
+    val primaryActionHeight = 56.dp
 }

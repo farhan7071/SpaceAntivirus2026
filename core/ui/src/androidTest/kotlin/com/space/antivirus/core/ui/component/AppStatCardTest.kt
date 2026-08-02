@@ -3,6 +3,7 @@ package com.space.antivirus.core.ui.component
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -77,6 +78,26 @@ class AppStatCardTest {
         composeTestRule.onNodeWithText("467").assertExists()
         composeTestRule.onNodeWithText("Apps Scanned").assertExists()
         composeTestRule.onNodeWithText("0").assertExists()
+        composeTestRule.onNodeWithText("Threats Found").assertExists()
+    }
+
+    @Test
+    fun rendersCorrectly_whenAnAccentColorIsProvided() {
+        // Sprint 036.5 - accentColor defaults to null (every pre-existing
+        // call site's exact prior appearance) but must render correctly
+        // when a caller does provide one, without changing which text is
+        // shown.
+        composeTestRule.setContent {
+            SpaceAntivirusTheme {
+                AppStatCard(
+                    value = "3",
+                    label = "Threats Found",
+                    accentColor = Color.Red,
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("3").assertExists()
         composeTestRule.onNodeWithText("Threats Found").assertExists()
     }
 }

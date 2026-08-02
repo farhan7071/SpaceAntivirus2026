@@ -1587,6 +1587,51 @@ See ADR 0050 for the full reasoning, including two real conflicts
 between the reference design and the actual data model and how each
 was resolved by adapting the UI rather than extending the ViewModel.
 
+### Home Screen Visual Polish (Sprint 036.5)
+
+Refinement only, on top of Sprint 036's already-correct structure - no
+layout, ViewModel, repository, or navigation-structure change. No new
+text content anywhere, so HomeScreenTest.kt needed zero changes.
+
+Hero Card - the status icon previously appeared twice (16dp in a label
+row, 48dp floating disconnected on the headline row); consolidated into
+one icon in a soft tonal circular badge (ShapeTokens.iconBadge, new),
+directly beside the status label/headline/supporting text as one visual
+group. Elevation raised to Elevation.floating - visually more raised
+than the plain cards beneath it now.
+
+Two real semantic mismatches found and fixed while polishing Recent
+Activity: the activity icon always showed a checkmark regardless of
+scan result, and was tinted backwards (brand color for clean, neutral
+gray for threats found - the concerning result read as less visually
+significant). Fixed to show a real checkmark/warning icon, tinted
+Safe-green or Attention-amber correctly.
+
+New SDS tokens (both additive, no existing token changed):
+LayoutTokens.primaryActionHeight (56dp, for "Scan Now" as the one
+dominant CTA) and ShapeTokens.iconBadge (a decorative circular icon
+container, named separately from badge/chip despite sharing their
+value, matching this file's own precedent for same-valued-but-
+differently-meant tokens).
+
+AppStatCard gained an optional accentColor (defaults to null,
+preserving every existing call site's appearance) - used only for
+Threats Found when genuinely non-zero, never applied to Trusted Items.
+
+A follow-up design-lead review pass on this same sprint added two more
+changes: ShapeTokens.heroCard (16dp, distinct from the standard 12dp
+`card` token every other card uses - a genuinely different silhouette,
+not just a different color) for the Hero Card specifically, and
+extended the Hero Card's own icon-badge motif into QuickActionCard and
+Recent Activity (both at 48dp, clearly smaller than the Hero Card's
+56dp) so the badge treatment reads as one deliberate system across the
+whole screen rather than an isolated element. AppStatCard's own icon
+treatment was deliberately left alone - its compact, stacked layout is
+genuinely different from the icon-beside-text pattern the badge motif
+fits naturally into elsewhere.
+
+See ADR 0051 for full reasoning.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
