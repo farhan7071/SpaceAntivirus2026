@@ -6,6 +6,48 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 037 — Home Screen Premium UI Polish
+
+Six numbered, mandatory design corrections against reference images,
+followed by a stricter second design-review round. No ViewModel,
+repository, scan engine, navigation architecture, or business logic
+touched.
+
+### Changed
+
+- **Hero Card**: reduced padding (~20-25% height reduction), Dismiss
+  moved to a top-right text action. Headline now uses `displayLarge` —
+  the design system's own typography scale already reserved this style
+  for exactly this "status headline" moment, but it had never actually
+  been applied here until this sprint. The separate icon badge beside
+  the headline (added in an earlier polish pass) was removed, since it
+  competed with the larger headline rather than reinforcing it.
+- **Security Summary**: now one connected dashboard container instead
+  of two separate cards.
+- **Quick Actions**: smaller icon badges, tighter padding, denser
+  cards — touch targets remain fully accessible.
+- **Vertical spacing**: reduced between all top-level sections.
+- **Unknown State copy**: warmer, onboarding-style language, both on
+  the Hero Card and Recent Activity's empty state.
+- **Scan progress messages**: replaced the flat "Scanning… N of M"
+  counter with milestone-based messages (Starting / Scanning / Almost
+  done) derived from real progress data.
+
+### Not changed, deliberately
+
+- Scan progress does **not** show named technical phases ("Analyzing
+  permissions…", "Scanning app signatures…") as literally requested —
+  `ScanProgress` has no phase data at all, and displaying invented
+  phase claims would misrepresent what the scan engine can actually
+  verify at any given moment.
+- No new `core:ui` component was kept from this sprint. An initial
+  extraction (`AppStatGroup`) was removed again once a stricter review
+  round caught that nothing else in the codebase actually used it —
+  the same connected-dashboard visual is now simple, local code inside
+  `HomeScreen.kt` instead.
+
+See ADR 0052 for the full design analysis and reasoning behind each fix.
+
 ## Sprint 036.5 — Home Screen Visual Polish
 
 Refinement only, on top of Sprint 036's already-correct structure. No

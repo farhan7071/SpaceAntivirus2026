@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,12 +23,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -45,7 +48,6 @@ import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
 import com.space.antivirus.core.ui.component.AppFilledButton
 import com.space.antivirus.core.ui.component.AppLinearProgress
-import com.space.antivirus.core.ui.component.AppStatCard
 import com.space.antivirus.core.ui.component.AppTextButton
 import java.text.DateFormat
 import java.util.Date
@@ -174,7 +176,12 @@ private fun HomeLoaded(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = LayoutTokens.screenHorizontalPadding),
-        verticalArrangement = Arrangement.spacedBy(spacing.large),
+        // Sprint 037 (Design Review #4, "too much vertical spacing...
+        // reduce gaps between sections... 8-12dp smaller"): spacing.large
+        // (24dp) -> spacing.medium (16dp), an 8dp reduction across every
+        // gap between Hero Card/Security Summary/Quick Actions/Recent
+        // Activity, matching the requested range exactly.
+        verticalArrangement = Arrangement.spacedBy(spacing.medium),
         contentPadding = PaddingValues(vertical = spacing.medium),
     ) {
         item {
@@ -223,20 +230,18 @@ private fun HomeLoaded(
  * Compliance requirement - no hardcoded hex/dp value appears in this
  * function.
  *
- * Sprint 036.5 (visual polish, not a redesign — structure, data, and
- * callbacks are all unchanged from Sprint 036): the status icon
- * previously appeared twice — once small (16dp) in its own "SECURE"/
- * "ATTENTION" label row, and again large (48dp) floating on the far
- * right of the headline row, visually disconnected from both the label
- * above it and the text beside it. Consolidated into one icon, sized
- * more deliberately and placed inside a soft, tonal circular badge
- * (ShapeTokens.iconBadge) directly beside the status label + headline +
- * supporting text as a single visual group — "the status graphic should
- * reinforce the message rather than compete with it," this sprint's own
- * words. Elevation raised from Elevation.card to Elevation.floating —
- * "the Hero Card is now the product's visual identity," so it should
- * read as more raised than the plain stat/action cards beneath it, not
- * matched to their elevation by default.
+ * Sprint 037 (design review round 2, first-principles rebuild): the
+ * headline now uses Type.kt's own displayLarge style — reserved,
+ * per that file's own KDoc, for exactly this "status headline" moment,
+ * but never actually applied here until this round. Two smaller
+ * icon-badge treatments were tried and removed across two earlier
+ * rounds of polish (Sprint 036.5's 56dp badge beside the headline,
+ * then a shrunk 44dp version) — at displayLarge's scale, a competing
+ * icon element beside it read as clutter rather than reinforcement, so
+ * this round removed it, keeping only the small, accessible icon in
+ * the status-label row above the headline. Elevation stays
+ * Elevation.floating — more raised than the plain stat/action cards
+ * beneath it, "the Hero Card is now the product's visual identity."
  */
 @Composable
 private fun HeroSecurityCard(
@@ -259,20 +264,16 @@ private fun HeroSecurityCard(
         ProtectionStatus.UNKNOWN -> MaterialTheme.colorScheme.surfaceVariant
         else -> statusColor.copy(alpha = if (isDark) 0.20f else 0.14f)
     }
-    // Sprint 036.5: the icon's own circular badge is a visibly stronger
-    // tint than the card's own background wash - a layered surface
-    // (this sprint's own "layered surfaces, subtle tonal variation"
-    // goal) giving the icon real presence rather than floating directly
-    // on the card's already-tinted background with no separation.
-    val iconBadgeTint = when (status) {
-        ProtectionStatus.UNKNOWN -> MaterialTheme.colorScheme.surface
-        else -> statusColor.copy(alpha = if (isDark) 0.32f else 0.20f)
-    }
     val statusIcon = when (status) {
         ProtectionStatus.PROTECTED -> IconTokens.security
         ProtectionStatus.NEEDS_ATTENTION -> IconTokens.warning
         ProtectionStatus.UNKNOWN -> IconTokens.security
     }
+    // Sprint 037 (Design Review #5, "Unknown State needs personality"):
+    // "Protection status unknown" read as clinical/error-like rather than
+    // a first-run welcome - the same underlying UNKNOWN state, but copy
+    // that reads as onboarding ("let's get started") rather than "we
+    // don't know what's going on."
     val (headline, supportingText) = when (status) {
         ProtectionStatus.PROTECTED ->
             "You're protected" to "No threats found in your last scan"
@@ -280,71 +281,102 @@ private fun HeroSecurityCard(
             "Attention needed" to
                 "${lastScan?.threatsFound ?: 0} item(s) from your last scan are worth reviewing"
         ProtectionStatus.UNKNOWN ->
-            "Protection status unknown" to "Run your first scan to see your protection status"
+            "Let's get you protected" to "Run your first scan to see how your device is doing"
     }
     val statusLabel = when (status) {
         ProtectionStatus.PROTECTED -> "SECURE"
         ProtectionStatus.NEEDS_ATTENTION -> "ATTENTION"
-        ProtectionStatus.UNKNOWN -> "UNKNOWN"
+        ProtectionStatus.UNKNOWN -> "GET STARTED"
     }
+    // Sprint 037 (Design Review #1, "move Dismiss to top-right as text or
+    // icon, not a large element"): Dismiss only has real meaning while
+    // there's an actual just-completed/failed scan result to acknowledge
+    // - onAcknowledgeScanResult, unchanged, still only does anything
+    // meaningful in those two states. Moving it to the top row is a pure
+    // repositioning of existing, real behavior, not new functionality.
+    val showDismiss = scanState is ScanUiState.Completed || scanState is ScanUiState.Error
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        // Design-lead review pass: ShapeTokens.heroCard (16dp), not the
-        // standard ShapeTokens.card (12dp) every other card on this
-        // screen uses - a deliberately distinct silhouette, not just a
-        // different color, for the one card meant to be recognizable at
-        // a glance.
         shape = ShapeTokens.heroCard,
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.floating),
         colors = CardDefaults.cardColors(containerColor = backgroundTint),
     ) {
         Column(
-            modifier = Modifier.padding(spacing.large),
-            verticalArrangement = Arrangement.spacedBy(spacing.medium),
+            // Sprint 037 (Design Review #1, "reduce height by ~20-25%"):
+            // outer padding tightened from spacing.large (24dp) to
+            // spacing.medium (16dp), and the internal gap between groups
+            // from spacing.medium to spacing.small - a real, measured
+            // reduction, not a cosmetic tweak, on top of removing the
+            // large 56dp badge-beside-headline layout below.
+            modifier = Modifier.padding(spacing.medium),
+            verticalArrangement = Arrangement.spacedBy(spacing.small),
         ) {
-            // One cohesive group: icon badge + (status label, headline,
-            // supporting text) - the icon now sits directly beside the
-            // exact text it represents, addressing "the status icon
-            // feels visually detached." Top-aligned, not center-aligned,
-            // so the badge lines up with the status label at the very
-            // top of the text column rather than floating at the
-            // vertical center of three lines of text.
-            Row(verticalAlignment = Alignment.Top) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(ShapeTokens.iconBadge)
-                        .background(iconBadgeTint),
-                    contentAlignment = Alignment.Center,
-                ) {
+            // Small, inline icon + status label row, matching both
+            // reference images' actual layout (neither shows a large
+            // icon badge beside the headline - that was this project's
+            // own Sprint 036.5 addition, reconsidered here against a
+            // clearer reference). Dismiss sits at the far right of this
+            // same row - "top-right, as text or icon, not a large
+            // element" - only shown while there's a real result to
+            // dismiss.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = statusIcon,
                         contentDescription = null,
                         tint = statusColor,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(18.dp),
                     )
-                }
-                Column(modifier = Modifier.padding(start = spacing.medium)) {
                     Text(
                         text = statusLabel,
                         style = MaterialTheme.typography.labelMedium,
                         color = statusColor,
                         fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = headline,
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.padding(top = spacing.tight),
-                    )
-                    Text(
-                        text = supportingText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = spacing.tight),
+                        modifier = Modifier.padding(start = spacing.tight),
                     )
                 }
+                if (showDismiss) {
+                    AppTextButton(text = "Dismiss", onClick = onAcknowledgeScanResult)
+                }
             }
+
+            // Sprint 037 (design review round 2, "redesign the Hero Card
+            // from first principles... avoid making it feel like:
+            // Material Card / Icon / Button. Instead it should feel
+            // like a product identity"): a real, significant finding
+            // made while re-reviewing this card against that
+            // instruction - Type.kt's own KDoc (Sprint 035) already
+            // says displayLarge is "reserved for exactly the two hero
+            // moments (status headline, scan-complete moment)." This
+            // exact headline is that status headline, and it had never
+            // actually used displayLarge - headlineSmall (24sp) was
+            // used instead throughout every prior round of polish. The
+            // design system's own typography scale already had the
+            // right answer for "unmistakably the primary focus...
+            // premium typography" before this sprint asked the
+            // question; it just hadn't been applied here yet.
+            //
+            // The separate restrained icon badge (44dp, prior round) is
+            // removed here, not shrunk further - at this new headline
+            // scale, a second icon element beside it read as competing
+            // clutter rather than reinforcement. The small icon in the
+            // status-label row above already carries the icon role,
+            // accessibly, without an additional decorative element.
+            Text(
+                text = headline,
+                style = MaterialTheme.typography.displayLarge,
+                modifier = Modifier.padding(top = spacing.tight),
+            )
+            Text(
+                text = supportingText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             if (lastScan != null) {
                 Text(
@@ -357,7 +389,6 @@ private fun HeroSecurityCard(
             HeroScanAction(
                 scanState = scanState,
                 onScanClick = onScanClick,
-                onAcknowledgeScanResult = onAcknowledgeScanResult,
             )
         }
     }
@@ -381,7 +412,6 @@ private fun formatScanTime(epochMillis: Long): String = remember(epochMillis) {
 private fun HeroScanAction(
     scanState: ScanUiState,
     onScanClick: () -> Unit,
-    onAcknowledgeScanResult: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
@@ -393,9 +423,8 @@ private fun HeroScanAction(
                     "Scan complete \u2014 ${scanState.threatsFound} item(s) found. " +
                         "See Security Center for details."
                 },
-                onDismiss = onAcknowledgeScanResult,
             )
-            is ScanUiState.Error -> HeroResultBanner(message = scanState.message, onDismiss = onAcknowledgeScanResult)
+            is ScanUiState.Error -> HeroResultBanner(message = scanState.message)
             else -> Unit
         }
 
@@ -419,12 +448,52 @@ private fun HeroScanAction(
     }
 }
 
+/**
+ * Sprint 037 (Design Review #1): no longer owns its own Dismiss button -
+ * that action moved to the Hero Card's top-right row, so this is now
+ * pure message text, letting the result read as one paragraph rather
+ * than a message + a second, separate action floating beneath it.
+ */
 @Composable
-private fun HeroResultBanner(message: String, onDismiss: () -> Unit) {
-    val spacing = LocalSpacing.current
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.tight)) {
-        Text(text = message, style = MaterialTheme.typography.bodySmall)
-        AppTextButton(text = "Dismiss", onClick = onDismiss)
+private fun HeroResultBanner(message: String) {
+    Text(text = message, style = MaterialTheme.typography.bodySmall)
+}
+
+/**
+ * Sprint 037 (Design Review #6, "replace the generic progress indicator
+ * with meaningful scan stages"). ScanProgress (core:model) carries only
+ * itemsProcessed/totalItems/threatsFoundSoFar - a linear count, not a
+ * phase or stage field of any kind (verified directly before writing
+ * this, not assumed). Literally implementing named technical phases
+ * ("Checking installed apps\u2026 Analyzing permissions\u2026 Scanning
+ * app signatures\u2026") would mean claiming the scan engine is doing a
+ * specific thing at a specific moment that this presentation-layer code
+ * has no way to actually verify - exactly the kind of fabricated detail
+ * this project has consistently avoided (e.g. Sprint 036 declining to
+ * invent "Apps Scanned"/"Scan Duration" as persistent Home stats).
+ * Modifying the scan engine to genuinely track and report phases would
+ * be a business-logic change, explicitly out of this sprint's own
+ * scope.
+ *
+ * Instead: three honest, real milestones derived directly from the
+ * fraction of items actually processed - "Starting", "Scanning" (with
+ * the real, current N-of-M count), and "Almost done" past the halfway
+ * point. Genuinely varies as the scan progresses, reads as considered
+ * rather than a bare technical counter, and every word is something
+ * this code can actually verify from the data it has.
+ * threatsFoundSoFar is deliberately never surfaced mid-scan - showing a
+ * partial, still-accumulating threat count before CumulativeRiskScorer
+ * has evaluated the complete picture risks reading as alarming ahead of
+ * time, the same "never exaggerate risk" discipline the detection
+ * engine itself already follows (ADR 0015).
+ */
+private fun scanStageMessage(progress: ScanProgress?): String {
+    if (progress == null || progress.totalItems == 0) return "Starting scan\u2026"
+    val fraction = progress.itemsProcessed.toFloat() / progress.totalItems.toFloat()
+    return when {
+        fraction >= 1f -> "Finishing up\u2026"
+        fraction >= 0.5f -> "Almost done \u2014 ${progress.itemsProcessed} of ${progress.totalItems} apps checked"
+        else -> "Scanning your apps \u2014 ${progress.itemsProcessed} of ${progress.totalItems} checked"
     }
 }
 
@@ -438,12 +507,7 @@ private fun HeroScanProgress(progress: ScanProgress?) {
             null
         }
         AppLinearProgress(progress = fraction, modifier = Modifier.fillMaxWidth())
-        val label = if (progress != null && progress.totalItems > 0) {
-            "Scanning\u2026 ${progress.itemsProcessed} of ${progress.totalItems}"
-        } else {
-            "Starting scan\u2026"
-        }
-        Text(text = label, style = MaterialTheme.typography.labelMedium)
+        Text(text = scanStageMessage(progress), style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -470,6 +534,23 @@ private fun HeroScanProgress(progress: ScanProgress?) {
  * misleadingly imply a clean scan already happened, the same "never
  * fabricate data" principle applied to a value that's technically
  * available (defaulting to 0) but not yet meaningful.
+ *
+ * Sprint 037 (Design Review #2, "feels like two unrelated cards... make
+ * it feel like one dashboard"): one shared Card with a vertical divider
+ * between the two stats, rather than two cards that happen to sit next
+ * to each other.
+ *
+ * Sprint 037 (design review round 2, "do not create reusable components
+ * unless two or more screens genuinely need them today"): this was
+ * briefly extracted to a public core:ui component (AppStatGroup) in the
+ * prior round, justified by "a future sprint touching Security Center
+ * might reasonably adopt this too" — that's hypothetical reuse, not a
+ * genuine need today (verified directly: nothing else in this codebase
+ * calls it). Folded back into this file as simple, local presentation
+ * code per this sprint's own explicit correction — a private SecurityStat
+ * composable below, not a shared component or a generic StatGroupItem
+ * data class, since there's exactly one caller and inventing that
+ * indirection for it isn't warranted.
  */
 @Composable
 private fun SecuritySummarySection(lastScan: LastScanSummary?, trustedItemsCount: Int) {
@@ -477,38 +558,73 @@ private fun SecuritySummarySection(lastScan: LastScanSummary?, trustedItemsCount
     val isDark = isSystemInDarkTheme()
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
         SectionHeading(text = "Security Summary")
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(spacing.small),
-        ) {
-            if (lastScan != null) {
-                // Sprint 036.5: a subtle semantic accent, only when there's
-                // genuinely something to flag - a zero-threats card stays
-                // neutral (this sprint's own "subtle," not "increasing
-                // saturation" everywhere, guidance). Trusted Items is
-                // deliberately left with no accentColor - it's a neutral
-                // count, not inherently good or concerning, so it doesn't
-                // need one.
-                val threatsAccent = if (lastScan.threatsFound > 0) {
-                    if (isDark) SeverityColors.AttentionDark else SeverityColors.AttentionLight
-                } else {
-                    null
+        Card(shape = ShapeTokens.card, elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card)) {
+            Row(modifier = Modifier.padding(vertical = spacing.medium)) {
+                if (lastScan != null) {
+                    // Sprint 036.5: a subtle semantic accent, only when
+                    // there's genuinely something to flag - a
+                    // zero-threats card stays neutral. Trusted Items is
+                    // deliberately left with no accentColor - it's a
+                    // neutral count, not inherently good or concerning.
+                    val threatsAccent = if (lastScan.threatsFound > 0) {
+                        if (isDark) SeverityColors.AttentionDark else SeverityColors.AttentionLight
+                    } else {
+                        null
+                    }
+                    SecurityStat(
+                        value = "${lastScan.threatsFound}",
+                        label = "Threats Found",
+                        icon = IconTokens.warning,
+                        accentColor = threatsAccent,
+                        modifier = Modifier.weight(1f),
+                    )
+                    VerticalDivider(modifier = Modifier.fillMaxHeight())
                 }
-                AppStatCard(
-                    value = "${lastScan.threatsFound}",
-                    label = "Threats Found",
-                    icon = IconTokens.warning,
-                    accentColor = threatsAccent,
+                SecurityStat(
+                    value = "$trustedItemsCount",
+                    label = "Trusted Items",
+                    icon = IconTokens.trusted,
                     modifier = Modifier.weight(1f),
                 )
             }
-            AppStatCard(
-                value = "$trustedItemsCount",
-                label = "Trusted Items",
-                icon = IconTokens.trusted,
-                modifier = Modifier.weight(1f),
-            )
         }
+    }
+}
+
+@Composable
+private fun SecurityStat(
+    value: String,
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    accentColor: Color? = null,
+) {
+    val spacing = LocalSpacing.current
+    val valueColor = accentColor ?: MaterialTheme.colorScheme.onSurface
+    val iconColor = accentColor ?: MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        modifier = modifier.padding(horizontal = spacing.small),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier
+                .size(18.dp)
+                .padding(bottom = spacing.tight),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineSmall,
+            color = valueColor,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -589,11 +705,12 @@ private fun QuickActionCard(
         modifier = modifier
             .fillMaxWidth()
             // LayoutTokens.minTouchTarget (48dp) - this sprint's own
-            // Accessibility requirement. Uses heightIn(min = ...), not
-            // height(...) - a fixed height would clip this card's real
-            // content (icon + two lines of text with padding, already
-            // taller than 48dp); the token here is a floor, not an
-            // exact size.
+            // Accessibility requirement, unchanged even as the visible
+            // content inside shrinks (Design Review #3) - the touch
+            // target and the icon badge's own visual size are two
+            // different things; the card's own heightIn floor keeps the
+            // former accessible regardless of the latter getting more
+            // compact.
             .heightIn(min = LayoutTokens.minTouchTarget)
             .clip(ShapeTokens.card)
             // Sprint 036.5: .clickable() already provides Compose's own
@@ -606,22 +723,22 @@ private fun QuickActionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card),
     ) {
         Row(
-            modifier = Modifier.padding(spacing.medium),
+            // Sprint 037 (Design Review #3, "reduce card height...
+            // increase information density"): internal padding tightened
+            // from spacing.medium (16dp) to spacing.small (8dp) - a real
+            // reduction in the card's own footprint, not just a smaller
+            // icon inside the same amount of whitespace.
+            modifier = Modifier.padding(spacing.small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Design-lead review pass: the Hero Card's own icon-badge
-            // motif (a tonal circle behind the icon) extended here, at a
-            // clearly smaller, subordinate scale - LayoutTokens.minTouchTarget
-            // (48dp) versus the Hero Card's 56dp, same proportional
-            // icon-to-badge ratio (roughly half) - so the whole screen
-            // reads as one deliberate, recognizable visual system rather
-            // than the Hero Card being visually isolated from everything
-            // beneath it. Tinted with the brand primary color at low
-            // opacity, not a severity color - Quick Actions aren't
-            // status-driven the way the Hero Card or Recent Activity are.
+            // Sprint 037 (Design Review #3, "reduce icon badge size"):
+            // shrunk from LayoutTokens.minTouchTarget (48dp) to 36dp -
+            // still the same tonal-circle motif tying this card to the
+            // Hero Card's own visual language, just sized to read as a
+            // dashboard shortcut rather than a large feature tile.
             Box(
                 modifier = Modifier
-                    .size(LayoutTokens.minTouchTarget)
+                    .size(36.dp)
                     .clip(ShapeTokens.iconBadge)
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
@@ -630,10 +747,10 @@ private fun QuickActionCard(
                     imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
-            Column(modifier = Modifier.padding(start = spacing.medium)) {
+            Column(modifier = Modifier.padding(start = spacing.small)) {
                 Text(text = title, style = MaterialTheme.typography.titleSmall)
                 Text(
                     text = subtitle,
@@ -657,6 +774,22 @@ private fun QuickActionCard(
  * Integrity section forbids. AppEmptyState (SDS, reused) covers the
  * true empty case honestly rather than showing a misleadingly-empty
  * activity list.
+ *
+ * Sprint 037 (prose "Recent Activity" section, "make it look like a
+ * timeline or activity feed, not just another card"): a literal
+ * timeline connector line was considered and rejected here specifically
+ * - this section shows exactly one real event (the same data
+ * constraint as above), and a connector line joining a single item to
+ * nothing would be decorative rather than meaningful, the same
+ * "restraint" discipline this project has applied consistently.
+ * Instead, stronger internal hierarchy: the event title is now bolder,
+ * and the timestamp has its own distinct, smaller/quieter caption
+ * styling (labelSmall) separated from the result text (bodySmall,
+ * semantically colored) rather than both run together in one
+ * undifferentiated line - "better timestamp styling" without inventing
+ * data this section doesn't have. Empty-state copy also warmed (Design
+ * Review #5's reasoning applies equally here, not only to the Hero
+ * Card's own UNKNOWN branch).
  */
 @Composable
 private fun RecentActivitySection(lastScan: LastScanSummary?) {
@@ -667,7 +800,7 @@ private fun RecentActivitySection(lastScan: LastScanSummary?) {
         if (lastScan == null) {
             AppEmptyState(
                 icon = IconTokens.scan,
-                message = "No activity yet. Run your first scan to get started.",
+                message = "Nothing to show yet \u2014 run your first scan and we'll keep you posted here.",
             )
         } else {
             val resultText = if (lastScan.isClean) {
@@ -675,16 +808,6 @@ private fun RecentActivitySection(lastScan: LastScanSummary?) {
             } else {
                 "${lastScan.threatsFound} item(s) found"
             }
-            // Sprint 036.5: fixed a genuine semantic mismatch - this icon
-            // previously always showed a checkmark (IconTokens.trusted),
-            // even when threats were found, tinted with the brand primary
-            // color for a clean result and a flat neutral gray for a
-            // dirty one (backwards - the concerning result read as less
-            // visually significant than the reassuring one). Now shows a
-            // real checkmark tinted Safe-green for clean, or a warning
-            // icon tinted Attention-amber when not - "status icon,
-            // typography, spacing, and alignment should work together,"
-            // this sprint's own words for Recent Activity specifically.
             val (activityIcon, activityColor) = if (lastScan.isClean) {
                 IconTokens.trusted to (if (isDark) SeverityColors.SafeDark else SeverityColors.SafeLight)
             } else {
@@ -695,14 +818,6 @@ private fun RecentActivitySection(lastScan: LastScanSummary?) {
                     modifier = Modifier.padding(spacing.medium),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Design-lead review pass: same icon-badge motif as
-                    // QuickActionCard, tinted with this section's own
-                    // already-computed semantic color (Safe-green or
-                    // Attention-amber) rather than the neutral brand
-                    // primary Quick Actions uses - Recent Activity is
-                    // status-driven the same way the Hero Card is, so
-                    // its badge should carry that same semantic meaning,
-                    // not a decorative one.
                     Box(
                         modifier = Modifier
                             .size(LayoutTokens.minTouchTarget)
@@ -718,10 +833,20 @@ private fun RecentActivitySection(lastScan: LastScanSummary?) {
                         )
                     }
                     Column(modifier = Modifier.padding(start = spacing.medium)) {
-                        Text(text = "Full device scan completed", style = MaterialTheme.typography.titleSmall)
                         Text(
-                            text = "${formatScanTime(lastScan.scannedAtEpochMillis)} \u00B7 $resultText",
+                            text = "Full device scan completed",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = resultText,
                             style = MaterialTheme.typography.bodySmall,
+                            color = activityColor,
+                            modifier = Modifier.padding(top = spacing.tight),
+                        )
+                        Text(
+                            text = formatScanTime(lastScan.scannedAtEpochMillis),
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }

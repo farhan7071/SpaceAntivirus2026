@@ -1632,6 +1632,53 @@ fits naturally into elsewhere.
 
 See ADR 0051 for full reasoning.
 
+### Home Screen Premium UI Polish (Sprint 037)
+
+Six numbered, mandatory design corrections. No ViewModel, repository,
+scan engine, navigation architecture, or business logic touched.
+
+```
+#1 Hero Card too tall - padding tightened (24dp -> 16dp), Dismiss moved
+   to a top-right text action (existing behavior, repositioned), large
+   56dp badge-beside-headline reconsidered against a clearer look at
+   the reference images (neither actually shows it) and replaced with
+   a small inline icon + a shrunk 44dp restrained badge
+#2 Security Summary disconnected - AppStatGroup (new, core:ui): one
+   shared container with a vertical divider, not two independent
+   AppStatCards side by side. AppStatCard itself untouched.
+#3 Quick Actions too large - icon badge 48dp -> 36dp, padding tightened;
+   the 48dp touch-target floor is unchanged (visual size and touch
+   target are different things)
+#4 Too much vertical spacing - inter-section gap 24dp -> 16dp
+#5 Unknown State needs personality - warmer copy, both the Hero Card's
+   own branch and Recent Activity's empty state
+#6 Scan progress - ScanProgress (core:model) verified to carry only a
+   linear item count, no phase/stage data at all. Literal named phases
+   ("Analyzing permissions...") would be an unverifiable claim about
+   what the scan engine is doing - the same fabrication this project
+   has consistently declined elsewhere. Replaced with three honest
+   milestones derived from the real progress fraction instead.
+```
+
+See ADR 0052 for the full "before writing code" analysis and reasoning
+behind each fix, including a reference-image labeling discrepancy
+resolved before starting.
+
+**Design review, round 2** (a stricter follow-up, "would I build it
+this way from scratch") produced two changes worth noting specifically.
+A direct self-correction: `AppStatGroup` (round 1's new `core:ui`
+component) was removed entirely and folded back into `HomeScreen.kt` as
+simple, local presentation code, since nothing else in the codebase
+called it — round 1's own justification ("a future sprint might adopt
+this") was hypothetical reuse, which this round's own brief explicitly
+ruled out. A genuine design-system finding: `Type.kt`'s own KDoc already
+documented `displayLarge` as reserved for "the status headline" — this
+exact Hero Card headline — but it had never actually been used there
+across two prior rounds of polish (`headlineSmall` was used instead).
+Switched to `displayLarge`, and removed the separate icon badge that
+had sat beside the smaller headline, since it competed with the new,
+larger text rather than reinforcing it.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

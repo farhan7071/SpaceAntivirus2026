@@ -69,13 +69,16 @@ class HomeScreenTest {
     fun loadedState_withNoScanHistory_showsUnknownStatusAndNoScansYet() {
         composeTestRule.setHomeScreen(uiState = unknownStatusState)
 
-        composeTestRule.onNodeWithText("Protection status unknown").assertExists()
-        // Sprint 036: the standalone "No scans yet" card was merged into
-        // the Hero Card's own supporting text, and Recent Activity now
-        // shows an honest empty state (AppEmptyState) rather than a
-        // second, separate "no scans yet" card repeating the same fact.
-        composeTestRule.onNodeWithText("Run your first scan to see your protection status").assertExists()
-        composeTestRule.onNodeWithText("No activity yet. Run your first scan to get started.").assertExists()
+        // Sprint 037 (Design Review #5, "Unknown State needs
+        // personality"): copy warmed from "Protection status unknown" /
+        // "Run your first scan to see your protection status" / "No
+        // activity yet. Run your first scan to get started." to more
+        // welcoming, onboarding-style text.
+        composeTestRule.onNodeWithText("Let's get you protected").assertExists()
+        composeTestRule.onNodeWithText("Run your first scan to see how your device is doing").assertExists()
+        composeTestRule.onNodeWithText(
+            "Nothing to show yet \u2014 run your first scan and we'll keep you posted here.",
+        ).assertExists()
         composeTestRule.onNodeWithText("Trusted Items").assertExists()
     }
 
@@ -173,7 +176,24 @@ class HomeScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("Scanning\u2026 3 of 10").assertExists()
+        // Sprint 037 (Design Review #6): replaced the old flat "Scanning…
+        // N of M" with an honest, milestone-based message - 3/10 is 30%,
+        // below the 50% "Almost done" threshold, so this is the
+        // "Scanning your apps" branch.
+        composeTestRule.onNodeWithText("Scanning your apps \u2014 3 of 10 checked").assertExists()
+    }
+
+    @Test
+    fun scanRunning_pastHalfway_showsTheAlmostDoneMessage() {
+        composeTestRule.setHomeScreen(
+            uiState = unknownStatusState,
+            scanState = ScanUiState.Running(
+                progress = ScanProgress(sessionId = "s1", itemsProcessed = 8, totalItems = 10, threatsFoundSoFar = 0),
+            ),
+        )
+
+        // 8/10 is 80%, at or past the 50% threshold.
+        composeTestRule.onNodeWithText("Almost done \u2014 8 of 10 apps checked").assertExists()
     }
 
     @Test
