@@ -6,6 +6,66 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 039 — Junk Cleaner engine (real deletion)
+
+The Cleaner now actually cleans. Every figure it shows is measured by
+the engine rather than assumed, and the three Sprint 038 tests that
+asserted the absence of fake UI were replaced by tests asserting the
+real capability that took its place.
+
+### Added
+
+- **Real file deletion** — `FileDeletionRepository`, the only file
+  deletion in the project, with a containment guard enforced inside the
+  repository so no caller can route around it.
+- **Real streaming scan** (`ScanForJunkFilesUseCase`) with live
+  inspected/found/reclaimable counters, and **real cancellation**.
+- **Real cleaning progress** (`CleanJunkFilesUseCase`) with a genuine
+  percentage, per-file counts, and bytes measured at the moment of
+  deletion.
+- **Cleaning and Completed screens**, assembled from the existing Sprint
+  038 building blocks — no new visual language.
+- **Cleanup history**, persisted (`cleanup_records`, schema 4 → 5), so
+  the Idle screen's "Last cleanup" line is real.
+- **Storage statistics** via `StatFs` — no permission needed, which is
+  why the omission Sprint 038 documented could finally be closed.
+- **`core:cleaningdata`** module and **`ScanScope.ApplicationCache`**.
+
+### Changed
+
+- `CleanUiState.Loading` became `Scanning(progress)`, and gained
+  `Cleaning` and `Completed`.
+- Two lines of Sprint 038 copy were true then and false now, so they
+  were replaced rather than left standing: the results hero no longer
+  says nothing has been deleted, and the reassurance card no longer says
+  the scan is read-only. Both now describe the real enforced boundary.
+
+### Removed
+
+- `FindCleanableItemsUseCase` (Sprint 022). Superseded by
+  `ScanForJunkFilesUseCase`; keeping both would have left the same
+  enumerate-then-classify orchestration duplicated in two shapes, with
+  the older one having no production caller.
+
+### Known limits, stated plainly
+
+- **The Cleaner cleans this app's own storage only.** With targetSdk 36
+  and no storage permissions, that is the complete set of what any app
+  may delete. Other apps' caches are unreachable on modern Android at
+  any price; shared storage needs `MANAGE_EXTERNAL_STORAGE` (declined
+  since Sprint 001) or per-batch MediaStore consent.
+- **`LEFTOVER_INSTALLER` is implemented but currently unreachable**,
+  since stale `.apk` files live in shared Downloads. Nothing in the UI
+  claims to find files it cannot reach.
+- **Scanning still shows no percentage**, deliberately — a filesystem
+  walk cannot know its own total without a counting pre-pass. Cleaning
+  does show one, because there the total is genuinely known.
+- **No time-remaining anywhere.** A countdown is a prediction presented
+  as a measurement.
+
+Full reasoning, including the permission analysis and the two product
+decisions it leaves open, in ADR 0054.
+
 ## Sprint 038 — Junk Cleaner UI (presentation-layer overhaul)
 
 A full redesign of the Junk Cleaner screen, and a sprint that was

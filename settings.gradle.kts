@@ -37,6 +37,7 @@ include(":core:testing")
 include(":core:enumeration")
 include(":core:securitydata")
 include(":core:trusteddata")
+include(":core:cleaningdata")
 include(":core:analysisengine")
 include(":core:workmanager")
 

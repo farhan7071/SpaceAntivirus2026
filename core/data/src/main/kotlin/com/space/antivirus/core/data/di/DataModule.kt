@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.space.antivirus.core.database.AppDatabase
+import com.space.antivirus.core.database.dao.CleanupRecordDao
 import com.space.antivirus.core.database.dao.DetectionDao
 import com.space.antivirus.core.database.dao.ScanSessionDao
 import com.space.antivirus.core.database.dao.ScanStatisticsDao
@@ -35,7 +36,8 @@ object DataModule {
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "space_antivirus.db")
             // Sprint 010 bumped 1 -> 2 (scan-history entities); Sprint 012
-            // bumped 2 -> 3 (TrustedItemEntity). See ADR 0023. No real
+            // bumped 2 -> 3 (TrustedItemEntity); Sprint 039 bumped 4 -> 5
+            // (CleanupRecordEntity). See ADR 0023 and ADR 0054. No real
             // Migration object exists yet because this database has never
             // shipped with actual persisted rows; destructive migration is
             // the correct, honest choice for a pre-1.0 app at this stage,
@@ -69,4 +71,8 @@ object DataModule {
     @Provides
     @Singleton
     fun provideTrustedItemDao(appDatabase: AppDatabase): TrustedItemDao = appDatabase.trustedItemDao()
+
+    @Provides
+    @Singleton
+    fun provideCleanupRecordDao(appDatabase: AppDatabase): CleanupRecordDao = appDatabase.cleanupRecordDao()
 }

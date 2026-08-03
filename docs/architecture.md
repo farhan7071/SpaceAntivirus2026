@@ -1743,6 +1743,70 @@ expand/collapse in `IconTokens.kt` (`core:designsystem`, never the
 feature module — ADR 0031), and the project's first `@Preview`
 functions.
 
+### Junk Cleaner engine — real deletion (Sprint 039)
+
+The capability ADR 0035 deferred and Sprint 038 refused to fake. The
+Cleaner now genuinely deletes, with real streamed progress, real
+cancellation, real measured bytes freed, and persisted cleanup history.
+
+```
+core:cleaningdata (new module)
+  AppPrivateStorageRoots      - the containment guard: the closed set of
+                                directories deletion may touch, compared
+                                after canonicalFile resolution
+  FileDeletionRepositoryImpl  - the ONLY file deletion in the project
+  CleanupHistoryRepositoryImpl- Room-backed, cleanup_records (schema 4->5)
+  StorageStatisticsRepositoryImpl - StatFs, no permission required
+
+domain
+  ScanForJunkFilesUseCase     - streaming scan; replaces (and deletes)
+                                FindCleanableItemsUseCase
+  CleanJunkFilesUseCase       - real deletion, per-item progress,
+                                cancellation-aware, persists a record
+  GetLastCleanupUseCase / ObserveCleanupHistoryUseCase
+  GetStorageStatisticsUseCase
+
+core:enumeration
+  FileTreeWalker.walkAsSequence   - lazy traversal; walk() delegates to it
+  enumerateFilesAsFlow            - streams files, ensureActive() per file
+  isScopeAvailable                - cheap stat, so a streaming scan can
+                                    still report an unreadable root
+```
+
+**The permission boundary, and why it is where it is.** targetSdk 36 and
+no storage permissions declared means exactly four directories are
+deletable: `filesDir`, `cacheDir`, `getExternalFilesDir(null)`,
+`externalCacheDir`. Other apps' caches are unreachable on any modern
+Android at any price (a system permission a Play app cannot hold), and
+shared storage needs either `MANAGE_EXTERNAL_STORAGE` — Play-restricted,
+declined since Sprint 001 — or per-batch MediaStore delete requests.
+One live consequence: `LEFTOVER_INSTALLER` is implemented but currently
+unreachable, since stale `.apk` files live in shared Downloads. See ADR
+0054; both remaining options are product decisions, not engineering
+ones.
+
+**Guard placement.** The containment check runs inside the deletion
+repository, below every use case, so no future caller can route around
+it. Canonical resolution — not string prefixes — is what stops `../`
+traversal, symlinks, and `files_backup` reading as inside `files`.
+
+**Progress honesty.** Cleaning shows a real percentage (the candidate
+count is known up front). Scanning still shows none, deliberately: a
+filesystem walk cannot know its own total without a counting pre-pass.
+No time-remaining anywhere — a countdown is a prediction dressed as a
+measurement.
+
+**Cancellation.** `ensureActive()` between files in both the walk and the
+deletion loop. `walkTopDown` is blocking I/O that never suspends, so
+without that check a cancelled scan would keep walking. A cancelled
+cleanup persists its record inside `NonCancellable`, because the files
+deleted before Stop genuinely are gone.
+
+**Sprint 038 copy corrected.** Two lines that were true then and false
+now — the results hero's "nothing has been deleted" and the reassurance
+card's "this scan is read-only" — were replaced with descriptions of the
+real enforced boundary.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

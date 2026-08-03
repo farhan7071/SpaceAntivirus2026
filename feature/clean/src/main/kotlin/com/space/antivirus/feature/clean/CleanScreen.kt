@@ -47,6 +47,9 @@ import com.space.antivirus.core.designsystem.theme.LocalSpacing
 import com.space.antivirus.core.designsystem.theme.ShapeTokens
 import com.space.antivirus.core.model.CleanableCategory
 import com.space.antivirus.core.model.CleanableItem
+import com.space.antivirus.core.model.CleanupRecord
+import com.space.antivirus.core.model.JunkScanProgress
+import com.space.antivirus.core.model.StorageStatistics
 import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
 import com.space.antivirus.core.ui.component.AppFilledButton
@@ -55,55 +58,80 @@ import com.space.antivirus.core.ui.component.AppOutlinedButton
 import com.space.antivirus.core.ui.component.AppSectionHeader
 
 /** Exposed so CleanScreenTest can find the scanning indicator — the
- *  Scanning state has no determinate value to assert on by design. */
+ *  Scanning state still has no determinate value to assert on, by
+ *  design (see `JunkScanProgress`). */
 const val CLEAN_SCANNING_TEST_TAG = "clean_scanning_indicator"
 
+/** The cleaning state's indicator, which unlike scanning IS
+ *  determinate — the candidate count is known before deletion starts. */
+const val CLEAN_CLEANING_TEST_TAG = "clean_cleaning_indicator"
+
 /**
- * Sprint 038 — a full presentation-layer overhaul of the Junk Scanner,
- * replacing the plain Sprint 022 list view with the approved Cleaner
- * design language.
+ * The Junk Cleaner screen.
  *
- * **Scope, and why it is what it is.** The sprint brief originally asked
- * for six screens, including Cleaning Progress and Cleaning Complete.
- * A verification pass against the actual codebase found those two cannot
- * be built honestly: nothing in this project deletes a file. That is not
- * an oversight to work around — `CleanableItem`, `FindCleanableItemsUseCase`
- * and `CleanViewModel` each state it explicitly in their own KDoc, and
- * ADR 0035 scoped the domain layer to candidates only. There is likewise
- * no progress Flow (`FindCleanableItemsUseCase` is a one-shot `suspend`
- * returning a finished `List`), no cancellation, no storage statistics
- * anywhere in the tree, and no cleanup history. Building the reference
- * design's percentage counters, per-file paths, countdown timers,
- * "space freed" totals or a `Stop Cleaning` button would mean shipping a
- * user-visible claim this code cannot verify — the exact fabrication
- * ADR 0015's "never exaggerate" discipline and every prior sprint's data
- * rules forbid. Sprint 038 was rescoped by the project owner to the four
- * states real data supports; Sprint 039 builds the cleaning domain layer,
- * and Sprint 040 builds those two screens on top of it.
+ * **Sprint 038** built these layouts against a domain layer that could
+ * only scan. Its central design constraint — that nothing in this
+ * project deleted a file — was true then and is documented at length in
+ * ADR 0053. **Sprint 039 made it false**, deliberately and in that
+ * order: the UI was built honest first, and the engine was built to
+ * match it rather than the UI being built to flatter an engine that did
+ * not exist.
  *
- * Everything on screen here is derived from `CleanUiState` and nothing
- * else. Category totals, percentages and file counts are all computed
- * from the real `List<CleanableItem>` the classifier returned.
+ * What changed here as a result is narrow, and only where a real
+ * capability replaced a documented omission:
+ * - Scanning shows real inspected/found counts and a real Cancel, both
+ *   streamed from `ScanForJunkFilesUseCase`.
+ * - Results has a real Clean action, because `CleanJunkFilesUseCase` now
+ *   genuinely deletes.
+ * - Cleaning and Completed exist at all, on real measured progress.
+ * - Idle shows a real "Last cleanup" and real storage totals.
+ *
+ * The layouts, spacing, typography and colour of the four Sprint 038
+ * states are untouched. Cleaning and Completed are assembled from the
+ * same local building blocks (`FeatureHeader`, `InfoCard`, `IconBadge`)
+ * rather than introducing any new visual language.
+ *
+ * Everything on screen is derived from `CleanUiState` and nothing else.
+ * The scanning state still shows no percentage: a filesystem walk does
+ * not know its own total (see `JunkScanProgress`). The cleaning state
+ * does show one, because there the total is genuinely known.
  */
 @Composable
 fun CleanRoute(
     viewModel: CleanViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    CleanScreen(uiState = uiState, onScanClick = viewModel::scanForJunk)
+    CleanScreen(
+        uiState = uiState,
+        onScanClick = viewModel::scanForJunk,
+        onCancelScanClick = viewModel::cancelScan,
+        onCleanClick = viewModel::cleanJunk,
+        onCancelCleanClick = viewModel::cancelClean,
+        onDoneClick = viewModel::dismissCompletion,
+    )
 }
 
 @Composable
-fun CleanScreen(uiState: CleanUiState, onScanClick: () -> Unit, modifier: Modifier = Modifier) {
+fun CleanScreen(
+    uiState: CleanUiState,
+    onScanClick: () -> Unit,
+    onCancelScanClick: () -> Unit = {},
+    onCleanClick: () -> Unit = {},
+    onCancelCleanClick: () -> Unit = {},
+    onDoneClick: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     when (uiState) {
-        is CleanUiState.Idle -> CleanIdle(onScanClick, modifier)
-        is CleanUiState.Loading -> CleanScanning(modifier)
+        is CleanUiState.Idle -> CleanIdle(uiState, onScanClick, modifier)
+        is CleanUiState.Scanning -> CleanScanning(uiState, onCancelScanClick, modifier)
         is CleanUiState.Loaded ->
             if (uiState.items.isEmpty()) {
                 CleanNothingFound(onScanClick, modifier)
             } else {
-                CleanResults(uiState, onScanClick, modifier)
+                CleanResults(uiState, onScanClick, onCleanClick, modifier)
             }
+        is CleanUiState.Cleaning -> CleanCleaning(uiState, onCancelCleanClick, modifier)
+        is CleanUiState.Completed -> CleanCompleted(uiState, onScanClick, onDoneClick, modifier)
         is CleanUiState.Error -> CleanError(uiState, onScanClick, modifier)
     }
 }
@@ -113,10 +141,13 @@ fun CleanScreen(uiState: CleanUiState, onScanClick: () -> Unit, modifier: Modifi
 // ---------------------------------------------------------------------
 
 /**
- * The pre-scan screen. The reference design's storage ring ("128 GB")
- * and "Last cleanup" row are both absent here, deliberately: no storage
- * statistics provider and no cleanup history exist in this project, and
- * the sprint's own data rule is to omit rather than invent.
+ * The pre-scan screen.
+ *
+ * Sprint 038 omitted the reference design's storage line and "Last
+ * cleanup" row because neither had any data behind it. Sprint 039 built
+ * both capabilities, so both now appear — with real values, and only
+ * when those values actually loaded. A null stays absent rather than
+ * becoming a zero or a placeholder.
  *
  * The four capability rows are not decorative copy — each one names a
  * rule `JunkFileClassifier` (`domain/cleaning`) genuinely implements,
@@ -126,7 +157,7 @@ fun CleanScreen(uiState: CleanUiState, onScanClick: () -> Unit, modifier: Modifi
  * promising it would describe behavior that does not exist.
  */
 @Composable
-private fun CleanIdle(onScanClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun CleanIdle(state: CleanUiState.Idle, onScanClick: () -> Unit, modifier: Modifier = Modifier) {
     val spacing = LocalSpacing.current
     LazyColumn(
         modifier = modifier
@@ -164,7 +195,7 @@ private fun CleanIdle(onScanClick: () -> Unit, modifier: Modifier = Modifier) {
                 }
             }
         }
-        item { ReadOnlyReassuranceCard() }
+        item { SafeCleanupCard() }
         item {
             AppFilledButton(
                 text = "Scan for Junk Files",
@@ -174,6 +205,8 @@ private fun CleanIdle(onScanClick: () -> Unit, modifier: Modifier = Modifier) {
                     .height(LayoutTokens.primaryActionHeight),
             )
         }
+        state.storage?.let { storage -> item { StorageLine(storage) } }
+        state.lastCleanup?.let { record -> item { LastCleanupLine(record) } }
     }
 }
 
@@ -182,35 +215,34 @@ private fun CleanIdle(onScanClick: () -> Unit, modifier: Modifier = Modifier) {
 // ---------------------------------------------------------------------
 
 /**
- * The in-progress screen, built on an **indeterminate** indicator.
+ * The in-progress scan, still built on an **indeterminate** indicator —
+ * and that is not a leftover from Sprint 038's constraints.
  *
- * The reference design shows 62%, a live file path, a processed/total
- * file count and a countdown. None of those exist:
- * `FindCleanableItemsUseCase` suspends once and returns a completed
- * list, emitting nothing along the way, and `CleanUiState.Loading`
- * carries no fields at all. A determinate ring here would be an
- * animation invented in the UI layer and presented as measurement —
- * precisely the failure Sprint 037 avoided when it declined to show
- * named scan phases `ScanProgress` had no field for.
+ * Sprint 039 gave this screen genuinely real progress: `filesInspected`,
+ * `junkFound` and `bytesFound` are live counters streamed out of
+ * `ScanForJunkFilesUseCase` as the walk visits each file. What it did
+ * NOT give it is a percentage, because a filesystem walk does not know
+ * how many files it will visit until it has visited them. Producing one
+ * would need either a full counting pre-pass (doubling the I/O purely to
+ * animate a bar) or an invented denominator. See `JunkScanProgress`.
  *
- * This is not a departure from the design system, either.
- * `AppProgressIndicator.kt`'s own KDoc states the SDS rule as
- * "determinate-first... wherever the underlying process reports one."
- * This one reports nothing, so indeterminate is what that rule actually
- * prescribes here — checked before assuming, rather than after.
+ * `Cancel Scan` is real now. `enumerateFilesAsFlow` checks for
+ * cancellation between files precisely so a blocking tree walk has
+ * somewhere to actually stop; Sprint 038 showed no such button because
+ * nothing underneath could have honoured it.
  *
- * `Cancel Scan` is likewise absent rather than decorative:
- * `CleanViewModel` exposes no cancellation entry point, so a visible
- * Cancel button would either do nothing or require business-logic
- * changes this presentation-only sprint may not make.
- *
- * What *is* shown is fully verifiable: the four things the classifier
- * actually looks for, and the fact that scanning reads files without
- * modifying them — which is not reassurance copy but a literal
- * description of what this code path does.
+ * The current path is shown as the file's name only, never its full
+ * path — the reference design's `com.whatsapp/cache/thumbs` is another
+ * app's private directory, which this app cannot read on any modern
+ * Android, and a real path here would mostly expose this app's own
+ * internals to no benefit.
  */
 @Composable
-private fun CleanScanning(modifier: Modifier = Modifier) {
+private fun CleanScanning(
+    state: CleanUiState.Scanning,
+    onCancelClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val spacing = LocalSpacing.current
     Column(
         modifier = modifier
@@ -243,22 +275,77 @@ private fun CleanScanning(modifier: Modifier = Modifier) {
             textAlign = TextAlign.Center,
         )
         Text(
-            text = "This can take a moment on a device with a lot of files.",
+            text = state.progress.currentItemLabel(),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        // Real counters, streamed per file. No total, so no percentage.
+        ScanCounters(state.progress)
         InfoCard(
             icon = IconTokens.scan,
             title = "What we're checking",
-            body = "Cache directories, files with common temporary extensions, log files, and app " +
-                "installers left in Downloads.",
+            body = "Your app files and cache: files with common temporary extensions, log files, " +
+                "and app installers left behind.",
         )
         InfoCard(
             icon = IconTokens.security,
             title = "Read-only",
             body = "Scanning only reads file information. Nothing is opened, changed or deleted.",
         )
+        AppOutlinedButton(
+            text = "Cancel Scan",
+            onClick = onCancelClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(LayoutTokens.primaryActionHeight),
+        )
+    }
+}
+
+/**
+ * The three live scan counters. Uses the same three-across row the
+ * Sprint 038 design language already established, and shows only values
+ * `JunkScanProgress` genuinely carries.
+ */
+@Composable
+private fun ScanCounters(progress: JunkScanProgress) {
+    val spacing = LocalSpacing.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(spacing.small),
+    ) {
+        CounterCell(label = "Checked", value = progress.filesInspected.toString(), modifier = Modifier.weight(1f))
+        CounterCell(label = "Junk found", value = progress.junkFound.toString(), modifier = Modifier.weight(1f))
+        CounterCell(
+            label = "Reclaimable",
+            value = formatSize(progress.bytesFound),
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun CounterCell(label: String, value: String, modifier: Modifier = Modifier) {
+    val spacing = LocalSpacing.current
+    Card(
+        modifier = modifier,
+        shape = ShapeTokens.card,
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.small),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(text = value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -269,16 +356,17 @@ private fun CleanScanning(modifier: Modifier = Modifier) {
 /**
  * The results screen.
  *
- * Two deliberate departures from the reference image, both documented in
- * ADR 0053:
+ * **The Clean button is real as of Sprint 039.** Sprint 038 shipped this
+ * screen with no clean action at all and a hero that said plainly that
+ * nothing had been deleted, because nothing could be. `CleanJunkFilesUseCase`
+ * now genuinely deletes, so the action exists and the disclaimer is
+ * replaced by an accurate description of what pressing it will do. The
+ * button names the amount it will free, from the real measured total.
  *
- * 1. **No `Clean 482 MB` button.** Nothing in this project can delete a
- *    file. A primary action that looked like it cleaned but didn't would
- *    be the single most misleading thing this screen could ship, and a
- *    disabled one promising a future capability is no better. The screen
- *    is therefore honest about what it is — a report — and says so in
- *    plain words rather than implying otherwise through a button.
- * 2. **No alarm-red hero.** The reference tints "Junk found" in the same
+ * One deliberate departure from the reference image remains, documented
+ * in ADR 0053 and unchanged:
+ *
+ * 1. **No alarm-red hero.** The reference tints "Junk found" in the same
  *    red this app reserves for `ACTION_NEEDED` security findings.
  *    `CleanableCategory`'s own KDoc is explicit that a cache file is not
  *    a security concern and that conflating reclaimable storage with a
@@ -295,6 +383,7 @@ private fun CleanScanning(modifier: Modifier = Modifier) {
 private fun CleanResults(
     state: CleanUiState.Loaded,
     onScanClick: () -> Unit,
+    onCleanClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
@@ -319,6 +408,15 @@ private fun CleanResults(
             JunkCategoryCard(group = group, totalSizeBytes = state.totalSizeBytes)
         }
         item {
+            AppFilledButton(
+                text = "Clean ${formatSize(state.totalSizeBytes)}",
+                onClick = onCleanClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(LayoutTokens.primaryActionHeight),
+            )
+        }
+        item {
             AppOutlinedButton(
                 text = "Scan Again",
                 onClick = onScanClick,
@@ -327,6 +425,7 @@ private fun CleanResults(
                     .height(LayoutTokens.primaryActionHeight),
             )
         }
+        state.storage?.let { storage -> item { StorageLine(storage) } }
     }
 }
 
@@ -375,8 +474,12 @@ private fun ResultsHeroCard(totalSizeBytes: Long, itemCount: Int) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Sprint 038's line here said nothing had been deleted and
+            // nothing would be. That was true then and is not now, so it
+            // is replaced rather than left standing as a stale promise.
             Text(
-                text = "Nothing has been deleted \u2014 this is a report of what the scan found.",
+                text = "These files are safe to remove. Your photos, documents and downloads " +
+                    "are never touched.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -589,6 +692,213 @@ private fun CleanNothingFound(onScanClick: () -> Unit, modifier: Modifier = Modi
 }
 
 // ---------------------------------------------------------------------
+// State 5 — Cleaning (Sprint 039)
+// ---------------------------------------------------------------------
+
+/**
+ * The cleaning screen. Unlike scanning, this one **can** honestly show a
+ * percentage: the candidate list is known before deletion begins, so
+ * `CleaningProgress.fraction` is a real fraction of real work, not an
+ * animation.
+ *
+ * `bytesFreed` accumulates the size each file actually was at the moment
+ * it was deleted, reported back by `FileDeletionRepository` — never the
+ * size recorded at scan time, and never including a file whose deletion
+ * failed. "Freed 240 MB" therefore means 240 MB that is genuinely no
+ * longer on disk.
+ *
+ * There is no "time remaining" anywhere on this screen. The reference
+ * design's countdown would require predicting how long the remaining
+ * deletions will take, which is an estimate dressed as a measurement.
+ * The real percentage and the real counts say everything a countdown
+ * would, without the invention.
+ *
+ * `Stop Cleaning` cancels the Job driving the deletion loop, which
+ * checks for cancellation between files. Files already deleted stay
+ * deleted — the completion screen reports exactly that, and says it was
+ * stopped early.
+ */
+@Composable
+private fun CleanCleaning(
+    state: CleanUiState.Cleaning,
+    onCancelClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    val progress = state.progress
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = LayoutTokens.screenHorizontalPadding)
+            .padding(vertical = spacing.medium),
+        verticalArrangement = Arrangement.spacedBy(spacing.medium),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier.size(SCANNING_RING_SIZE),
+            contentAlignment = Alignment.Center,
+        ) {
+            AppCircularProgress(
+                progress = progress.fraction,
+                modifier = Modifier
+                    .size(SCANNING_RING_SIZE)
+                    .testTag(CLEAN_CLEANING_TEST_TAG),
+            )
+            Icon(
+                imageVector = IconTokens.cleaner,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(HERO_ICON_SIZE),
+            )
+        }
+        Text(
+            text = "Cleaning\u2026",
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = progress.currentItemName?.let { "Removing $it" }
+                ?: "Removing junk files from your device.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(spacing.small),
+        ) {
+            CounterCell(
+                label = "Removed",
+                value = "${progress.itemsDeleted} of ${progress.totalItems}",
+                modifier = Modifier.weight(1f),
+            )
+            CounterCell(
+                label = "Space freed",
+                value = formatSize(progress.bytesFreed),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        SafeCleanupCard()
+        AppOutlinedButton(
+            text = "Stop Cleaning",
+            onClick = onCancelClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(LayoutTokens.primaryActionHeight),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------
+// State 6 — Completed (Sprint 039)
+// ---------------------------------------------------------------------
+
+/**
+ * The completion screen, reporting a real `CleaningSummary`.
+ *
+ * Every figure is measured: bytes actually freed, files actually
+ * removed, and the real wall-clock duration of the run. A cancelled
+ * cleanup lands here too and says so plainly rather than being dressed
+ * up as a finished one — the files deleted before Stop genuinely were
+ * deleted, and both that and the ones skipped are stated.
+ *
+ * Failures are surfaced rather than hidden. A file can vanish or be held
+ * open between being scanned and being deleted; when that happens the
+ * count is shown, because silently reporting a smaller success total
+ * than the user was promised is how a cleaner starts lying by omission.
+ */
+@Composable
+private fun CleanCompleted(
+    state: CleanUiState.Completed,
+    onScanClick: () -> Unit,
+    onDoneClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    val summary = state.summary
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = LayoutTokens.screenHorizontalPadding),
+        verticalArrangement = Arrangement.spacedBy(spacing.medium),
+        contentPadding = PaddingValues(vertical = spacing.medium),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        item {
+            FeatureHeader(
+                icon = IconTokens.trusted,
+                title = if (summary.wasCancelled) "Cleaning stopped" else "Storage cleaned",
+                description = if (summary.wasCancelled) {
+                    "You stopped the cleanup. Everything removed before that is gone for good."
+                } else {
+                    "Your device now has more free space."
+                },
+            )
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.small),
+            ) {
+                CounterCell(
+                    label = "Space freed",
+                    value = formatSize(summary.bytesFreed),
+                    modifier = Modifier.weight(1f),
+                )
+                CounterCell(
+                    label = "Files removed",
+                    value = summary.itemsDeleted.toString(),
+                    modifier = Modifier.weight(1f),
+                )
+                CounterCell(
+                    label = "Time taken",
+                    value = formatDuration(summary.durationMillis),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        if (summary.itemsFailed > 0) {
+            item {
+                InfoCard(
+                    icon = IconTokens.warning,
+                    title = "${summary.itemsFailed} file(s) couldn't be removed",
+                    body = "They may have been in use or already deleted. Running another scan " +
+                        "will show whether they are still there.",
+                )
+            }
+        }
+        if (summary.itemsSkipped > 0) {
+            item {
+                InfoCard(
+                    icon = IconTokens.recommendation,
+                    title = "${summary.itemsSkipped} file(s) not reached",
+                    body = "Cleaning stopped before these were processed. They are untouched.",
+                )
+            }
+        }
+        state.storage?.let { storage -> item { StorageLine(storage) } }
+        item {
+            AppFilledButton(
+                text = "Done",
+                onClick = onDoneClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(LayoutTokens.primaryActionHeight),
+            )
+        }
+        item {
+            AppOutlinedButton(
+                text = "Scan Again",
+                onClick = onScanClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(LayoutTokens.primaryActionHeight),
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
 // Error
 // ---------------------------------------------------------------------
 
@@ -710,14 +1020,16 @@ private fun CheckedRow(label: String) {
 }
 
 @Composable
-private fun ReadOnlyReassuranceCard() {
+private fun SafeCleanupCard() {
     InfoCard(
         icon = IconTokens.security,
         title = "Safe by design",
-        // Literally true of this code path, not marketing copy: the scan
-        // enumerates and classifies files, and no delete-capable use case
-        // exists anywhere in this project for it to call.
-        body = "This scan is read-only. Space Antivirus lists what it finds \u2014 your photos, " +
+        // Sprint 038's copy here said nothing is ever deleted. Sprint 039
+        // made that false, so the copy states the real, enforced boundary
+        // instead: AppPrivateStorageRoots refuses any path outside this
+        // app's own storage, checked inside the deletion repository below
+        // every use case. That is a property of the code, not a promise.
+        body = "Space Antivirus only removes files from its own app storage. Your photos, " +
             "documents and downloads are never touched.",
     )
 }
@@ -829,6 +1141,97 @@ private fun CleanableCategory.icon(): ImageVector = when (this) {
  *  date formatting, HistoryScreen's duration formatting) — not business
  *  logic, so it stays in the Screen file, not the ViewModel. Unchanged
  *  from Sprint 022. */
+/**
+ * Real device storage totals, shown only when they loaded. Sprint 038
+ * omitted this entirely because no provider existed; `StatFs` needs no
+ * permission, so Sprint 039 could close that gap honestly.
+ */
+@Composable
+private fun StorageLine(storage: StorageStatistics) {
+    val spacing = LocalSpacing.current
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = ShapeTokens.card,
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.flat),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(modifier = Modifier.padding(spacing.medium)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(text = "Device storage", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "${formatSize(storage.freeBytes)} free",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            storage.usedFraction?.let { fraction ->
+                AppLinearProgress(
+                    progress = fraction,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = spacing.small),
+                )
+            }
+            Text(
+                text = "${formatSize(storage.usedBytes)} used of ${formatSize(storage.totalBytes)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = spacing.tight),
+            )
+        }
+    }
+}
+
+/** The reference design's "Last cleanup" row, real at last — backed by
+ *  the cleanup_records table added in Sprint 039. Absent entirely if the
+ *  user has never run one, rather than showing "Never" against a value
+ *  that was never stored. */
+@Composable
+private fun LastCleanupLine(record: CleanupRecord) {
+    val spacing = LocalSpacing.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = LayoutTokens.minTouchTarget),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = IconTokens.history,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(STATUS_ICON_SIZE),
+        )
+        Text(
+            text = "Last cleanup freed ${formatSize(record.bytesFreed)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = spacing.small),
+        )
+    }
+}
+
+/** The scan's supporting line. Shows the current file's NAME only — the
+ *  full path would expose this app's internal directory layout to no
+ *  benefit. Falls back to a neutral line before the first file arrives. */
+private fun JunkScanProgress.currentItemLabel(): String =
+    currentPath?.substringAfterLast('/')?.takeIf { it.isNotBlank() }?.let { "Checking $it" }
+        ?: "Looking through your app files\u2026"
+
+/** Presentation-layer formatting, same placement rationale as
+ *  formatSize. Whole seconds: a cleanup measured to the millisecond
+ *  would imply a precision the number does not have. */
+private fun formatDuration(durationMillis: Long): String {
+    val totalSeconds = durationMillis / 1_000
+    return if (totalSeconds < 60) {
+        "$totalSeconds sec"
+    } else {
+        "${totalSeconds / 60}m ${totalSeconds % 60}s"
+    }
+}
+
 private fun formatSize(sizeBytes: Long): String = when {
     sizeBytes >= 1_000_000 -> "%.1f MB".format(sizeBytes / 1_000_000.0)
     sizeBytes >= 1_000 -> "%.1f KB".format(sizeBytes / 1_000.0)

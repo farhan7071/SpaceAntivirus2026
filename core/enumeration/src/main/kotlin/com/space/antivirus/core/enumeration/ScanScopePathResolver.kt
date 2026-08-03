@@ -49,6 +49,7 @@ class ScanScopePathResolver @Inject constructor(
                 ),
             )
         is ScanScope.InternalStorage -> context.filesDir.toAppResult()
+        is ScanScope.ApplicationCache -> context.cacheDir.toAppResult()
         is ScanScope.ExternalStorage -> context.getExternalFilesDir(null).toAppResult()
         is ScanScope.DownloadsFolder ->
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toAppResult()

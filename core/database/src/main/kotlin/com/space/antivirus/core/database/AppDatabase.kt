@@ -2,11 +2,13 @@ package com.space.antivirus.core.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.space.antivirus.core.database.dao.CleanupRecordDao
 import com.space.antivirus.core.database.dao.DetectionDao
 import com.space.antivirus.core.database.dao.ScanSessionDao
 import com.space.antivirus.core.database.dao.ScanStatisticsDao
 import com.space.antivirus.core.database.dao.ThreatDao
 import com.space.antivirus.core.database.dao.TrustedItemDao
+import com.space.antivirus.core.database.entity.CleanupRecordEntity
 import com.space.antivirus.core.database.entity.DetectionEntity
 import com.space.antivirus.core.database.entity.ScanSessionEntity
 import com.space.antivirus.core.database.entity.ScanStatisticsEntity
@@ -21,7 +23,9 @@ import com.space.antivirus.core.database.entity.TrustedItemEntity
  * ThreatEntity.appLabel and DetectionEntity.confidence added (ADR 0043) —
  * a real root-cause fix and a real pre-existing persistence gap found
  * while investigating a real-device report, not schema churn for its own
- * sake. All bumps pair with fallbackToDestructiveMigration() in
+ * sake. Sprint 039 (version 4 -> 5): CleanupRecordEntity added — another
+ * standalone table, holding the cleanup history the Cleaner needs to
+ * show a real "Last cleanup" line (ADR 0054). All bumps pair with fallbackToDestructiveMigration() in
  * core:data's DataModule rather than a real Migration object — see ADR
  * 0023 for why that's the correct, honest choice for a pre-1.0 app with
  * no real persisted rows yet to preserve across any of these changes.
@@ -37,8 +41,9 @@ import com.space.antivirus.core.database.entity.TrustedItemEntity
         ThreatEntity::class,
         DetectionEntity::class,
         TrustedItemEntity::class,
+        CleanupRecordEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -47,4 +52,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun threatDao(): ThreatDao
     abstract fun detectionDao(): DetectionDao
     abstract fun trustedItemDao(): TrustedItemDao
+    abstract fun cleanupRecordDao(): CleanupRecordDao
 }

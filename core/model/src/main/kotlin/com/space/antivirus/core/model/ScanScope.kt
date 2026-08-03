@@ -9,6 +9,19 @@ package com.space.antivirus.core.model
 sealed interface ScanScope {
     data object InstalledApplications : ScanScope
     data object InternalStorage : ScanScope
+
+    /**
+     * The app's own cache directories (internal + external), added in
+     * Sprint 039 when the Cleaner gained real deletion.
+     *
+     * Deliberately a distinct scope rather than folding cache into
+     * InternalStorage: `filesDir` holds data the app is expected to
+     * keep, `cacheDir` holds data Android itself documents as
+     * discardable at any time. A cleaner should treat those two very
+     * differently, and a scope that conflated them would remove the
+     * ability to.
+     */
+    data object ApplicationCache : ScanScope
     data object ExternalStorage : ScanScope
     data object DownloadsFolder : ScanScope
     data object MediaCollection : ScanScope

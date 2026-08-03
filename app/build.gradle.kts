@@ -28,6 +28,7 @@ dependencies {
     implementation(project(":core:enumeration"))
     implementation(project(":core:securitydata"))
     implementation(project(":core:trusteddata"))
+    implementation(project(":core:cleaningdata"))
     implementation(project(":core:analysisengine"))
     implementation(project(":core:workmanager"))
     implementation(project(":domain"))

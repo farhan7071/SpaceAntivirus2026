@@ -9,6 +9,9 @@ import com.space.antivirus.core.model.ScanRequest
 import com.space.antivirus.core.model.ScanScope
 import com.space.antivirus.core.model.ScanTarget
 import com.space.antivirus.domain.repository.EnumerationRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * Local to :domain's own test source set, same reasoning as every other
@@ -34,6 +37,19 @@ class FakeEnumerationRepository(
     ): AppResult<List<FileMetadata>> {
         forcedFailure?.let { return AppResult.Failure(it) }
         return AppResult.Success(fileTargets.map { it.metadata })
+    }
+
+    override suspend fun isScopeAvailable(scope: ScanScope): AppResult<Unit> {
+        forcedFailure?.let { return AppResult.Failure(it) }
+        return AppResult.Success(Unit)
+    }
+
+    /** Sprint 039. Mirrors enumerateFiles: a forced failure completes
+     *  empty, matching the real implementation's documented behavior of
+     *  not surfacing root-resolution failures per element. */
+    override fun enumerateFilesAsFlow(scope: ScanScope, filter: EnumerationFilter): Flow<FileMetadata> {
+        if (forcedFailure != null) return emptyFlow()
+        return fileTargets.map { it.metadata }.asFlow()
     }
 
     override suspend fun resolveScanTargets(request: ScanRequest): AppResult<List<ScanTarget>> {

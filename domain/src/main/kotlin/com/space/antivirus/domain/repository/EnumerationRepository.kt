@@ -7,6 +7,7 @@ import com.space.antivirus.core.model.InstalledApplicationInfo
 import com.space.antivirus.core.model.ScanRequest
 import com.space.antivirus.core.model.ScanScope
 import com.space.antivirus.core.model.ScanTarget
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Contract for answering "what can be scanned" — enumeration only, never
@@ -36,6 +37,37 @@ interface EnumerationRepository {
         scope: ScanScope,
         filter: EnumerationFilter = EnumerationFilter.DEFAULT,
     ): AppResult<List<FileMetadata>>
+
+    /**
+     * Whether [scope] resolves to a location that currently exists and
+     * can be read — Sprint 039.
+     *
+     * Cheap: resolves the root and stats it, never walks it. Exists
+     * because [enumerateFilesAsFlow] cannot report a root-resolution
+     * failure per element, and a streaming scan that silently completed
+     * empty on an unreadable volume would tell the user their storage
+     * was clean when it had in fact never been looked at. A caller that
+     * streams should check this first.
+     */
+    suspend fun isScopeAvailable(scope: ScanScope): AppResult<Unit>
+
+    /**
+     * The same enumeration as [enumerateFiles], streamed one file at a
+     * time as the walk visits it — Sprint 039.
+     *
+     * Added so callers that need to report genuine progress can, without
+     * waiting for the entire tree to be walked first. Emits nothing and
+     * completes normally if the scope cannot be resolved; callers that
+     * need to distinguish "empty" from "unavailable" should call
+     * [enumerateFiles], which still returns a real AppResult.Failure.
+     * That is a deliberate split rather than wrapping every element in a
+     * result type: a per-file failure channel would be noise, since the
+     * only failure mode here is resolving the root, which happens once.
+     */
+    fun enumerateFilesAsFlow(
+        scope: ScanScope,
+        filter: EnumerationFilter = EnumerationFilter.DEFAULT,
+    ): Flow<FileMetadata>
 
     /** Resolves every scope in a ScanRequest into concrete ScanTargets,
      *  combining file and application enumeration as needed. This is the

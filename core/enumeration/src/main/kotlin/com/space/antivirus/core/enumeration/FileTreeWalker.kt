@@ -26,8 +26,21 @@ import javax.inject.Inject
  */
 class FileTreeWalker @Inject constructor() {
 
-    fun walk(root: File, filter: EnumerationFilter): List<FileMetadata> {
-        if (!root.exists()) return emptyList()
+    fun walk(root: File, filter: EnumerationFilter): List<FileMetadata> =
+        walkAsSequence(root, filter).toList()
+
+    /**
+     * The same traversal `walk` performs, exposed lazily.
+     *
+     * Sprint 039: added so a caller that wants to report genuine
+     * progress can act on each file as it is visited, instead of
+     * blocking until the whole tree has been walked and then inventing
+     * progress after the fact. `walk` now delegates to this, so there is
+     * exactly one traversal implementation and no behavioral drift
+     * between the two — every existing caller keeps identical results.
+     */
+    fun walkAsSequence(root: File, filter: EnumerationFilter): Sequence<FileMetadata> {
+        if (!root.exists()) return emptySequence()
 
         return root.walkTopDown()
             .onEnter { directory -> filter.includeHiddenFiles || (!directory.isHidden && !directory.name.startsWith(".")) }
@@ -36,7 +49,6 @@ class FileTreeWalker @Inject constructor() {
             .filterNot { file -> isExcluded(file, filter.excludedPathPrefixes) }
             .filter { file -> matchesSize(file, filter) }
             .map { it.toFileMetadata() }
-            .toList()
     }
 
     private fun isExcluded(file: File, excludedPrefixes: List<String>): Boolean {
