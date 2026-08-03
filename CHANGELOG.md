@@ -6,6 +6,68 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 038 — Junk Cleaner UI (presentation-layer overhaul)
+
+A full redesign of the Junk Cleaner screen, and a sprint that was
+rescoped before implementation because the brief's stated premise
+("business logic already exists — only connect the UI to existing
+state") did not match the codebase.
+
+### Added
+
+- **Junk Cleaner, four states**: Idle (what the scanner looks for, plus
+  a read-only reassurance card), Scanning (indeterminate), Results
+  (total, per-category breakdown with real sizes/percentages/counts,
+  expandable to the actual files and the classifier's own reason for
+  each), and Nothing Found.
+- **`AppSectionHeader`** (`core:ui`) — closes the one component the SDS
+  catalog had recorded as planned-but-not-built. Home's private
+  `SectionHeading` was removed and switched over to it in the same
+  sprint.
+- **Icon tokens** for the four `CleanableCategory` values plus
+  expand/collapse, in `core:designsystem` (never the feature module).
+- **The project's first Compose previews** — four Cleaner states, light
+  and dark.
+
+### Changed
+
+- The Cleaner's results are now grouped by category rather than shown as
+  one flat file list.
+
+### Not built, deliberately
+
+The reference designs included two screens — Cleaning Progress and
+Cleaning Complete — plus a number of individual elements that no data in
+this project supports:
+
+- **Nothing in this project deletes a file.** There is no delete use
+  case, no cleaning engine, and three separate files say so in their own
+  KDoc. The Results screen therefore has **no "Clean" button at all** —
+  not even a disabled one, which would still promise a capability that
+  has never existed — and states plainly that nothing was deleted.
+- **Scanning is indeterminate.** The junk scan reports nothing while it
+  runs, so the percentage, live file path, file counters and countdown
+  in the reference would have been invented in the UI layer and
+  presented as measurement. `Cancel Scan` is absent for the same reason:
+  there is no cancellation entry point.
+- **Storage overview, "Last cleanup", and "Next recommended scan"** are
+  omitted — no storage statistics provider, no cleanup history, no
+  scheduler.
+- **"Empty Folders"** is not advertised as a capability: the classifier
+  only ever classifies files, never directories.
+
+Three tests assert these absences so they can't quietly reappear, and
+each names the sprint that should delete it. Sprint 039 builds the real
+cleaning domain layer; Sprint 040 builds the two remaining screens on
+top of it. Full reasoning in ADR 0053.
+
+### Also deliberately
+
+- The junk hero is **brand teal, not alarm red**. A cache file is not a
+  security concern (`CleanableCategory`'s own KDoc), and colouring
+  reclaimable storage the same red as an `ACTION_NEEDED` threat is
+  exactly the risk exaggeration ADR 0015 rules out.
+
 ## Sprint 037 — Home Screen Premium UI Polish
 
 Six numbered, mandatory design corrections against reference images,

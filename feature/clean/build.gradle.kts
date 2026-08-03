@@ -13,6 +13,15 @@ android {
 }
 
 dependencies {
+    // Sprint 038 — expand/collapse on the junk-breakdown category rows.
+    // Same precedent and same reasoning as core:ui's own addition
+    // (Sprint 034, ThreatSummaryCard): not covered by
+    // AndroidLibraryComposeConventionPlugin's default set (compose-ui/
+    // material3/graphics only), so it's added to the one module that
+    // actually needs it rather than to the convention plugin shared by
+    // every Compose module in this project.
+    implementation(libs.compose.animation)
+
     testImplementation(libs.truth)
     testImplementation(libs.kotlinx.coroutines.test)
 

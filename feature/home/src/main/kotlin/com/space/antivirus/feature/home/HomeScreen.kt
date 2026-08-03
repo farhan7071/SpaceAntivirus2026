@@ -48,6 +48,7 @@ import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
 import com.space.antivirus.core.ui.component.AppFilledButton
 import com.space.antivirus.core.ui.component.AppLinearProgress
+import com.space.antivirus.core.ui.component.AppSectionHeader
 import com.space.antivirus.core.ui.component.AppTextButton
 import java.text.DateFormat
 import java.util.Date
@@ -557,7 +558,7 @@ private fun SecuritySummarySection(lastScan: LastScanSummary?, trustedItemsCount
     val spacing = LocalSpacing.current
     val isDark = isSystemInDarkTheme()
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-        SectionHeading(text = "Security Summary")
+        AppSectionHeader(title = "Security Summary")
         Card(shape = ShapeTokens.card, elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card)) {
             Row(modifier = Modifier.padding(vertical = spacing.medium)) {
                 if (lastScan != null) {
@@ -650,7 +651,7 @@ private fun QuickActionsSection(
 ) {
     val spacing = LocalSpacing.current
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-        SectionHeading(text = "Quick Actions")
+        AppSectionHeader(title = "Quick Actions")
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(spacing.small),
@@ -796,7 +797,7 @@ private fun RecentActivitySection(lastScan: LastScanSummary?) {
     val spacing = LocalSpacing.current
     val isDark = isSystemInDarkTheme()
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-        SectionHeading(text = "Recent Activity")
+        AppSectionHeader(title = "Recent Activity")
         if (lastScan == null) {
             AppEmptyState(
                 icon = IconTokens.scan,
@@ -854,22 +855,4 @@ private fun RecentActivitySection(lastScan: LastScanSummary?) {
             }
         }
     }
-}
-
-/**
- * A section title consistent across Security Summary/Quick Actions/
- * Recent Activity. Sprint 035's own SDS Component Catalog documented
- * SpaceSectionHeader as a real gap ("Planned Components" — not yet
- * implemented). Building a full, generalized shared component ahead of
- * that catalog entry being formally implemented is out of this sprint's
- * own scope (Home redesign, not a return to Phase 1's token/component
- * work) — this is a small, private, Home-screen-local heading using
- * SDS's own titleMedium type token, not a public core:ui component. A
- * future Phase 1 pass turning this into the catalog's own
- * SpaceSectionHeader, with Home switched over to it, is the right way
- * to close that gap — not invented here, ahead of being asked for.
- */
-@Composable
-private fun SectionHeading(text: String) {
-    Text(text = text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 }

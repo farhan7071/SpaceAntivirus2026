@@ -1,11 +1,16 @@
 package com.space.antivirus.core.designsystem.theme
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -78,4 +83,35 @@ object IconTokens {
 
     /** A recommendation. Used by ThreatSummaryCard's recommendation section already. */
     val recommendation = Icons.Filled.Info
+
+    /**
+     * Sprint 038 — one icon per `CleanableCategory` (`core:model`), added
+     * here rather than in `feature:clean` for the reason ADR 0031 already
+     * established and this file's own KDoc depends on: feature modules
+     * deliberately do NOT depend on `compose-material-icons-extended`,
+     * only `core:designsystem` and `core:ui` do. A feature module that
+     * needs a non-baseline icon reaches for a token here; it does not add
+     * the icon dependency to itself.
+     *
+     * Deliberately no color is attached to any of these — a cache file is
+     * not a security concern (`CleanableCategory`'s own KDoc), so nothing
+     * in the Cleaner's visual language should borrow the severity palette.
+     */
+    val cacheFile = Icons.Filled.Layers
+
+    /** Temporary file. Same glyph as `evidence`, different semantic role —
+     *  same precedent as `warning`/`highRisk` sharing one glyph above. */
+    val temporaryFile = Icons.Filled.Description
+
+    /** Log file. */
+    val logFile = Icons.Filled.Article
+
+    /** A leftover `.apk` installer sitting in Downloads. */
+    val leftoverInstaller = Icons.Filled.Android
+
+    /** Expand a collapsed section. Baseline icon, no extended dependency needed. */
+    val expand = Icons.Filled.KeyboardArrowDown
+
+    /** Collapse an expanded section. Baseline icon. */
+    val collapse = Icons.Filled.KeyboardArrowUp
 }

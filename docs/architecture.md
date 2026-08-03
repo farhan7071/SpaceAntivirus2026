@@ -1679,6 +1679,70 @@ Switched to `displayLarge`, and removed the separate icon badge that
 had sat beside the smaller headline, since it competed with the new,
 larger text rather than reinforcing it.
 
+### Junk Cleaner UI — presentation-layer overhaul (Sprint 038)
+
+The Cleaner's first real design treatment, and the second screen (after
+Home) to go through the SDS process. Also the sprint where a brief's own
+premise was verified against the codebase and found to be wrong.
+
+The brief asked for six screens and stated "business logic already
+exists — only connect the UI to existing state." A verification pass
+against `origin/main` found otherwise:
+
+```
+nothing in this project deletes a file   — CleanableItem,
+   FindCleanableItemsUseCase and CleanViewModel each say so in their
+   own KDoc; ADR 0035 scoped the domain layer to candidates only
+no scan progress                         — FindCleanableItemsUseCase is
+   a one-shot suspend returning a finished List; CleanUiState.Loading
+   has no fields; there is nothing to observe
+no cancellation                          — no entry point on the VM
+no storage statistics                    — no StatFs/StorageManager
+   usage anywhere in the tree
+no cleanup history                       — nothing persists "last
+   cleanup" or "space freed"
+category mismatch                        — CleanableCategory has four
+   values; the references show "Empty Folders" (the classifier never
+   classifies directories) and omit LEFTOVER_INSTALLER
+```
+
+Screens 5 and 6 (Cleaning Progress, Cleaning Complete) could not be
+built without either fabricating a cleaning process or building a
+cleaning domain layer — the latter explicitly outside a presentation-only
+sprint. The audit was raised before implementation; the project owner
+rescoped Sprint 038 to the four states real data supports, with Sprint
+039 building the cleaning domain layer (delete use case, progress Flow,
+cancellation, storage statistics, cleanup history) and Sprint 040
+building the two remaining screens on top of it.
+
+Delivered: `CleanScreen.kt` rebuilt around Idle / Scanning
+(indeterminate) / Results / Nothing Found, every value derived from the
+real `CleanUiState`. Category totals, percentages and file counts are
+computed from the actual `List<CleanableItem>`; only categories present
+in the results are rendered. Category rows expand to show real files
+with the classifier's own `reason` string, evidence-first, the same way
+threat reports work.
+
+Two judgment calls, both documented in ADR 0053: the Results screen has
+**no primary clean action at all** (a disabled one would still promise a
+capability that has never existed), and the junk hero uses **brand teal,
+not alarm red** — `CleanableCategory`'s own KDoc says a cache file is
+not a security concern, and colouring it the same red as an
+`ACTION_NEEDED` threat is exactly the risk exaggeration ADR 0015
+forbids. Three tests assert the *absence* of fabricated UI (no Clean
+button, no Cancel, no unsupported capability rows) and each names the
+sprint that should delete it.
+
+New shared component: `AppSectionHeader` (`core:ui`), closing the one
+`docs/design/SDS_COMPONENT_CATALOG.md` "Planned Components" gap. Built now because the
+bar Sprint 037 round 2 set — 2+ screens genuinely need it today — is
+finally met (Home's three headings plus the Cleaner's two); Home's
+private `SectionHeading` was deleted and switched over in the same
+sprint. Also new: four `CleanableCategory` icon tokens plus
+expand/collapse in `IconTokens.kt` (`core:designsystem`, never the
+feature module — ADR 0031), and the project's first `@Preview`
+functions.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

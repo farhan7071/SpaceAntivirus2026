@@ -20,10 +20,11 @@ This catalog documents the real components under their real names, with
 each entry cross-referenced to the `Space*` name it corresponds to, so nothing
 requested is missing — only relabeled to match what actually exists.
 
-One requested component, **SpaceSectionHeader**, has no existing
-counterpart at all. It's documented at the end of this catalog under
-**Planned Components**, specified but explicitly marked not-yet-implemented,
-rather than either silently dropped or built without being asked.
+One requested component, **SpaceSectionHeader**, had no existing
+counterpart when this catalog was written (Sprint 035), and was recorded at
+the end under **Planned Components** rather than either silently dropped or
+built without being asked. Sprint 038 built it, as `AppSectionHeader` — see
+**Section Headers** below — once two screens genuinely needed it.
 
 ## How to read this catalog
 
@@ -781,6 +782,66 @@ matching M3's defaults by coincidence.
 
 ---
 
+## Section Headers
+
+### AppSectionHeader
+*(`Space*` equivalent: SpaceSectionHeader)*
+**File:** `core/ui/component/AppSectionHeader.kt`
+
+**Purpose**
+A consistent section title for screens that group content into several
+distinct blocks. Added in Sprint 038, when the bar for extraction was
+genuinely met: Home has three section headings (Sprint 036) and the Junk
+Cleaner has two (Sprint 038). Before that, Home carried a private
+`SectionHeading` composable of its own; it was deleted and switched over
+to this component in the same sprint, so there is exactly one
+implementation, not two.
+
+That timing is deliberate and worth recording. Sprint 037 round 2 deleted
+an earlier `core:ui` extraction (`AppStatGroup`) precisely because it had
+one caller and was justified by hypothetical future reuse. The rule that
+reversal set — extract when 2+ screens need it *today* — is why this
+component exists now and did not exist in Sprint 035.
+
+**Anatomy**
+```
+┌─────────────────────────────────────────┐
+│ Title                        [Action]   │  ← action optional
+└─────────────────────────────────────────┘
+```
+
+**Variants**
+- **Title only** (default) — every current call site.
+- **Title + trailing action** — `actionText` + `onActionClick`, rendered
+  as an `AppTextButton`. Both must be supplied; a half-specified action
+  renders nothing rather than an inert control.
+
+**Component States**
+No states of its own. The optional trailing action inherits
+`AppTextButton`'s enabled/pressed/focused behavior unchanged.
+
+**Usage Guidelines**
+- Place inside a `Column` that already sets its own vertical rhythm
+  (`Arrangement.spacedBy`). This component deliberately carries no
+  vertical padding of its own, so two spacing systems never fight over
+  the same gap.
+- Use for section titles within a screen — not as a screen title, which
+  belongs to the app bar.
+
+**Accessibility Requirements**
+The title is plain text and is read as such. The trailing action is an
+`AppTextButton`, which already meets the 48dp touch-target and ripple
+requirements — no bespoke clickable `Text`.
+
+**Tokens consumed**
+`Type.kt` (`titleMedium`). No colour, shape, or elevation token: the
+header sits directly on the screen background.
+
+**Do / Don't**
+- **Do** reach for this instead of writing a styled `Text` per screen.
+- **Don't** pass `actionText` without `onActionClick` expecting a
+  non-interactive label — nothing will render.
+
 ## Planned Components
 
 Components requested or implied by the reference design that have no
@@ -789,24 +850,10 @@ from the catalog, but explicitly **not built** as part of this
 documentation-only deliverable.
 
 ### SpaceSectionHeader
-**Status:** Not implemented.
-
-**Purpose (proposed)**
-A consistent section-title treatment for screens with multiple distinct
-content groupings (e.g. "Security Findings," "Trusted Apps" as separate
-sections on one screen) — currently, screens that need this write a
-`Text` with `MaterialTheme.typography.titleSmall`/`titleMedium` ad hoc,
-with no shared component enforcing consistent styling or spacing above/
-below.
-
-**Anatomy (proposed)**
-A title text, optionally with a trailing action (e.g. "See all") and/or a
-leading icon, using `Type.kt`'s `titleSmall` or `titleMedium` slot and
-`LayoutTokens`/`Spacing` for consistent vertical rhythm above and below.
-
-**Why it wasn't built now:** this deliverable is documentation-only,
-explicitly scoped to not implement or redesign anything. A real Phase 2
-task, not a gap silently left out of this catalog.
+**Status:** ✅ Implemented in Sprint 038 as `AppSectionHeader` — see
+**Section Headers** above. This entry is kept for the record: it was the
+one component in this catalog with no existing counterpart when the
+catalog was written.
 
 ### Secondary and Destructive button variants
 **Status:** Not implemented — see **Buttons** above for full detail.
