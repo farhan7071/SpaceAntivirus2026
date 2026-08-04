@@ -8,6 +8,10 @@ android {
 }
 
 dependencies {
+    // Sprint 043A: PackageInfoCompat.getLongVersionCode, which handles the
+    // API 28 versionCode/longVersionCode split without a manual SDK check.
+    implementation(libs.androidx.core.ktx)
+
     implementation(project(":core:common"))
     implementation(project(":core:model"))
     implementation(project(":core:database"))

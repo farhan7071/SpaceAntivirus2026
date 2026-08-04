@@ -3,6 +3,8 @@ package com.space.antivirus.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.space.antivirus.core.common.AppResult
+import com.space.antivirus.core.model.AppInfo
+import com.space.antivirus.domain.usecase.GetAppInfoUseCase
 import com.space.antivirus.domain.usecase.GetBatteryOptimizationStatusUseCase
 import com.space.antivirus.domain.usecase.ObserveProtectionStateUseCase
 import com.space.antivirus.domain.usecase.SetNotifyAfterScanUseCase
@@ -46,6 +48,7 @@ class SettingsViewModel @Inject constructor(
     private val setNotifyAfterScan: SetNotifyAfterScanUseCase,
     private val setScanInterval: SetScanIntervalUseCase,
     private val getBatteryOptimizationStatus: GetBatteryOptimizationStatusUseCase,
+    private val getAppInfo: GetAppInfoUseCase,
 ) : ViewModel() {
 
     private val transientError = MutableStateFlow<String?>(null)
@@ -70,6 +73,7 @@ class SettingsViewModel @Inject constructor(
             // harmless — the card is informational and the underlying
             // setting is one tap away in system settings.
             isIgnoringBatteryOptimizations = getBatteryOptimizationStatus(),
+            appInfo = getAppInfo(),
             errorMessage = error,
         ) as SettingsUiState
     }
@@ -148,6 +152,7 @@ sealed interface SettingsUiState {
         val lastScheduledAtEpochMillis: Long?,
         val notifyAfterScan: Boolean = false,
         val isIgnoringBatteryOptimizations: Boolean = true,
+        val appInfo: AppInfo? = null,
         val errorMessage: String? = null,
     ) : SettingsUiState
 

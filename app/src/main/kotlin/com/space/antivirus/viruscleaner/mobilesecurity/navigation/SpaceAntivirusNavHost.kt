@@ -1,10 +1,10 @@
 package com.space.antivirus.viruscleaner.mobilesecurity.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,6 +30,14 @@ import com.space.antivirus.feature.realtime.RealTimeNavigationRoute
 import com.space.antivirus.feature.realtime.RealTimeRoute
 import com.space.antivirus.feature.security.SecurityCenterNavigationRoute
 import com.space.antivirus.feature.security.SecurityCenterRoute
+import com.space.antivirus.feature.settings.AboutNavigationRoute
+import com.space.antivirus.feature.settings.AboutRoute
+import com.space.antivirus.feature.settings.IgnoreListNavigationRoute
+import com.space.antivirus.feature.settings.IgnoreListRoute
+import com.space.antivirus.feature.settings.NotificationSettingsNavigationRoute
+import com.space.antivirus.feature.settings.NotificationSettingsRoute
+import com.space.antivirus.feature.settings.ScheduledScanNavigationRoute
+import com.space.antivirus.feature.settings.ScheduledScanRoute
 import com.space.antivirus.feature.settings.SettingsNavigationRoute
 import com.space.antivirus.feature.settings.SettingsRoute
 
@@ -94,7 +102,23 @@ fun SpaceAntivirusNavHost(
                 )
             }
             composable(CleanNavigationRoute) { CleanRoute() }
-            composable(SettingsNavigationRoute) { SettingsRoute() }
+            composable(SettingsNavigationRoute) {
+                SettingsRoute(
+                    onNavigateToScheduledScan = { navController.navigate(ScheduledScanNavigationRoute) },
+                    onNavigateToNotifications = {
+                        navController.navigate(NotificationSettingsNavigationRoute)
+                    },
+                    onNavigateToIgnoreList = { navController.navigate(IgnoreListNavigationRoute) },
+                    onNavigateToAbout = { navController.navigate(AboutNavigationRoute) },
+                )
+            }
+            // Sprint 043A leaf destinations. Plain string routes, per
+            // ADR 0009's existing convention — a UI sprint is not the
+            // place to migrate half the graph to type-safe routes.
+            composable(ScheduledScanNavigationRoute) { ScheduledScanRoute() }
+            composable(NotificationSettingsNavigationRoute) { NotificationSettingsRoute() }
+            composable(IgnoreListNavigationRoute) { IgnoreListRoute() }
+            composable(AboutNavigationRoute) { AboutRoute() }
             composable(PremiumNavigationRoute) { PremiumRoute() }
             composable(HistoryNavigationRoute) { HistoryRoute() }
             composable(NotificationsNavigationRoute) { NotificationsRoute() }

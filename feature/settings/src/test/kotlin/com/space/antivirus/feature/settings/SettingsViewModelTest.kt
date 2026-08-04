@@ -4,8 +4,10 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.common.AppError
 import com.space.antivirus.core.common.AppResult
+import com.space.antivirus.core.model.AppInfo
 import com.space.antivirus.core.model.ProtectionState
 import com.space.antivirus.core.testing.MainDispatcherRule
+import com.space.antivirus.domain.usecase.GetAppInfoUseCase
 import com.space.antivirus.domain.usecase.GetBatteryOptimizationStatusUseCase
 import com.space.antivirus.domain.usecase.ObserveProtectionStateUseCase
 import com.space.antivirus.domain.usecase.SetNotifyAfterScanUseCase
@@ -44,6 +46,7 @@ class SettingsViewModelTest {
     private val setNotifyAfterScan = mockk<SetNotifyAfterScanUseCase>(relaxed = true)
     private val setScanInterval = mockk<SetScanIntervalUseCase>(relaxed = true)
     private val getBatteryOptimizationStatus = mockk<GetBatteryOptimizationStatusUseCase>()
+    private val getAppInfo = mockk<GetAppInfoUseCase>()
 
     private fun protectionState(
         isEnabled: Boolean = false,
@@ -63,6 +66,12 @@ class SettingsViewModelTest {
     ): SettingsViewModel {
         every { observeProtectionState() } returns flowOf(state)
         every { getBatteryOptimizationStatus() } returns ignoringBatteryOptimizations
+        every { getAppInfo() } returns AppInfo(
+            versionName = "1.4.0",
+            versionCode = 42L,
+            packageName = "com.space.antivirus",
+            isDebugBuild = false,
+        )
         coEvery { setProtectionEnabled(any(), any()) } returns AppResult.Success(Unit)
         return SettingsViewModel(
             observeProtectionState = observeProtectionState,
@@ -70,6 +79,7 @@ class SettingsViewModelTest {
             setNotifyAfterScan = setNotifyAfterScan,
             setScanInterval = setScanInterval,
             getBatteryOptimizationStatus = getBatteryOptimizationStatus,
+            getAppInfo = getAppInfo,
         )
     }
 
@@ -181,6 +191,21 @@ class SettingsViewModelTest {
         viewModel.uiState.test {
             skipItems(1)
             assertThat((awaitItem() as SettingsUiState.Loaded).isIgnoringBatteryOptimizations).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    /** Sprint 043A: the About screen reads this from the installed
+     *  package, never from a module's generated BuildConfig. */
+    @Test
+    fun `app info is surfaced for the about screen`() = runTest {
+        val viewModel = buildViewModel()
+
+        viewModel.uiState.test {
+            skipItems(1)
+            val loaded = awaitItem() as SettingsUiState.Loaded
+            assertThat(loaded.appInfo?.versionName).isEqualTo("1.4.0")
+            assertThat(loaded.appInfo?.versionCode).isEqualTo(42L)
             cancelAndIgnoreRemainingEvents()
         }
     }

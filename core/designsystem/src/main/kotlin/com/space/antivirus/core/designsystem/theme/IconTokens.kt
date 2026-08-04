@@ -3,18 +3,27 @@ package com.space.antivirus.core.designsystem.theme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.StarRate
 import androidx.compose.material.icons.filled.Warning
 
 /**
@@ -114,4 +123,42 @@ object IconTokens {
 
     /** Collapse an expanded section. Baseline icon. */
     val collapse = Icons.Filled.KeyboardArrowUp
+
+    /**
+     * Sprint 043A — the Settings hub's vocabulary.
+     *
+     * Added here rather than in `feature:settings` for the reason this
+     * file's own KDoc and ADR 0031 already establish: feature modules
+     * deliberately do NOT depend on compose-material-icons-extended.
+     * `chevronRight` is used by `SettingsRow` in core:ui; the rest name
+     * the hub's sections.
+     */
+    val chevronRight = Icons.Filled.ChevronRight
+
+    /** Scheduled / recurring work. */
+    val schedule = Icons.Filled.Schedule
+
+    /** Notifications. */
+    val notifications = Icons.Filled.Notifications
+
+    /** Battery. */
+    val battery = Icons.Filled.BatteryFull
+
+    /** Privacy and policy documents. */
+    val privacy = Icons.Filled.PrivacyTip
+
+    /** Help / support. */
+    val support = Icons.Filled.HelpOutline
+
+    /** Rating the app. */
+    val rate = Icons.Filled.StarRate
+
+    /** Sharing. */
+    val share = Icons.Filled.Share
+
+    /** Feedback by email. */
+    val feedback = Icons.Filled.Email
+
+    /** Terms / legal document. */
+    val document = Icons.Filled.Description
 }

@@ -1952,6 +1952,64 @@ Declared since Sprint 003, but a runtime permission on API 33+, so denied
 by default on modern devices. `NotificationHelper` checks and no-ops
 rather than throwing. Wiring the request into onboarding is a follow-up.
 
+### Settings hub (Sprint 043A)
+
+Sprint 026 built Settings as three `AppCard`s with inline controls. That
+was right for three settings and would not have survived seven sections,
+so 043A rebuilt it as a grouped hub of shared rows with four leaf
+destinations.
+
+```
+core:ui/component/SettingsRow.kt   - one row anatomy for every settings
+                                     screen; trailing control is a closed
+                                     enum (None/Navigate/Toggle/Selection/
+                                     Value/Action), not a @Composable slot
+feature:settings/
+  SettingsScreen        - the hub
+  ScheduledScanScreen   - single-choice interval, real radio semantics
+  NotificationSettingsScreen
+  IgnoreListScreen + IgnoreListViewModel
+  AboutScreen
+  SupportLinks          - every external URL in one file
+  SettingsIntents       - every system hand-off, all failing quietly
+```
+
+**The trailing control is an enum on purpose.** A `@Composable` slot
+would be more flexible, and that is the problem: this project's
+discipline is that a control exists only when it changes real behavior,
+so "add a switch here" should be a deliberate act rather than a one-line
+convenience.
+
+**Accessibility: the row is the target, never the control.** A bare
+`Switch` is a ~32dp target and TalkBack would announce "switch, on" with
+no idea what it switches. The row carries role, merged label and the
+click action; inner controls are cleared from the semantics tree — except
+`Action`, which is a genuinely separate target and stays focusable.
+
+**Three proposed toggles were cut before implementation.** "Scan APK
+files", "Scan installed apps" and "Ignore trusted apps" all back nothing:
+every analyzer casts to `ScanTarget.ApplicationTarget` and refuses
+anything else, `ScanViewModel` requests exactly one scope, and trusted
+filtering is unconditional inside `RunScanRequestUseCase` (which a UI
+sprint may not change anyway). Tests assert their absence.
+
+**The Ignore List is a view, not a store.** It reuses `TrustedItem`, its
+Room table and the existing observe/remove use cases — the same rows
+Security Center's Ignore action writes. No new model, no duplicated
+storage.
+
+**About reads the installed package**, via `AppInfoProvider` /
+`AndroidAppInfoProvider` (core:data), not a module's generated
+BuildConfig — a feature module's BuildConfig describes that module, not
+the app the user installed. No signature-database version and no
+last-signature-update field: this project has never shipped a signature
+database, so both would have nothing behind them.
+
+**Policy URLs are placeholders and say so on screen.**
+`SupportLinks.arePolicyLinksConfigured` checks for the reserved
+`.invalid` TLD, so an unconfigured build cannot read as configured.
+Replace both constants before release.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

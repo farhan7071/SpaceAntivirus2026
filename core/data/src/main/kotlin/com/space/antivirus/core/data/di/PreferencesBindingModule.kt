@@ -1,7 +1,9 @@
 package com.space.antivirus.core.data.di
 
+import com.space.antivirus.core.data.AndroidAppInfoProvider
 import com.space.antivirus.core.data.preferences.DataStoreBackgroundProtectionPreferences
 import com.space.antivirus.domain.repository.BackgroundProtectionPreferences
+import com.space.antivirus.domain.support.AppInfoProvider
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -14,6 +16,11 @@ import dagger.hilt.components.SingletonComponent
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class PreferencesBindingModule {
+
+    /** Sprint 043A. Lives here because core:data already owns the
+     *  Context-bound platform readers this module binds. */
+    @Binds
+    abstract fun bindAppInfoProvider(impl: AndroidAppInfoProvider): AppInfoProvider
 
     @Binds
     abstract fun bindBackgroundProtectionPreferences(

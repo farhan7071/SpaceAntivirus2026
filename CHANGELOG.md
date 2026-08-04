@@ -6,6 +6,55 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 043A — Professional Settings foundation
+
+### Added
+
+- **`SettingsRow`** in `core:ui` — one row anatomy for every settings
+  screen, with a closed set of trailing controls and row-level
+  accessibility semantics.
+- **Four new destinations**: Scheduled Scan (real Material single-choice
+  selection), Notification Settings, Ignore List, About. All wired into
+  the navigation graph.
+- **Ignore List management** — real ignored packages with their ignored
+  date and stored reason, and a Remove action. A view over the existing
+  trusted-items table; no new model or storage.
+- **About** — version, version code, and debug-only build details, read
+  from the installed package via a new `AppInfoProvider`.
+- **Privacy and Support sections** — policy links behind a single
+  `SupportLinks` object, and Rate / Share / Send Feedback via intents
+  that fail quietly when no handler exists.
+
+### Changed
+
+- The Settings screen is a grouped hub instead of three inline cards.
+- Scan interval moved out of the hub onto its own screen.
+- The battery-optimisation card is now an actionable row that opens the
+  system settings list, shown only when the app is actually restricted.
+
+### Not built, deliberately
+
+- **"Scan APK files", "Scan installed apps" and "Ignore trusted apps"**
+  back nothing: every analyzer refuses non-application targets, the
+  security scan requests exactly one scope, and trusted filtering is
+  unconditional in the scan engine. Tests assert their absence.
+- **Three of the four proposed notification toggles.** Security alerts
+  has a channel nothing posts to by design (ADR 0055); background
+  protection notifications exist exactly when protection is on; and
+  "important updates" has no corresponding notification. Per-channel
+  control is handed to Android, which genuinely owns it.
+- **Signature database version, last signature update, OSS licenses.**
+  The first two have never existed in this project; the third needs a
+  Gradle plugin and generated artifact that aren't present, and a
+  hand-written attribution list would go stale immediately.
+
+### Needs your input before release
+
+`SupportLinks` holds placeholder `.invalid` URLs for the privacy policy,
+terms and feedback address. The UI says "Not published yet" beneath those
+rows until they're replaced, so an unconfigured build can't quietly ship
+a broken privacy-policy link.
+
 ## Sprint 042 — Background Protection Engine
 
 ### Added
