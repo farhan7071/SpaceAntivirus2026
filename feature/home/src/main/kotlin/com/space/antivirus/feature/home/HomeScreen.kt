@@ -50,6 +50,7 @@ import com.space.antivirus.core.ui.component.AppFilledButton
 import com.space.antivirus.core.ui.component.AppLinearProgress
 import com.space.antivirus.core.ui.component.AppSectionHeader
 import com.space.antivirus.core.ui.component.AppTextButton
+import com.space.antivirus.core.ui.format.formatBytes
 import java.text.DateFormat
 import java.util.Date
 
@@ -206,7 +207,10 @@ private fun HomeLoaded(
             )
         }
         item {
-            RecentActivitySection(lastScan = state.lastScanSummary)
+            RecentActivitySection(
+                lastScan = state.lastScanSummary,
+                lastCleanup = state.lastCleanupSummary,
+            )
         }
     }
 }
@@ -793,17 +797,18 @@ private fun QuickActionCard(
  * Card's own UNKNOWN branch).
  */
 @Composable
-private fun RecentActivitySection(lastScan: LastScanSummary?) {
+private fun RecentActivitySection(lastScan: LastScanSummary?, lastCleanup: LastCleanupSummary?) {
     val spacing = LocalSpacing.current
     val isDark = isSystemInDarkTheme()
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
         AppSectionHeader(title = "Recent Activity")
-        if (lastScan == null) {
+        if (lastScan == null && lastCleanup == null) {
             AppEmptyState(
                 icon = IconTokens.scan,
                 message = "Nothing to show yet \u2014 run your first scan and we'll keep you posted here.",
             )
-        } else {
+        }
+        if (lastScan != null) {
             val resultText = if (lastScan.isClean) {
                 "No threats detected"
             } else {
@@ -852,6 +857,74 @@ private fun RecentActivitySection(lastScan: LastScanSummary?) {
                         )
                     }
                 }
+            }
+        }
+        if (lastCleanup != null) {
+            LastCleanupCard(lastCleanup)
+        }
+    }
+}
+
+/**
+ * Sprint 040. The Cleaner has persisted real cleanup records since
+ * Sprint 039, but nothing read them back — Recent Activity showed only
+ * scans, so a user who had just freed 480 MB saw no trace of it here.
+ *
+ * Built as a second card in the existing Recent Activity section, using
+ * the same Card/icon-badge/three-line anatomy as the scan card directly
+ * above it. Home's visual design has been locked since Sprint 037; this
+ * adds real data to an existing section rather than introducing anything
+ * new to look at.
+ *
+ * Every figure comes from a persisted `CleanupRecord`. The row is absent
+ * entirely until the user has actually run a cleanup — never a
+ * placeholder "0 B" or "Never".
+ */
+@Composable
+private fun LastCleanupCard(lastCleanup: LastCleanupSummary) {
+    val spacing = LocalSpacing.current
+    val isDark = isSystemInDarkTheme()
+    val accent = if (isDark) SeverityColors.SafeDark else SeverityColors.SafeLight
+    Card(shape = ShapeTokens.card, elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card)) {
+        Row(
+            modifier = Modifier.padding(spacing.medium),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(LayoutTokens.minTouchTarget)
+                    .clip(ShapeTokens.iconBadge)
+                    .background(accent.copy(alpha = if (isDark) 0.24f else 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = IconTokens.cleaner,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Column(modifier = Modifier.padding(start = spacing.medium)) {
+                Text(
+                    // A cancelled cleanup really did free the bytes it
+                    // reports, so it belongs here — but it says it was
+                    // stopped rather than implying it ran to completion.
+                    text = if (lastCleanup.wasCancelled) "Cleanup stopped early" else "Junk cleanup completed",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "${formatBytes(lastCleanup.bytesFreed)} freed \u00B7 " +
+                        "${lastCleanup.itemsDeleted} file(s) removed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = accent,
+                    modifier = Modifier.padding(top = spacing.tight),
+                )
+                Text(
+                    text = formatScanTime(lastCleanup.cleanedAtEpochMillis),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

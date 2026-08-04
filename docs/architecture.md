@@ -1807,6 +1807,35 @@ now — the results hero's "nothing has been deleted" and the reassurance
 card's "this scan is read-only" — were replaced with descriptions of the
 real enforced boundary.
 
+### Cleanup history on Home (Sprint 040)
+
+Sprint 039 built the cleaning engine and persisted real `CleanupRecord`
+rows, but nothing read them back: `ObserveCleanupHistoryUseCase` shipped
+with zero callers, and Home's Recent Activity showed scans only. A user
+who had just freed 480 MB saw no trace of it on the home screen.
+
+`HomeViewModel` now combines a third Flow alongside scan history and
+trusted items, in the same passive reactive shape (`GetLastCleanupUseCase`
+exists and is deliberately not used here, exactly as
+`GetLatestScanResultUseCase` isn't — Recent Activity updates the moment
+a cleanup finishes while Home is open). `HomeScreen` renders it as a
+second card in the existing Recent Activity section, reusing the scan
+card's own Card/icon-badge/three-line anatomy. Home's visual design has
+been locked since Sprint 037; this adds real data to an existing section
+rather than introducing anything new to look at.
+
+A cancelled cleanup appears here too and says "Cleanup stopped early" —
+the bytes it reports really were freed, so hiding it would lose a true
+fact, and labelling it as completed would overstate one.
+
+Also extracted: `formatBytes` (`core:ui/format`), moved out of
+`CleanScreen.kt` now that Home needs identical formatting. Two feature
+modules formatting bytes independently would drift. Same extraction bar
+as `AppSectionHeader` (Sprint 038) — 2+ callers that genuinely need it
+today, the rule Sprint 037 round 2 set by deleting `AppStatGroup`.
+Decimal units, matching Android's own Settings > Storage, so a "482 MB
+freed" claim is checkable against what the system itself reports.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

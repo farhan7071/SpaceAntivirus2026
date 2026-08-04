@@ -2,8 +2,10 @@ package com.space.antivirus.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.space.antivirus.core.model.CleanupRecord
 import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.ScanSessionState
+import com.space.antivirus.domain.usecase.ObserveCleanupHistoryUseCase
 import com.space.antivirus.domain.usecase.ObserveScanHistoryUseCase
 import com.space.antivirus.domain.usecase.ObserveTrustedItemsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +34,15 @@ import kotlinx.coroutines.flow.stateIn
  * own Flow (updates live the moment a new scan completes while Home is
  * open, not just on next ViewModel creation). See docs/architecture.md.
  *
+ * Sprint 040 added a third source, ObserveCleanupHistoryUseCase, for
+ * the same reason and in the same shape: the Cleaner began persisting
+ * real cleanup records in Sprint 039, and Home's Recent Activity had
+ * been showing only half the story since. It's a Flow, so it composes
+ * into the existing combine() rather than needing a one-shot read —
+ * Recent Activity updates the moment a cleanup finishes while Home is
+ * open. GetLastCleanupUseCase exists and is deliberately NOT used here,
+ * exactly as GetLatestScanResultUseCase isn't, for that same reason.
+ *
  * Active-scan-session state (whether a scan is CURRENTLY running,
  * independent of HomeViewModel's own passive observation) is deliberately
  * NOT surfaced by this ViewModel — that's ScanViewModel's job (Sprint
@@ -43,12 +54,14 @@ import kotlinx.coroutines.flow.stateIn
 class HomeViewModel @Inject constructor(
     observeScanHistory: ObserveScanHistoryUseCase,
     observeTrustedItems: ObserveTrustedItemsUseCase,
+    observeCleanupHistory: ObserveCleanupHistoryUseCase,
 ) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> = combine(
         observeScanHistory(),
         observeTrustedItems(),
-    ) { scanHistory, trustedItems ->
+        observeCleanupHistory(),
+    ) { scanHistory, trustedItems, cleanupHistory ->
         val lastScan = scanHistory.firstOrNull()
         // Cast to the sealed supertype explicitly — without it, this
         // lambda's inferred return type is HomeUiState.Loaded specifically,
@@ -58,6 +71,7 @@ class HomeViewModel @Inject constructor(
             protectionStatus = protectionStatusFor(lastScan),
             lastScanSummary = lastScan?.toSummary(),
             trustedItemsCount = trustedItems.size,
+            lastCleanupSummary = cleanupHistory.firstOrNull()?.toSummary(),
         ) as HomeUiState
     }
         .catch { error ->
@@ -87,6 +101,17 @@ class HomeViewModel @Inject constructor(
         scannedAtEpochMillis = session.completedAtEpochMillis ?: session.startedAtEpochMillis,
     )
 
+    /** A cancelled cleanup is still a real cleanup — the files deleted
+     *  before the user pressed Stop are genuinely gone — so it appears in
+     *  Recent Activity like any other, and carries the flag so the screen
+     *  can say it was stopped early rather than implying it finished. */
+    private fun CleanupRecord.toSummary(): LastCleanupSummary = LastCleanupSummary(
+        bytesFreed = bytesFreed,
+        itemsDeleted = itemsDeleted,
+        cleanedAtEpochMillis = completedAtEpochMillis,
+        wasCancelled = wasCancelled,
+    )
+
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
     }
@@ -99,6 +124,9 @@ sealed interface HomeUiState {
         val protectionStatus: ProtectionStatus,
         val lastScanSummary: LastScanSummary?,
         val trustedItemsCount: Int,
+        /** Null until the user has actually run a cleanup. Absent, never
+         *  a placeholder zero. */
+        val lastCleanupSummary: LastCleanupSummary? = null,
     ) : HomeUiState
 
     data class Error(val message: String) : HomeUiState
@@ -116,4 +144,11 @@ data class LastScanSummary(
     val isClean: Boolean,
     val threatsFound: Int,
     val scannedAtEpochMillis: Long,
+)
+
+data class LastCleanupSummary(
+    val bytesFreed: Long,
+    val itemsDeleted: Int,
+    val cleanedAtEpochMillis: Long,
+    val wasCancelled: Boolean,
 )

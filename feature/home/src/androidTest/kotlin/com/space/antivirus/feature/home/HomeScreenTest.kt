@@ -320,4 +320,61 @@ class HomeScreenTest {
 
         assertThat(navigated).isTrue()
     }
+
+    // -- Last cleanup in Recent Activity (Sprint 040) -----------------
+
+    private fun cleanupSummary(
+        bytesFreed: Long = 482_000_000L,
+        itemsDeleted: Int = 152,
+        wasCancelled: Boolean = false,
+    ) = LastCleanupSummary(
+        bytesFreed = bytesFreed,
+        itemsDeleted = itemsDeleted,
+        cleanedAtEpochMillis = 1_700_000_000_000L,
+        wasCancelled = wasCancelled,
+    )
+
+    @Test
+    fun recentActivity_showsTheRealBytesFreedAndFilesRemoved() {
+        composeTestRule.setHomeScreen(
+            uiState = unknownStatusState.copy(lastCleanupSummary = cleanupSummary()),
+        )
+
+        composeTestRule.onNodeWithText("Junk cleanup completed").assertExists()
+        composeTestRule.onNodeWithText("482.0 MB freed \u00B7 152 file(s) removed").assertExists()
+    }
+
+    /** Absent entirely until a cleanup has actually run — never a
+     *  placeholder "0 B" or "Never". */
+    @Test
+    fun recentActivity_showsNoCleanupRowBeforeAnyCleanupHasRun() {
+        composeTestRule.setHomeScreen(uiState = unknownStatusState)
+
+        composeTestRule.onNodeWithText("Junk cleanup completed").assertDoesNotExist()
+        composeTestRule.onNodeWithText("0 B freed \u00B7 0 file(s) removed").assertDoesNotExist()
+    }
+
+    @Test
+    fun recentActivity_saysPlainlyWhenTheCleanupWasStoppedEarly() {
+        composeTestRule.setHomeScreen(
+            uiState = unknownStatusState.copy(lastCleanupSummary = cleanupSummary(wasCancelled = true)),
+        )
+
+        composeTestRule.onNodeWithText("Cleanup stopped early").assertExists()
+        composeTestRule.onNodeWithText("Junk cleanup completed").assertDoesNotExist()
+    }
+
+    /** With a cleanup recorded but no scan yet, the section must show the
+     *  cleanup rather than the "nothing to show yet" empty state. */
+    @Test
+    fun recentActivity_withACleanupButNoScan_showsTheCleanupNotTheEmptyState() {
+        composeTestRule.setHomeScreen(
+            uiState = unknownStatusState.copy(lastCleanupSummary = cleanupSummary()),
+        )
+
+        composeTestRule.onNodeWithText("Junk cleanup completed").assertExists()
+        composeTestRule
+            .onNodeWithText("Nothing to show yet \u2014 run your first scan and we'll keep you posted here.")
+            .assertDoesNotExist()
+    }
 }

@@ -24,6 +24,14 @@ dependencies {
     // plugin shared by every Compose module in this project.
     implementation(libs.compose.animation)
 
+    // Sprint 040: core:ui's first plain unit test. formatBytes is pure
+    // Kotlin with no Compose or Android dependency, so it belongs in the
+    // fast JVM source set rather than needing an emulator — the module's
+    // existing tests are all instrumented only because every prior
+    // addition to it was a composable.
+    testImplementation(libs.junit)
+    testImplementation(libs.truth)
+
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.truth)

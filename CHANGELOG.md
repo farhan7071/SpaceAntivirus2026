@@ -6,6 +6,44 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 040 — Cleanup history on Home
+
+A deliberately small sprint. The Sprint 040 brief asked for the cleanup
+engine, progress flow, cancellation, history persistence, storage
+refresh, real completion values and removal of the Sprint 038 guards —
+all of which shipped in Sprint 039. Verified item by item against
+`origin/main` before starting; one genuine gap remained.
+
+### Added
+
+- **Last cleanup on Home.** Recent Activity now shows real bytes freed,
+  real files removed and the real timestamp from a persisted
+  `CleanupRecord`. Absent entirely until a cleanup has actually run —
+  never a placeholder "0 B" or "Never". A cancelled cleanup shows as
+  "Cleanup stopped early" rather than as a completed one.
+- **`formatBytes`** in `core:ui/format`, extracted from `CleanScreen.kt`
+  now that two modules need identical formatting.
+
+### Fixed
+
+- `ObserveCleanupHistoryUseCase` shipped in Sprint 039 with no caller.
+  It has one now; that was dead code and is called out as such.
+
+### Not changed, and why
+
+Nothing else in the brief needed work. Details in the Sprint 040 section
+of `docs/architecture.md`; the short version is that the delete engine,
+`Flow<CleaningProgress>`, cancellation, history persistence, `StatFs`
+refresh and real completion values are all live as of Sprint 039, and
+the three Sprint 038 guard tests were replaced in that same sprint by
+tests asserting the real capability.
+
+Two things the brief listed were deliberately left as they are: the
+scanning screen still shows no percentage (a filesystem walk cannot know
+its own total without a counting pre-pass — cleaning does show one), and
+Recent Activity keeps its existing absolute timestamp format rather than
+introducing relative dates like "Today" for the cleanup row only.
+
 ## Sprint 039 — Junk Cleaner engine (real deletion)
 
 The Cleaner now actually cleans. Every figure it shows is measured by

@@ -3,6 +3,7 @@ package com.space.antivirus.feature.home
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.model.AnalyzerId
+import com.space.antivirus.core.model.CleanupRecord
 import com.space.antivirus.core.model.Detection
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanResult
@@ -15,8 +16,10 @@ import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.core.model.TrustedItem
 import com.space.antivirus.core.model.TrustedItemType
 import com.space.antivirus.core.testing.MainDispatcherRule
+import com.space.antivirus.domain.repository.CleanupHistoryRepository
 import com.space.antivirus.domain.repository.SecurityRepository
 import com.space.antivirus.domain.repository.TrustedItemRepository
+import com.space.antivirus.domain.usecase.ObserveCleanupHistoryUseCase
 import com.space.antivirus.domain.usecase.ObserveScanHistoryUseCase
 import com.space.antivirus.domain.usecase.ObserveTrustedItemsUseCase
 import io.mockk.every
@@ -45,10 +48,32 @@ class HomeViewModelTest {
 
     private val securityRepository = mockk<SecurityRepository>()
     private val trustedItemRepository = mockk<TrustedItemRepository>()
+    private val cleanupHistoryRepository = mockk<CleanupHistoryRepository>()
 
     private fun buildViewModel(): HomeViewModel = HomeViewModel(
         observeScanHistory = ObserveScanHistoryUseCase(securityRepository),
         observeTrustedItems = ObserveTrustedItemsUseCase(trustedItemRepository),
+        observeCleanupHistory = ObserveCleanupHistoryUseCase(cleanupHistoryRepository),
+    )
+
+    /** Sprint 040 added a third source. Existing tests call this so they
+     *  keep asserting only what they were written to assert. */
+    private fun noCleanupHistory() {
+        every { cleanupHistoryRepository.observeHistory() } returns flowOf(emptyList())
+    }
+
+    private fun cleanupRecord(
+        bytesFreed: Long = 482_000_000L,
+        itemsDeleted: Int = 152,
+        wasCancelled: Boolean = false,
+    ) = CleanupRecord(
+        id = "c1",
+        completedAtEpochMillis = 9_000L,
+        itemsDeleted = itemsDeleted,
+        itemsFailed = 0,
+        bytesFreed = bytesFreed,
+        durationMillis = 18_000L,
+        wasCancelled = wasCancelled,
     )
 
     private fun completedSession(id: String = "s1") = ScanSession(
@@ -112,6 +137,7 @@ class HomeViewModelTest {
     @Test
     fun `no scan history and no trusted items yields UNKNOWN status and zero trusted count`() = runTest {
         every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        noCleanupHistory()
         every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
         buildViewModel().uiState.test {
@@ -126,6 +152,7 @@ class HomeViewModelTest {
     @Test
     fun `a clean completed scan yields PROTECTED status`() = runTest {
         every { securityRepository.observeScanHistory() } returns flowOf(listOf(cleanScanResult()))
+        noCleanupHistory()
         every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
         buildViewModel().uiState.test {
@@ -139,6 +166,7 @@ class HomeViewModelTest {
     @Test
     fun `a completed scan with threats yields NEEDS_ATTENTION status and the correct threat count`() = runTest {
         every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(threatCount = 2)))
+        noCleanupHistory()
         every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
         buildViewModel().uiState.test {
@@ -153,6 +181,7 @@ class HomeViewModelTest {
     @Test
     fun `trusted items count reflects the observed list size`() = runTest {
         every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        noCleanupHistory()
         every { trustedItemRepository.observeTrustedItems() } returns
             flowOf(listOf(trustedItem("1"), trustedItem("2"), trustedItem("3")))
 
@@ -169,6 +198,7 @@ class HomeViewModelTest {
             val mostRecent = flaggedScanResult(threatCount = 1)
             val older = cleanScanResult()
             every { securityRepository.observeScanHistory() } returns flowOf(listOf(mostRecent, older))
+            noCleanupHistory()
             every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
             buildViewModel().uiState.test {
@@ -184,12 +214,79 @@ class HomeViewModelTest {
     @Test
     fun `an upstream failure surfaces as Error state, not a crash`() = runTest {
         every { securityRepository.observeScanHistory() } returns flow { throw IllegalStateException("db error") }
+        noCleanupHistory()
         every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
         buildViewModel().uiState.test {
             assertThat(awaitItem()).isEqualTo(HomeUiState.Loading)
             val state = awaitItem()
             assertThat(state).isInstanceOf(HomeUiState.Error::class.java)
+        }
+    }
+
+    // -- Cleanup history on Home (Sprint 040) -------------------------
+
+    @Test
+    fun `last cleanup is exposed when one has been recorded`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
+        every { cleanupHistoryRepository.observeHistory() } returns flowOf(listOf(cleanupRecord()))
+
+        buildViewModel().uiState.test {
+            skipItems(1)
+            val loaded = awaitItem() as HomeUiState.Loaded
+            assertThat(loaded.lastCleanupSummary?.bytesFreed).isEqualTo(482_000_000L)
+            assertThat(loaded.lastCleanupSummary?.itemsDeleted).isEqualTo(152)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    /** Absent, never a placeholder zero. */
+    @Test
+    fun `last cleanup is null when the user has never run one`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
+        noCleanupHistory()
+
+        buildViewModel().uiState.test {
+            skipItems(1)
+            assertThat((awaitItem() as HomeUiState.Loaded).lastCleanupSummary).isNull()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `the most recent cleanup is the one exposed`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
+        // observeHistory's contract is most-recent-first.
+        every { cleanupHistoryRepository.observeHistory() } returns flowOf(
+            listOf(cleanupRecord(bytesFreed = 900L), cleanupRecord(bytesFreed = 100L)),
+        )
+
+        buildViewModel().uiState.test {
+            skipItems(1)
+            assertThat((awaitItem() as HomeUiState.Loaded).lastCleanupSummary?.bytesFreed).isEqualTo(900L)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    /** A cancelled cleanup really did free the bytes it reports, so it
+     *  belongs in Recent Activity — carrying the flag so the screen can
+     *  say it was stopped rather than implying it finished. */
+    @Test
+    fun `a cancelled cleanup is still surfaced and carries its flag`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
+        every { cleanupHistoryRepository.observeHistory() } returns flowOf(
+            listOf(cleanupRecord(wasCancelled = true)),
+        )
+
+        buildViewModel().uiState.test {
+            skipItems(1)
+            val loaded = awaitItem() as HomeUiState.Loaded
+            assertThat(loaded.lastCleanupSummary?.wasCancelled).isTrue()
+            cancelAndIgnoreRemainingEvents()
         }
     }
 }

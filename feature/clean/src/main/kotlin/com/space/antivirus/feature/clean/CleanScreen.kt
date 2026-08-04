@@ -56,6 +56,7 @@ import com.space.antivirus.core.ui.component.AppFilledButton
 import com.space.antivirus.core.ui.component.AppLinearProgress
 import com.space.antivirus.core.ui.component.AppOutlinedButton
 import com.space.antivirus.core.ui.component.AppSectionHeader
+import com.space.antivirus.core.ui.format.formatBytes
 
 /** Exposed so CleanScreenTest can find the scanning indicator — the
  *  Scanning state still has no determinate value to assert on, by
@@ -1232,11 +1233,11 @@ private fun formatDuration(durationMillis: Long): String {
     }
 }
 
-private fun formatSize(sizeBytes: Long): String = when {
-    sizeBytes >= 1_000_000 -> "%.1f MB".format(sizeBytes / 1_000_000.0)
-    sizeBytes >= 1_000 -> "%.1f KB".format(sizeBytes / 1_000.0)
-    else -> "$sizeBytes B"
-}
+/** Sprint 040: the implementation moved to `core:ui`'s `formatBytes`
+ *  now that Home needs identical formatting. Kept as a local alias so
+ *  the ~15 call sites in this file stay unchanged rather than churning
+ *  for a rename. */
+private fun formatSize(sizeBytes: Long): String = formatBytes(sizeBytes)
 
 // Local dimension constants. Every spacing/shape/color value on this
 // screen is an SDS token; these four are icon/illustration sizes, for
