@@ -9,10 +9,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 
 /** Persists an interval choice on its own — used when background
  *  protection is currently disabled, so there's nothing to re-schedule
- *  yet; the SettingsViewModel calls ScheduleBackgroundScanUseCase
- *  separately when protection is already enabled and the interval
- *  changes, since that path needs to know the outcome to decide whether
- *  to also call RecordBackgroundProtectionEnabledUseCase again. */
+ *  yet. When protection is already enabled, SettingsViewModel follows
+ *  this with SetProtectionEnabledUseCase, which re-schedules at the new
+ *  interval and re-persists together (Sprint 042). */
 class SetScanIntervalUseCase @Inject constructor(
     private val preferences: BackgroundProtectionPreferences,
     @IoDispatcher dispatcher: CoroutineDispatcher,

@@ -1897,6 +1897,61 @@ problem is the low-grade version of the exaggeration ADR 0015 rules out.
 `fillMaxSize()` is kept unchanged so Home's Recent Activity, which is
 out of this sprint's scope, is unaffected in layout.
 
+### Background protection engine (Sprint 042)
+
+```
+domain/protection/
+  ProtectionManager        - the single owner: enable / disable /
+                             restoreAfterBoot / onScheduledScanCompleted
+  ProtectionNotifier       - three methods, one per thing the app has to
+                             say. No general notify(title, body).
+  BatteryOptimizationStatus- read-only; this app never requests exemption
+
+core:protection (new module)
+  ProtectionManagerImpl    - zero Android types, so the ordering is
+                             JVM-testable
+  NotificationHelper       - three channels, POST_NOTIFICATIONS-aware
+  AndroidBatteryOptimizationStatus
+
+app/protection/
+  BootCompletedReceiver    - restores the notification, NOT the schedule
+```
+
+**The ordering is the whole point.** Enable is: schedule -> persist only
+on confirmed success -> notify. Any other order lets preferences claim
+protection WorkManager rejected, or tells the user their device is
+monitored before anything is scheduled to monitor it. Sprint 024/025
+enforced this by convention inside `SettingsViewModel`; with Home's
+toggle, the boot receiver and the worker all needing it, convention
+would have drifted. Disable inverts the last step — the notification
+goes first, because a stale "protection active" notification is the
+worse failure.
+
+**The copy is not the brief's.** The sprint asked for "Real-time
+protection active". This app has no real-time protection; it runs
+scheduled scans, and live scanning/APK interception/install interception
+are out of scope and absent. A permanent notification claiming real-time
+protection is a false security claim in the most consequential place the
+app could put one. See ADR 0055. The next-scan line says "around" for the
+same reason: WorkManager defers periodic work for this project's own
+battery and storage constraints.
+
+**Boot does not reschedule.** WorkManager reschedules its own persisted
+work (the reason for `RECEIVE_BOOT_COMPLETED` since Sprint 025).
+Re-enqueueing would replace a live schedule and reset its interval
+window. The receiver restores the notification, which is the thing that
+genuinely does not survive a reboot.
+
+**Six use cases were deleted** (`ScheduleBackgroundScan`,
+`CancelBackgroundScan`, both `Record*`, both `Observe*`) — zero
+production callers once Settings moved to the manager, and keeping them
+would leave a second, unordered route to the same repositories.
+
+**Known gap: POST_NOTIFICATIONS is never requested at runtime.**
+Declared since Sprint 003, but a runtime permission on API 33+, so denied
+by default on modern devices. `NotificationHelper` checks and no-ops
+rather than throwing. Wiring the request into onboarding is a follow-up.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

@@ -6,6 +6,62 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 042 — Background Protection Engine
+
+### Added
+
+- **`ProtectionManager`** — one owner for enabling, disabling, boot
+  restoration and scan-completion reporting. The
+  schedule-then-persist-then-notify ordering is structural now rather
+  than repeated per caller.
+- **`NotificationHelper`** with three channels (protection status,
+  scheduled scan results, security alerts).
+- **`BootCompletedReceiver`** — restores the ongoing notification after
+  a restart.
+- **Home**: live protection status with a quick toggle, sharing one use
+  case with Settings' switch.
+- **Settings**: "Notify After Scan" (off by default) and a one-time
+  battery-optimisation card.
+- **`ScanScope`-free `ProtectionState`** in `core:model`, plus the
+  `core:protection` module.
+
+### Changed
+
+- The scheduled worker now reports its real scan counts, so a
+  notification cannot claim more than the scan actually found.
+
+### Removed
+
+- Six use cases (`ScheduleBackgroundScan`, `CancelBackgroundScan`, both
+  `Record*` and both `Observe*` background-protection use cases). Once
+  Settings moved to `ProtectionManager` they had zero production callers
+  and existed only to be composed in the order the manager now
+  guarantees.
+
+### Not done, deliberately
+
+- **The brief's "Real-time protection active" copy was not used.** This
+  app has no real-time protection — live scanning, APK interception and
+  install interception are all out of scope and absent. A permanent
+  notification claiming otherwise would be a false security claim in the
+  most consequential place the app could put one.
+- **The boot receiver does not reschedule work.** WorkManager already
+  does that; re-enqueueing would reset the interval window.
+- **Nothing posts to the security-alerts channel yet.** Every finding
+  the app can produce has already been shown to the user elsewhere.
+
+### Known gap
+
+**POST_NOTIFICATIONS has never been requested at runtime.** It has been
+declared in the manifest since Sprint 003, but on API 33+ it is a runtime
+permission, so on a modern device it is denied by default and these
+notifications will not appear until it is requested. `NotificationHelper`
+degrades safely and reports the real state. Wiring the request into
+onboarding is a follow-up — where the app asks matters, and a prompt
+fired the instant a toggle flips is the one users deny.
+
+Full reasoning in ADR 0055.
+
 ## Sprint 041 — Security Center & Scan History polish
 
 Presentation only. No analyzer, detection rule, repository, ViewModel or

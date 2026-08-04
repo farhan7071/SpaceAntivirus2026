@@ -5,6 +5,7 @@ import com.google.common.truth.Truth.assertThat
 import com.space.antivirus.core.model.AnalyzerId
 import com.space.antivirus.core.model.CleanupRecord
 import com.space.antivirus.core.model.Detection
+import com.space.antivirus.core.model.ProtectionState
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.ScanSession
@@ -16,16 +17,21 @@ import com.space.antivirus.core.model.ThreatType
 import com.space.antivirus.core.model.TrustedItem
 import com.space.antivirus.core.model.TrustedItemType
 import com.space.antivirus.core.testing.MainDispatcherRule
+import com.space.antivirus.domain.protection.ProtectionManager
 import com.space.antivirus.domain.repository.CleanupHistoryRepository
 import com.space.antivirus.domain.repository.SecurityRepository
 import com.space.antivirus.domain.repository.TrustedItemRepository
 import com.space.antivirus.domain.usecase.ObserveCleanupHistoryUseCase
+import com.space.antivirus.domain.usecase.ObserveProtectionStateUseCase
 import com.space.antivirus.domain.usecase.ObserveScanHistoryUseCase
 import com.space.antivirus.domain.usecase.ObserveTrustedItemsUseCase
+import com.space.antivirus.domain.usecase.SetProtectionEnabledUseCase
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -49,17 +55,34 @@ class HomeViewModelTest {
     private val securityRepository = mockk<SecurityRepository>()
     private val trustedItemRepository = mockk<TrustedItemRepository>()
     private val cleanupHistoryRepository = mockk<CleanupHistoryRepository>()
+    private val protectionManager = mockk<ProtectionManager>()
+    private val setProtectionEnabled = mockk<SetProtectionEnabledUseCase>(relaxed = true)
 
     private fun buildViewModel(): HomeViewModel = HomeViewModel(
         observeScanHistory = ObserveScanHistoryUseCase(securityRepository),
         observeTrustedItems = ObserveTrustedItemsUseCase(trustedItemRepository),
         observeCleanupHistory = ObserveCleanupHistoryUseCase(cleanupHistoryRepository),
+        observeProtectionState = ObserveProtectionStateUseCase(protectionManager),
+        setProtectionEnabled = setProtectionEnabled,
     )
 
     /** Sprint 040 added a third source. Existing tests call this so they
      *  keep asserting only what they were written to assert. */
     private fun noCleanupHistory() {
         every { cleanupHistoryRepository.observeHistory() } returns flowOf(emptyList())
+    }
+
+    /** Sprint 042 added a fourth source. Existing tests call this so they
+     *  keep asserting only what they were written to assert. */
+    private fun protectionOff() {
+        every { protectionManager.state } returns flowOf(
+            ProtectionState(
+                isEnabled = false,
+                intervalHours = 24L,
+                lastScheduledAtEpochMillis = null,
+                notifyAfterScan = false,
+            ),
+        )
     }
 
     private fun cleanupRecord(
@@ -138,6 +161,7 @@ class HomeViewModelTest {
     fun `no scan history and no trusted items yields UNKNOWN status and zero trusted count`() = runTest {
         every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
         noCleanupHistory()
+        protectionOff()
         every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
         buildViewModel().uiState.test {
@@ -153,6 +177,7 @@ class HomeViewModelTest {
     fun `a clean completed scan yields PROTECTED status`() = runTest {
         every { securityRepository.observeScanHistory() } returns flowOf(listOf(cleanScanResult()))
         noCleanupHistory()
+        protectionOff()
         every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
         buildViewModel().uiState.test {
@@ -167,6 +192,7 @@ class HomeViewModelTest {
     fun `a completed scan with threats yields NEEDS_ATTENTION status and the correct threat count`() = runTest {
         every { securityRepository.observeScanHistory() } returns flowOf(listOf(flaggedScanResult(threatCount = 2)))
         noCleanupHistory()
+        protectionOff()
         every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
         buildViewModel().uiState.test {
@@ -182,6 +208,7 @@ class HomeViewModelTest {
     fun `trusted items count reflects the observed list size`() = runTest {
         every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
         noCleanupHistory()
+        protectionOff()
         every { trustedItemRepository.observeTrustedItems() } returns
             flowOf(listOf(trustedItem("1"), trustedItem("2"), trustedItem("3")))
 
@@ -199,6 +226,7 @@ class HomeViewModelTest {
             val older = cleanScanResult()
             every { securityRepository.observeScanHistory() } returns flowOf(listOf(mostRecent, older))
             noCleanupHistory()
+            protectionOff()
             every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
             buildViewModel().uiState.test {
@@ -215,6 +243,7 @@ class HomeViewModelTest {
     fun `an upstream failure surfaces as Error state, not a crash`() = runTest {
         every { securityRepository.observeScanHistory() } returns flow { throw IllegalStateException("db error") }
         noCleanupHistory()
+        protectionOff()
         every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
 
         buildViewModel().uiState.test {
@@ -247,6 +276,7 @@ class HomeViewModelTest {
         every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
         every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
         noCleanupHistory()
+        protectionOff()
 
         buildViewModel().uiState.test {
             skipItems(1)
@@ -288,5 +318,49 @@ class HomeViewModelTest {
             assertThat(loaded.lastCleanupSummary?.wasCancelled).isTrue()
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // -- Protection (Sprint 042) --------------------------------------
+
+    @Test
+    fun `protection state is exposed for the home toggle`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
+        noCleanupHistory()
+        every { protectionManager.state } returns flowOf(
+            ProtectionState(
+                isEnabled = true,
+                intervalHours = 24L,
+                lastScheduledAtEpochMillis = 1_000L,
+                notifyAfterScan = false,
+            ),
+        )
+
+        buildViewModel().uiState.test {
+            skipItems(1)
+            val loaded = awaitItem() as HomeUiState.Loaded
+            assertThat(loaded.protection?.isEnabled).isTrue()
+            assertThat(loaded.protection?.earliestNextScanEpochMillis)
+                .isEqualTo(1_000L + 24 * 3_600_000L)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    /**
+     * Home's quick toggle and Settings' switch must not diverge, so both
+     * go through the same use case rather than each re-deriving the
+     * schedule/persist/notify ordering.
+     */
+    @Test
+    fun `the quick toggle delegates to the shared use case`() = runTest {
+        every { securityRepository.observeScanHistory() } returns flowOf(emptyList())
+        every { trustedItemRepository.observeTrustedItems() } returns flowOf(emptyList())
+        noCleanupHistory()
+        protectionOff()
+
+        buildViewModel().onProtectionToggled(true)
+        runCurrent()
+
+        coVerify { setProtectionEnabled(enabled = true) }
     }
 }

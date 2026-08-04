@@ -22,6 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -43,6 +44,7 @@ import com.space.antivirus.core.designsystem.theme.LayoutTokens
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
 import com.space.antivirus.core.designsystem.theme.SeverityColors
 import com.space.antivirus.core.designsystem.theme.ShapeTokens
+import com.space.antivirus.core.model.ProtectionState
 import com.space.antivirus.core.model.ScanProgress
 import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
@@ -80,6 +82,10 @@ const val HOME_LOADING_TEST_TAG = "home_loading_indicator"
  * function would be a worse outcome than this minimal, precedented
  * wiring.
  */
+/** Sprint 042. Exposed so HomeScreenTest can find the quick toggle —
+ *  a Switch has no text of its own to match on. */
+const val HOME_PROTECTION_SWITCH_TEST_TAG = "home_protection_switch"
+
 @Composable
 fun HomeRoute(
     homeViewModel: HomeViewModel = hiltViewModel(),
@@ -96,6 +102,7 @@ fun HomeRoute(
         scanState = scanState,
         onScanClick = scanViewModel::startScan,
         onAcknowledgeScanResult = scanViewModel::acknowledgeResult,
+        onProtectionToggled = homeViewModel::onProtectionToggled,
         onNavigateToSecurityCenter = onNavigateToSecurityCenter,
         onNavigateToCleaner = onNavigateToCleaner,
         onNavigateToHistory = onNavigateToHistory,
@@ -113,6 +120,7 @@ fun HomeScreen(
     onNavigateToCleaner: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onProtectionToggled: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (uiState) {
@@ -126,6 +134,7 @@ fun HomeScreen(
             onNavigateToCleaner = onNavigateToCleaner,
             onNavigateToHistory = onNavigateToHistory,
             onNavigateToSettings = onNavigateToSettings,
+            onProtectionToggled = onProtectionToggled,
             modifier = modifier,
         )
         is HomeUiState.Error -> HomeError(uiState, modifier)
@@ -171,6 +180,7 @@ private fun HomeLoaded(
     onNavigateToCleaner: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onProtectionToggled: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
@@ -196,6 +206,10 @@ private fun HomeLoaded(
             )
         }
         item {
+            state.protection?.let { protection ->
+                ProtectionSection(protection = protection, onProtectionToggled = onProtectionToggled)
+            }
+
             SecuritySummarySection(lastScan = state.lastScanSummary, trustedItemsCount = state.trustedItemsCount)
         }
         item {
@@ -557,6 +571,101 @@ private fun HeroScanProgress(progress: ScanProgress?) {
  * data class, since there's exactly one caller and inventing that
  * indirection for it isn't warranted.
  */
+/**
+ * Sprint 042 — live background-protection status with a quick toggle.
+ *
+ * **The copy here is deliberately not the brief's.** The sprint brief
+ * suggested "Real-time protection active". This app has no real-time
+ * protection: it runs scheduled scans, and live file scanning, APK
+ * interception, accessibility monitoring and install interception are
+ * all explicitly out of scope and absent from the project. Claiming
+ * real-time protection on the home screen of a security app would be the
+ * most consequential false claim this project could make, and ADR 0015's
+ * "never exaggerate" rule does not stop applying because the sentence is
+ * reassuring rather than alarming. It says what is true instead.
+ *
+ * The next-scan line is worded as approximate for the same reason:
+ * WorkManager decides when periodic work actually fires and defers it
+ * for this project's battery and storage constraints, so an exact time
+ * would state a guarantee the platform does not make.
+ *
+ * Built from the same Card + tonal icon badge + Switch pieces Settings
+ * and the rest of Home already use — no new visual language.
+ */
+@Composable
+private fun ProtectionSection(protection: ProtectionState, onProtectionToggled: (Boolean) -> Unit) {
+    val spacing = LocalSpacing.current
+    val isDark = isSystemInDarkTheme()
+    val accent = if (protection.isEnabled) {
+        if (isDark) SeverityColors.SafeDark else SeverityColors.SafeLight
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+        AppSectionHeader(title = "Background Protection")
+        Card(shape = ShapeTokens.card, elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(spacing.medium),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(LayoutTokens.minTouchTarget)
+                        .clip(ShapeTokens.iconBadge)
+                        .background(accent.copy(alpha = if (isDark) 0.24f else 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = IconTokens.security,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = spacing.medium),
+                ) {
+                    Text(
+                        text = if (protection.isEnabled) "Protection enabled" else "Protection disabled",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = protectionSupportingText(protection),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = protection.isEnabled,
+                    onCheckedChange = onProtectionToggled,
+                    modifier = Modifier.testTag(HOME_PROTECTION_SWITCH_TEST_TAG),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * "Around", not "at": the next-scan time is an estimate derived from
+ * when the periodic work was enqueued, and WorkManager may defer it.
+ * Falls back to saying less when there is no timestamp to derive from,
+ * rather than inventing one.
+ */
+private fun protectionSupportingText(protection: ProtectionState): String = when {
+    !protection.isEnabled -> "Tap to enable automatic scans"
+    protection.earliestNextScanEpochMillis != null ->
+        "Automatic scans on \u00B7 next scan around " +
+            DateFormat.getTimeInstance(DateFormat.SHORT)
+                .format(Date(protection.earliestNextScanEpochMillis!!))
+    else -> "Automatic scans on"
+}
+
 @Composable
 private fun SecuritySummarySection(lastScan: LastScanSummary?, trustedItemsCount: Int) {
     val spacing = LocalSpacing.current

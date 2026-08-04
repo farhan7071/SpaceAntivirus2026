@@ -3,14 +3,10 @@ package com.space.antivirus.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.space.antivirus.core.common.AppResult
-import com.space.antivirus.domain.usecase.CancelBackgroundScanUseCase
-import com.space.antivirus.domain.usecase.ObserveBackgroundProtectionEnabledUseCase
-import com.space.antivirus.domain.usecase.ObserveLastScheduledAtUseCase
-import com.space.antivirus.domain.usecase.ObserveScanIntervalUseCase
-import com.space.antivirus.domain.usecase.RecordBackgroundProtectionDisabledUseCase
-import com.space.antivirus.domain.usecase.RecordBackgroundProtectionEnabledParams
-import com.space.antivirus.domain.usecase.RecordBackgroundProtectionEnabledUseCase
-import com.space.antivirus.domain.usecase.ScheduleBackgroundScanUseCase
+import com.space.antivirus.domain.usecase.GetBatteryOptimizationStatusUseCase
+import com.space.antivirus.domain.usecase.ObserveProtectionStateUseCase
+import com.space.antivirus.domain.usecase.SetNotifyAfterScanUseCase
+import com.space.antivirus.domain.usecase.SetProtectionEnabledUseCase
 import com.space.antivirus.domain.usecase.SetScanIntervalUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -23,53 +19,57 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Replaces the Sprint 003 placeholder. Reuses ScheduleBackgroundScanUseCase/
- * CancelBackgroundScanUseCase directly (Sprint 024/025) rather than any
- * new scheduling logic — this screen is the first real caller of both,
- * exactly what ADR 0037/0038 said the next increment would be.
+ * Replaces the Sprint 003 placeholder.
+ *
+ * Sprint 042: routes everything through ProtectionManager rather than
+ * calling the scheduler and preferences use cases itself. Those six use
+ * cases (ScheduleBackgroundScan, CancelBackgroundScan, the two Record*
+ * and the two Observe*) were deleted in the same sprint — once Home's
+ * quick toggle and the boot receiver also needed this behaviour, having
+ * three callers each re-deriving "schedule, then persist only on
+ * confirmed success, then update the notification" is exactly how they
+ * drift. The ordering lives in one place now.
  *
  * Reactive Flow-combine shape (like HomeViewModel/SecurityCenterViewModel),
  * not action-triggered like ScanViewModel/CleanViewModel — the underlying
  * data here (persisted preferences) IS genuinely ongoing, observable
  * state, unlike a one-shot scan or file enumeration.
  *
- * PERSIST-ONLY-ON-CONFIRMED-SUCCESS, throughout: every write to
- * BackgroundProtectionPreferences happens only after the corresponding
- * scheduler call has already succeeded. This is what keeps the persisted
- * state (and therefore lastScheduledAtEpochMillis) an honest reflection
- * of what WorkManager actually has scheduled, rather than an assumption
- * — see BackgroundProtectionPreferences' own KDoc for the same reasoning
- * stated from the contract's side.
+ * PERSIST-ONLY-ON-CONFIRMED-SUCCESS still holds — it just isn't this
+ * class's job to enforce any more. See ProtectionManagerImpl, where the
+ * ordering is now structural rather than repeated per caller.
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    observeBackgroundProtectionEnabled: ObserveBackgroundProtectionEnabledUseCase,
-    observeScanInterval: ObserveScanIntervalUseCase,
-    observeLastScheduledAt: ObserveLastScheduledAtUseCase,
-    private val scheduleBackgroundScan: ScheduleBackgroundScanUseCase,
-    private val cancelBackgroundScan: CancelBackgroundScanUseCase,
-    private val recordEnabled: RecordBackgroundProtectionEnabledUseCase,
-    private val recordDisabled: RecordBackgroundProtectionDisabledUseCase,
+    observeProtectionState: ObserveProtectionStateUseCase,
+    private val setProtectionEnabled: SetProtectionEnabledUseCase,
+    private val setNotifyAfterScan: SetNotifyAfterScanUseCase,
     private val setScanInterval: SetScanIntervalUseCase,
+    private val getBatteryOptimizationStatus: GetBatteryOptimizationStatusUseCase,
 ) : ViewModel() {
 
     private val transientError = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<SettingsUiState> = combine(
-        observeBackgroundProtectionEnabled(),
-        observeScanInterval(),
-        observeLastScheduledAt(),
+        observeProtectionState(),
         transientError,
-    ) { enabled, intervalHours, lastScheduledAt, error ->
+    ) { protection, error ->
         // Cast to the sealed supertype explicitly — same reason as every
         // other stateIn-backed ViewModel in this project (ADR 0030):
         // without it, this lambda's inferred return type is Loaded
         // specifically, and the .catch{} below (emitting a sibling
         // Error) would not type-check against a Flow<Loaded>.
         SettingsUiState.Loaded(
-            backgroundProtectionEnabled = enabled,
-            selectedInterval = ScanInterval.fromHours(intervalHours),
-            lastScheduledAtEpochMillis = lastScheduledAt,
+            backgroundProtectionEnabled = protection.isEnabled,
+            selectedInterval = ScanInterval.fromHours(protection.intervalHours),
+            lastScheduledAtEpochMillis = protection.lastScheduledAtEpochMillis,
+            notifyAfterScan = protection.notifyAfterScan,
+            // Read once per state emission rather than observed: this is
+            // a system setting the user changes outside this app, and
+            // there is no broadcast for it. A stale value here is
+            // harmless — the card is informational and the underlying
+            // setting is one tap away in system settings.
+            isIgnoringBatteryOptimizations = getBatteryOptimizationStatus(),
             errorMessage = error,
         ) as SettingsUiState
     }
@@ -85,25 +85,26 @@ class SettingsViewModel @Inject constructor(
     fun onBackgroundProtectionToggled(enabled: Boolean) {
         viewModelScope.launch {
             transientError.value = null
-            if (enabled) {
-                val intervalHours = currentIntervalHoursOrDefault()
-                when (val result = scheduleBackgroundScan(intervalHours)) {
-                    is AppResult.Success -> recordEnabled(
-                        RecordBackgroundProtectionEnabledParams(intervalHours, System.currentTimeMillis()),
-                    )
-                    is AppResult.Failure -> transientError.value =
-                        "Couldn't turn on background protection. Please try again."
-                    AppResult.Loading -> Unit
-                }
-            } else {
-                when (cancelBackgroundScan()) {
-                    is AppResult.Success -> recordDisabled()
-                    is AppResult.Failure -> transientError.value =
-                        "Couldn't turn off background protection. Please try again."
-                    AppResult.Loading -> Unit
+            // Sprint 042: the schedule-then-persist-then-notify ordering
+            // this method used to spell out now lives in
+            // ProtectionManager, so Home's quick toggle and this switch
+            // cannot drift apart.
+            val result = setProtectionEnabled(
+                enabled = enabled,
+                intervalHours = if (enabled) currentIntervalHoursOrDefault() else null,
+            )
+            if (result is AppResult.Failure) {
+                transientError.value = if (enabled) {
+                    "Couldn't turn on background protection. Please try again."
+                } else {
+                    "Couldn't turn off background protection. Please try again."
                 }
             }
         }
+    }
+
+    fun onNotifyAfterScanToggled(enabled: Boolean) {
+        viewModelScope.launch { setNotifyAfterScan(enabled) }
     }
 
     fun onIntervalSelected(interval: ScanInterval) {
@@ -116,13 +117,11 @@ class SettingsViewModel @Inject constructor(
             // next time, with nothing running yet to update.
             val currentlyEnabled = (uiState.value as? SettingsUiState.Loaded)?.backgroundProtectionEnabled == true
             if (currentlyEnabled) {
-                when (val result = scheduleBackgroundScan(interval.hours)) {
-                    is AppResult.Success -> recordEnabled(
-                        RecordBackgroundProtectionEnabledParams(interval.hours, System.currentTimeMillis()),
-                    )
-                    is AppResult.Failure -> transientError.value =
-                        "Couldn't update the scan interval. Please try again."
-                    AppResult.Loading -> Unit
+                // Re-enabling at the new interval replaces the existing
+                // unique work rather than adding a second schedule.
+                val result = setProtectionEnabled(enabled = true, intervalHours = interval.hours)
+                if (result is AppResult.Failure) {
+                    transientError.value = "Couldn't update the scan interval. Please try again."
                 }
             }
         }
@@ -147,6 +146,8 @@ sealed interface SettingsUiState {
         val backgroundProtectionEnabled: Boolean,
         val selectedInterval: ScanInterval,
         val lastScheduledAtEpochMillis: Long?,
+        val notifyAfterScan: Boolean = false,
+        val isIgnoringBatteryOptimizations: Boolean = true,
         val errorMessage: String? = null,
     ) : SettingsUiState
 

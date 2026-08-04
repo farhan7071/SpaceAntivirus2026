@@ -97,6 +97,27 @@
         </provider>
 
         <!--
+          Sprint 042. Restores the ongoing protection notification after a
+          restart — NOT the scheduled work, which WorkManager already
+          reschedules itself (see the RECEIVE_BOOT_COMPLETED comment
+          above, Sprint 025). Registering our own receiver to re-enqueue
+          would replace a live schedule and reset its interval window.
+          android:exported="true" is required: the sender is the system,
+          not this app. LOCKED_BOOT_COMPLETED is included so the
+          notification returns on direct-boot-aware devices before the
+          user unlocks.
+        -->
+        <receiver
+            android:name=".protection.BootCompletedReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
           NOTE for Sprint 004: real-time protection's foreground service
           goes here with an explicit foregroundServiceType (resolving
           Sprint 001 Risk #2 / Sprint 002 §9's specialUse decision) once

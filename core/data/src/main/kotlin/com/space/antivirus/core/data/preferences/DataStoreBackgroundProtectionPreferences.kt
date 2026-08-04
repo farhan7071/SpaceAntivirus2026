@@ -1,8 +1,8 @@
 package com.space.antivirus.core.data.preferences
 
 import com.space.antivirus.domain.repository.BackgroundProtectionPreferences
-import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Real BackgroundProtectionPreferences implementation — a thin adapter
@@ -21,6 +21,7 @@ class DataStoreBackgroundProtectionPreferences @Inject constructor(
     override val isEnabled: Flow<Boolean> = dataSource.backgroundProtectionEnabled
     override val intervalHours: Flow<Long> = dataSource.scanIntervalHours
     override val lastScheduledAtEpochMillis: Flow<Long?> = dataSource.lastScheduledAtEpochMillis
+    override val notifyAfterScan: Flow<Boolean> = dataSource.notifyAfterScan
 
     override suspend fun recordEnabled(intervalHours: Long, scheduledAtEpochMillis: Long) {
         dataSource.recordBackgroundProtectionEnabled(intervalHours, scheduledAtEpochMillis)
@@ -32,5 +33,9 @@ class DataStoreBackgroundProtectionPreferences @Inject constructor(
 
     override suspend fun setIntervalHours(hours: Long) {
         dataSource.setScanIntervalHours(hours)
+    }
+
+    override suspend fun setNotifyAfterScan(enabled: Boolean) {
+        dataSource.setNotifyAfterScan(enabled)
     }
 }

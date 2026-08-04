@@ -6,9 +6,11 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.space.antivirus.core.common.AppError
 import com.space.antivirus.core.common.AppResult
+import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.model.ScanRequest
 import com.space.antivirus.core.model.ScanScope
 import com.space.antivirus.core.model.ScanType
+import com.space.antivirus.domain.protection.ProtectionManager
 import com.space.antivirus.domain.usecase.RunScanRequestUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -59,6 +61,7 @@ class ScanWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val runScanRequest: RunScanRequestUseCase,
+    private val protectionManager: ProtectionManager,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -70,7 +73,19 @@ class ScanWorker @AssistedInject constructor(
         )
 
         return when (val result = runScanRequest(request)) {
-            is AppResult.Success -> Result.success()
+            is AppResult.Success -> {
+                // Sprint 042: report the real outcome, from this scan's
+                // own ScanResult. The manager stays silent unless the
+                // user asked to be told, so this is safe to call
+                // unconditionally — and passing counts rather than a
+                // message means the notification cannot claim more than
+                // the scan actually found.
+                protectionManager.onScheduledScanCompleted(
+                    threatsFound = result.data.threats.size,
+                    highRiskFound = result.data.threats.count { it.riskLevel == RiskLevel.ACTION_NEEDED },
+                )
+                Result.success()
+            }
             is AppResult.Failure -> when (result.error) {
                 is AppError.ScanAlreadyInProgress -> Result.success()
                 is AppError.PermissionMissing -> Result.failure()

@@ -24,11 +24,17 @@ interface BackgroundProtectionPreferences {
 
     /** Null if background protection has never been successfully
      *  scheduled. Recorded only alongside a CONFIRMED successful
-     *  scheduler call (see RecordBackgroundProtectionEnabledUseCase) —
+     *  scheduler call (see ProtectionManagerImpl) —
      *  this is what makes it an honest "last scheduled state" signal
      *  rather than an assumption; it can never silently drift from what
      *  actually happened. */
     val lastScheduledAtEpochMillis: Flow<Long?>
+
+    /** Sprint 042. Whether to post a notification after each scheduled
+     *  scan. Defaults to false: a security app that interrupts you every
+     *  time it finds nothing is a security app you mute, and a muted app
+     *  cannot tell you when something is actually wrong. */
+    val notifyAfterScan: Flow<Boolean>
 
     /** Sets isEnabled=true, intervalHours, and lastScheduledAtEpochMillis
      *  together, atomically. Called only after a scheduler call has
@@ -46,4 +52,8 @@ interface BackgroundProtectionPreferences {
      *  — a user can select an interval while background protection is
      *  off; it takes effect the next time they turn it on. */
     suspend fun setIntervalHours(hours: Long)
+
+    /** Sprint 042. Independent of enabled/disabled state, same as
+     *  setIntervalHours. */
+    suspend fun setNotifyAfterScan(enabled: Boolean)
 }

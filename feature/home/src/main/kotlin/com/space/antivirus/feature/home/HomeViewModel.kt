@@ -3,11 +3,14 @@ package com.space.antivirus.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.space.antivirus.core.model.CleanupRecord
+import com.space.antivirus.core.model.ProtectionState
 import com.space.antivirus.core.model.ScanResult
 import com.space.antivirus.core.model.ScanSessionState
 import com.space.antivirus.domain.usecase.ObserveCleanupHistoryUseCase
+import com.space.antivirus.domain.usecase.ObserveProtectionStateUseCase
 import com.space.antivirus.domain.usecase.ObserveScanHistoryUseCase
 import com.space.antivirus.domain.usecase.ObserveTrustedItemsUseCase
+import com.space.antivirus.domain.usecase.SetProtectionEnabledUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * This project's first production ViewModel — establishes the pattern
@@ -55,13 +59,16 @@ class HomeViewModel @Inject constructor(
     observeScanHistory: ObserveScanHistoryUseCase,
     observeTrustedItems: ObserveTrustedItemsUseCase,
     observeCleanupHistory: ObserveCleanupHistoryUseCase,
+    observeProtectionState: ObserveProtectionStateUseCase,
+    private val setProtectionEnabled: SetProtectionEnabledUseCase,
 ) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> = combine(
         observeScanHistory(),
         observeTrustedItems(),
         observeCleanupHistory(),
-    ) { scanHistory, trustedItems, cleanupHistory ->
+        observeProtectionState(),
+    ) { scanHistory, trustedItems, cleanupHistory, protection ->
         val lastScan = scanHistory.firstOrNull()
         // Cast to the sealed supertype explicitly — without it, this
         // lambda's inferred return type is HomeUiState.Loaded specifically,
@@ -72,6 +79,7 @@ class HomeViewModel @Inject constructor(
             lastScanSummary = lastScan?.toSummary(),
             trustedItemsCount = trustedItems.size,
             lastCleanupSummary = cleanupHistory.firstOrNull()?.toSummary(),
+            protection = protection,
         ) as HomeUiState
     }
         .catch { error ->
@@ -112,6 +120,19 @@ class HomeViewModel @Inject constructor(
         wasCancelled = wasCancelled,
     )
 
+    /**
+     * Sprint 042 — Home's quick toggle.
+     *
+     * Calls the same use case Settings' switch does, so the two cannot
+     * diverge: all the schedule-then-persist-then-notify ordering lives
+     * in ProtectionManager. A failure leaves the persisted state
+     * untouched, so the switch simply springs back — the state Home
+     * renders is always what WorkManager really has.
+     */
+    fun onProtectionToggled(enabled: Boolean) {
+        viewModelScope.launch { setProtectionEnabled(enabled) }
+    }
+
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
     }
@@ -127,6 +148,8 @@ sealed interface HomeUiState {
         /** Null until the user has actually run a cleanup. Absent, never
          *  a placeholder zero. */
         val lastCleanupSummary: LastCleanupSummary? = null,
+        /** Sprint 042. Null only until the first emission arrives. */
+        val protection: ProtectionState? = null,
     ) : HomeUiState
 
     data class Error(val message: String) : HomeUiState

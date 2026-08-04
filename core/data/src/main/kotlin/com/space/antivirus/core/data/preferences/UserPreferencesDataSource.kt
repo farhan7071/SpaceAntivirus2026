@@ -5,9 +5,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
 
 /**
  * Routine (non-sensitive) settings live in DataStore, not
@@ -32,6 +32,7 @@ class UserPreferencesDataSource @Inject constructor(
         val BACKGROUND_PROTECTION_ENABLED = booleanPreferencesKey("background_protection_enabled")
         val SCAN_INTERVAL_HOURS = longPreferencesKey("scan_interval_hours")
         val LAST_SCHEDULED_AT_EPOCH_MILLIS = longPreferencesKey("last_scheduled_at_epoch_millis")
+        val NOTIFY_AFTER_SCAN = booleanPreferencesKey("notify_after_scan")
     }
 
     val analyticsEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.ANALYTICS_ENABLED] ?: true }
@@ -81,6 +82,18 @@ class UserPreferencesDataSource @Inject constructor(
 
     suspend fun setScanIntervalHours(hours: Long) {
         dataStore.edit { it[Keys.SCAN_INTERVAL_HOURS] = hours }
+    }
+
+    /** Sprint 042. Defaults to false, for the same reason background
+     *  protection itself does: an app that notifies after every routine
+     *  scan that found nothing trains the user to dismiss it, and a
+     *  notification the user has learned to ignore is worse than none
+     *  when something genuinely needs attention. */
+    val notifyAfterScan: Flow<Boolean> =
+        dataStore.data.map { it[Keys.NOTIFY_AFTER_SCAN] ?: false }
+
+    suspend fun setNotifyAfterScan(enabled: Boolean) {
+        dataStore.edit { it[Keys.NOTIFY_AFTER_SCAN] = enabled }
     }
 
     private companion object {
