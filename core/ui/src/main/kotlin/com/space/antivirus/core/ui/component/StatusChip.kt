@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -49,7 +50,7 @@ import com.space.antivirus.core.designsystem.theme.ShapeTokens
 enum class Severity(val label: String, val icon: ImageVector) {
     INFO("Informational", Icons.Filled.Info),
     ATTENTION("Attention", Icons.Filled.Warning),
-    ACTION_NEEDED("High Risk", Icons.Filled.Warning),
+    ACTION_NEEDED("High Risk", Icons.Filled.Error),
 }
 
 /**
@@ -77,14 +78,25 @@ enum class Severity(val label: String, val icon: ImageVector) {
  *
  * Sprint 034 (Part 3 — "Each badge should have: Icon, Color, Rounded
  * capsule, Consistent padding"): gained Severity's own icon, shown
- * before the label inside the same capsule. ACTION_NEEDED and ATTENTION
- * deliberately share Icons.Default.Warning rather than each getting a
- * visually distinct glyph — this project has kept feature modules and
- * shared icon usage restricted to icons verified safe in this exact
- * environment (ADR 0031), and severity here is still, correctly, only
- * ever communicated by color + text label together, with the icon
- * reinforcing "this needs attention" generally rather than trying to
- * carry the specific tier on its own.
+ * before the label inside the same capsule.
+ *
+ * Sprint 041: ACTION_NEEDED and ATTENTION no longer share one glyph.
+ * They did because Sprint 034 was cautious about which icons were safe
+ * in this environment (ADR 0031) — but that caution applies to FEATURE
+ * modules, and this file is in core:ui, which has carried
+ * compose-material-icons-extended since Sprint 030. Two tiers rendering
+ * an identical triangle meant the middle and top of a three-tier scale
+ * were distinguished by color alone at a glance, which is exactly the
+ * distinction this sprint was asked to strengthen — and the weakest
+ * distinction for anyone with a color-vision deficiency. Icon, color and
+ * text label now all three differ per tier.
+ *
+ * The scale itself is still three tiers, and deliberately so. Sprint
+ * 041's brief mentions "Suspicious" as though it were a fourth: it is
+ * not one, for the same reason it wasn't in Sprint 034. No analyzer and
+ * no CumulativeRiskScorer output computes a signal distinct from these
+ * three, so a fourth badge would be a visual distinction with nothing
+ * real underneath it.
  */
 @Composable
 fun StatusChip(severity: Severity, modifier: Modifier = Modifier) {

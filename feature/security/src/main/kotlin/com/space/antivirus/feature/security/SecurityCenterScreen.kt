@@ -22,11 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.space.antivirus.core.designsystem.theme.IconTokens
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
 import com.space.antivirus.core.model.RiskLevel
 import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
 import com.space.antivirus.core.ui.component.AppTextButton
+import com.space.antivirus.core.ui.component.EmptyStateTone
 import com.space.antivirus.core.ui.component.EvidenceIcon
 import com.space.antivirus.core.ui.component.ScanSummaryCard
 import com.space.antivirus.core.ui.component.Severity
@@ -120,13 +122,20 @@ private fun SecurityCenterLoaded(
         Column(modifier = Modifier.weight(1f)) {
             when {
                 state.protectionStatus == ProtectionStatus.UNKNOWN -> AppEmptyState(
-                    icon = Icons.Default.Warning,
-                    message = "No scan results yet. Run a scan from Home to see your security status here.",
+                    icon = IconTokens.scan,
+                    title = "No scan results yet",
+                    message = "Run a scan from Home and your security status will appear here.",
                     modifier = Modifier.fillMaxSize(),
                 )
+                // Sprint 041: this was rendering a warning triangle for
+                // a genuinely clean result. A finished scan that found
+                // nothing is good news, and dressing it as a problem is
+                // the same exaggeration ADR 0015 rules out for findings.
                 state.threats.isEmpty() -> AppEmptyState(
-                    icon = Icons.Default.Warning,
-                    message = "No threats found. Your last scan didn't detect anything to review.",
+                    icon = IconTokens.trusted,
+                    title = "Nothing to review",
+                    message = "Your last scan completed and didn't flag anything.",
+                    tone = EmptyStateTone.POSITIVE,
                     modifier = Modifier.fillMaxSize(),
                 )
                 else -> LazyColumn(
@@ -150,7 +159,16 @@ private fun SecurityCenterLoaded(
                                 highRiskCount = state.threats.count { it.riskLevel == RiskLevel.ACTION_NEEDED },
                                 ignoredCount = summary.ignoredThreats,
                                 scanDurationLabel = "${"%.1f".format(summary.scanDurationMillis / 1000.0)}s",
-                                highestSeverityLabel = summary.highestThreatLabel,
+                                // Sprint 041: a real Severity so the card
+                                // can render the app's own badge instead of
+                                // a bare string. Same purely UI-layer
+                                // aggregation HistoryScreen already does;
+                                // ScanSummary.highestThreatLabel is
+                                // untouched and still computed as before.
+                                highestSeverity = state.threats
+                                    .maxByOrNull { it.riskLevel.ordinal }
+                                    ?.riskLevel
+                                    ?.toSeverity(),
                                 averageConfidenceLabel = summary.averageConfidenceLabel,
                             )
                         }

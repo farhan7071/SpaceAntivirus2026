@@ -6,6 +6,51 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 041 — Security Center & Scan History polish
+
+Presentation only. No analyzer, detection rule, repository, ViewModel or
+domain type changed.
+
+### Changed
+
+- **Summary dashboard** rebuilt for hierarchy: ten equal-weight stats
+  became one status headline, three primary numbers, a real severity
+  badge, and quiet secondary lines. Nothing previously visible was
+  removed.
+- **Severity tiers are now visually distinct**: ATTENTION and
+  ACTION_NEEDED had shared one warning triangle since Sprint 034, so the
+  top two tiers differed by colour alone.
+- **Finding cards**: evidence icons demoted and moved below the summary,
+  threat category no longer duplicated across collapsed and expanded
+  states, "View details" full-width.
+- **Expanded details**: all four sections (why flagged / evidence /
+  recommendation / confidence) now share one heading treatment.
+  Confidence was an inline grey line despite ADR 0045.
+- **Scan History**: entries lead with the outcome, timestamp supports
+  it, metrics on one quiet line.
+- **`AppEmptyState`** was an unstyled stub; now has real typography, a
+  tonal icon badge, an optional title, and a tone.
+
+### Fixed
+
+- "No threats found" was rendering behind a **warning triangle**. A
+  clean scan is good news; showing it as a problem is the low-grade
+  version of the risk exaggeration ADR 0015 rules out.
+
+### Already present, not rebuilt
+
+Verified against `origin/main` before starting. Expanded-detail sections,
+the shared finding card across both screens, severity badges with icon +
+colour + label, per-session history cards and `ScanResultBadge` all
+already existed (Sprints 030–034) and were polished rather than replaced.
+Recent Activity on Home was already consistent after Sprint 040 and was
+left alone, since redesigning Home is a stated non-goal.
+
+### Not done, deliberately
+
+- No fourth "Suspicious" severity. Nothing in the engine computes a
+  signal distinct from the three that exist.
+
 ## Sprint 040 — Cleanup history on Home
 
 A deliberately small sprint. The Sprint 040 brief asked for the cleanup

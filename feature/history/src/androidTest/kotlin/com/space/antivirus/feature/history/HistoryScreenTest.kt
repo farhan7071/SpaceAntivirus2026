@@ -63,7 +63,7 @@ class HistoryScreenTest {
     fun loadingState_doesNotShowAnyEntryContent() {
         setScreen(HistoryUiState.Loading)
 
-        composeTestRule.onNodeWithText("No scans yet. Run a scan from Home to see your history here.")
+        composeTestRule.onNodeWithText("No scans yet")
             .assertDoesNotExist()
     }
 
@@ -71,7 +71,7 @@ class HistoryScreenTest {
     fun emptyHistory_showsTheNoScansYetMessage() {
         setScreen(HistoryUiState.Loaded(entries = emptyList()))
 
-        composeTestRule.onNodeWithText("No scans yet. Run a scan from Home to see your history here.").assertExists()
+        composeTestRule.onNodeWithText("No scans yet").assertExists()
     }
 
     @Test
@@ -95,10 +95,12 @@ class HistoryScreenTest {
         // previous StatusChip(Severity.INFO) misuse for clean sessions;
         // fields are now separate text nodes rather than one combined
         // "20 apps scanned in 1.5s · No threats found" string.
+        // Sprint 041: the outcome is the headline and the metrics sit
+        // on one quiet line, so a user scrolling the list reads results
+        // rather than a column of timestamps.
         composeTestRule.onNodeWithText("Safe").assertExists()
-        composeTestRule.onNodeWithText("20 apps scanned").assertExists()
-        composeTestRule.onNodeWithText("0 findings").assertExists()
-        composeTestRule.onNodeWithText("1.5s").assertExists()
+        composeTestRule.onNodeWithText("No threats found").assertExists()
+        composeTestRule.onNodeWithText("20 apps scanned \u00B7 1.5s").assertExists()
     }
 
     @Test
@@ -124,8 +126,8 @@ class HistoryScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("10 apps scanned").assertExists()
-        composeTestRule.onNodeWithText("1 findings").assertExists()
+        composeTestRule.onNodeWithText("1 finding(s)").assertExists()
+        composeTestRule.onNodeWithText("10 apps scanned \u00B7 0.8s").assertExists()
         composeTestRule.onNodeWithText("Suspicious App").assertExists()
         composeTestRule.onNodeWithText("com.example.suspicious").assertExists()
         composeTestRule.onNodeWithText("Can access SMS and internet.").assertExists()
@@ -190,10 +192,8 @@ class HistoryScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText("5 apps scanned").assertExists()
-        composeTestRule.onNodeWithText("0.5s").assertExists()
-        composeTestRule.onNodeWithText("12 apps scanned").assertExists()
-        composeTestRule.onNodeWithText("0.9s").assertExists()
+        composeTestRule.onNodeWithText("5 apps scanned \u00B7 0.5s").assertExists()
+        composeTestRule.onNodeWithText("12 apps scanned \u00B7 0.9s").assertExists()
     }
 
     @Test

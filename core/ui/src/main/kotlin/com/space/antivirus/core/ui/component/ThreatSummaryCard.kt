@@ -43,8 +43,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.space.antivirus.core.designsystem.theme.Elevation
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
 import com.space.antivirus.core.designsystem.theme.SeverityColors
+import com.space.antivirus.core.designsystem.theme.ShapeTokens
 
 /**
  * Sprint 030 — the shared card component behind both SecurityCenterScreen
@@ -143,8 +145,8 @@ fun ThreatSummaryCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(spacing.small),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card),
+        shape = ShapeTokens.card,
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(
@@ -170,11 +172,18 @@ fun ThreatSummaryCard(
                     onUninstallClick = onUninstallClick,
                 )
 
-                if (evidenceIcons.isNotEmpty()) {
-                    EvidenceIconRow(evidenceIcons)
-                }
-
                 Text(text = shortSummary, style = MaterialTheme.typography.bodyMedium)
+
+                // Sprint 041: the icon row moved below the summary and
+                // shrank. It was sitting between the app name and the
+                // one sentence explaining the finding, splitting the two
+                // things a user actually reads first. Category rides
+                // alongside it as quiet context rather than as the
+                // "Threat Category: X" line the expanded section used to
+                // open with.
+                if (evidenceIcons.isNotEmpty() || threatCategory.isNotBlank()) {
+                    EvidenceIconRow(icons = evidenceIcons, threatCategory = threatCategory)
+                }
 
                 AnimatedVisibility(
                     visible = expanded,
@@ -261,16 +270,34 @@ private fun IdentityRow(
     }
 }
 
+/**
+ * Sprint 041 — secondary by construction. 20dp -> 16dp and a muted
+ * tint, so the row reads as metadata about the finding rather than as
+ * another thing to look at above the app name. The category label sits
+ * on the same line because it answers the same "what kind of finding is
+ * this?" question the icons gesture at.
+ */
 @Composable
-private fun EvidenceIconRow(icons: Set<EvidenceIcon>) {
+private fun EvidenceIconRow(icons: Set<EvidenceIcon>, threatCategory: String) {
     val spacing = LocalSpacing.current
-    Row(horizontalArrangement = Arrangement.spacedBy(spacing.small)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.tight),
+    ) {
         icons.forEach { icon ->
             Icon(
                 imageVector = icon.imageVector,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(EVIDENCE_ICON_SIZE),
+            )
+        }
+        if (threatCategory.isNotBlank()) {
+            Text(
+                text = threatCategory,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = if (icons.isEmpty()) 0.dp else spacing.tight),
             )
         }
     }
@@ -286,10 +313,11 @@ private fun ExpandedDetail(
 ) {
     val spacing = LocalSpacing.current
     Column(verticalArrangement = Arrangement.spacedBy(spacing.medium)) {
-        LabeledField(label = "Threat Category", value = threatCategory)
-
-        Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-            Text(text = "Why it was flagged", style = MaterialTheme.typography.titleSmall)
+        // Sprint 041: the "Threat Category: X" line that used to open
+        // this section is gone — it now sits in the collapsed card, so
+        // repeating it on expand was telling the user something they had
+        // already read.
+        DetailSection(title = "Why it was flagged") {
             Text(text = technicalDetail, style = MaterialTheme.typography.bodySmall)
         }
 
@@ -355,7 +383,15 @@ private fun ExpandedDetail(
         // shown alongside the recommendation, not the evidence bullets —
         // this is about how sure the ENGINE is overall, not a property
         // of any one piece of evidence.
-        LabeledField(label = "Confidence", value = confidenceLabel)
+        //
+        // Sprint 041 promoted it from an inline "Confidence: High" line
+        // to a real section with the same heading treatment as the three
+        // above it. This project treats confidence as something the user
+        // is entitled to see and weigh (ADR 0045); rendering it as the
+        // smallest, greyest text in the card said the opposite.
+        DetailSection(title = "Confidence") {
+            Text(text = confidenceLabel, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
@@ -391,24 +427,49 @@ private fun EvidenceRow(bulletText: String) {
     }
 }
 
+/**
+ * Sprint 041 — one titled block inside the expanded detail. Replaces
+ * `LabeledField`'s inline "Label: value" text so that all four sections
+ * this sprint's brief names (why it was flagged, evidence,
+ * recommendation, confidence) carry the same heading weight and are
+ * separated by the same rhythm, instead of two being headed sections and
+ * two being grey sentences.
+ */
 @Composable
-private fun LabeledField(label: String, value: String) {
-    Text(
-        text = "$label: $value",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+private fun DetailSection(title: String, content: @Composable () -> Unit) {
+    val spacing = LocalSpacing.current
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.tight)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        content()
+    }
 }
 
+/**
+ * Sprint 041 — full-width and left-aligned rather than a small button
+ * floating at the card's left edge with the default TextButton inset.
+ * "View details" is the one action every finding card has, and this
+ * sprint's brief asked for it to be easier to discover; widening the
+ * target and letting the chevron sit at the opposite edge makes the row
+ * read as an expander rather than as an afterthought.
+ */
 @Composable
 private fun ViewDetailsButton(expanded: Boolean, onToggle: () -> Unit) {
-    val spacing = LocalSpacing.current
-    TextButton(onClick = onToggle) {
-        Text(if (expanded) "Hide details" else "View details")
-        Spacer(modifier = Modifier.width(spacing.tight))
+    TextButton(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = if (expanded) "Hide details" else "View details",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
         Icon(
             imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
             contentDescription = null,
         )
     }
 }
+
+private val EVIDENCE_ICON_SIZE = 16.dp

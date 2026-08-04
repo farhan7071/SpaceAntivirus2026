@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,11 +23,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.space.antivirus.core.designsystem.theme.Elevation
+import com.space.antivirus.core.designsystem.theme.IconTokens
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
+import com.space.antivirus.core.designsystem.theme.ShapeTokens
 import com.space.antivirus.core.model.RiskLevel
-import com.space.antivirus.core.ui.component.AppCard
 import com.space.antivirus.core.ui.component.AppCircularProgress
 import com.space.antivirus.core.ui.component.AppEmptyState
 import com.space.antivirus.core.ui.component.EvidenceIcon
@@ -102,8 +107,10 @@ private fun HistoryLoaded(
 ) {
     if (state.entries.isEmpty()) {
         AppEmptyState(
-            icon = Icons.Default.Warning,
-            message = "No scans yet. Run a scan from Home to see your history here.",
+            icon = IconTokens.history,
+            title = "No scans yet",
+            message = "Once you run your first scan from Home, every scan will be listed here " +
+                "so you can look back at what was checked and when.",
             modifier = modifier.fillMaxSize(),
         )
         return
@@ -138,55 +145,81 @@ private fun HistoryLoaded(
 private fun ScanHistoryEntryCard(entry: ScanHistoryEntry, onIgnoreClick: (String) -> Unit) {
     val spacing = LocalSpacing.current
     val context = LocalContext.current
-    val formattedDate = DateFormat.getDateTimeInstance().format(Date(entry.completedAtEpochMillis))
+    val completedAt = Date(entry.completedAtEpochMillis)
     val durationSeconds = entry.durationMillis / 1000.0
     val highestSeverity = entry.threats.maxByOrNull { it.riskLevel.ordinal }?.riskLevel?.toSeverity()
         ?: Severity.INFO
 
-    AppCard(headline = formattedDate) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card),
+        shape = ShapeTokens.card,
+    ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.medium),
             verticalArrangement = Arrangement.spacedBy(spacing.small),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Sprint 041: the outcome leads, the timestamp supports it.
+            // Previously the raw date/time was the card's headline and
+            // the result was a badge underneath, so scrolling the list
+            // meant reading a column of timestamps to find the scan that
+            // actually mattered.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (entry.isClean) {
+                            "No threats found"
+                        } else {
+                            "${entry.threats.size} finding(s)"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                            .format(completedAt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 ScanResultBadge(isClean = entry.isClean, highestSeverity = highestSeverity)
             }
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    text = "${entry.itemsScanned} apps scanned",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = "${entry.threats.size} findings",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = "${"%.1f".format(durationSeconds)}s",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            // The three facts the brief asks each row to communicate
+            // without expanding anything, kept on one quiet line rather
+            // than spread edge-to-edge across the card. Findings already
+            // appear as the headline above, so this line carries what
+            // the headline doesn't.
+            Text(
+                text = "${entry.itemsScanned} apps scanned \u00B7 ${"%.1f".format(durationSeconds)}s",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             if (!entry.isClean) {
-                entry.threats.forEach { threat ->
-                    ThreatSummaryCard(
-                        appLabel = threat.appLabel,
-                        packageName = threat.packageName,
-                        severity = threat.riskLevel.toSeverity(),
-                        threat.threatCategory,
-                        evidenceIcons = threat.evidenceBullets.flatMap { EvidenceIcon.inferFrom(it) }.toSet(),
-                        shortSummary = threat.shortSummary,
-                        technicalDetail = threat.technicalDetail,
-                        evidenceBullets = threat.evidenceBullets,
-                        recommendation = threat.recommendation,
-                        confidenceLabel = threat.confidenceLabel,
-                        onIgnoreClick = { onIgnoreClick(threat.packageName) },
-                        onOpenAppInfoClick = { openAppInfo(context, threat.packageName) },
-                        onUninstallClick = { requestUninstall(context, threat.packageName) },
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+                    entry.threats.forEach { threat ->
+                        ThreatSummaryCard(
+                            appLabel = threat.appLabel,
+                            packageName = threat.packageName,
+                            severity = threat.riskLevel.toSeverity(),
+                            threatCategory = threat.threatCategory,
+                            evidenceIcons = threat.evidenceBullets.flatMap { EvidenceIcon.inferFrom(it) }.toSet(),
+                            shortSummary = threat.shortSummary,
+                            technicalDetail = threat.technicalDetail,
+                            evidenceBullets = threat.evidenceBullets,
+                            recommendation = threat.recommendation,
+                            confidenceLabel = threat.confidenceLabel,
+                            onIgnoreClick = { onIgnoreClick(threat.packageName) },
+                            onOpenAppInfoClick = { openAppInfo(context, threat.packageName) },
+                            onUninstallClick = { requestUninstall(context, threat.packageName) },
+                        )
+                    }
                 }
             }
         }

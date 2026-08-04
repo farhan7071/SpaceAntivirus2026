@@ -79,8 +79,9 @@ class SecurityCenterScreenTest {
             ),
         )
 
+        composeTestRule.onNodeWithText("No scan results yet").assertExists()
         composeTestRule.onNodeWithText(
-            "No scan results yet. Run a scan from Home to see your security status here.",
+            "Run a scan from Home and your security status will appear here.",
         ).assertExists()
     }
 
@@ -95,12 +96,9 @@ class SecurityCenterScreenTest {
             ),
         )
 
-        composeTestRule.onNodeWithText(
-            "No threats found. Your last scan didn't detect anything to review.",
-        ).assertExists()
-        composeTestRule.onNodeWithText(
-            "No scan results yet. Run a scan from Home to see your security status here.",
-        ).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Nothing to review").assertExists()
+        composeTestRule.onNodeWithText("Your last scan completed and didn't flag anything.").assertExists()
+        composeTestRule.onNodeWithText("No scan results yet").assertDoesNotExist()
     }
 
     @Test
@@ -164,6 +162,16 @@ class SecurityCenterScreenTest {
         composeTestRule.onNodeWithText("\u2022 Overlay reason").assertExists()
         composeTestRule.onNodeWithText("\u2022 Surveillance reason").assertExists()
         composeTestRule.onNodeWithText("Review these findings.").assertExists()
+
+        // Sprint 041: all four sections the brief names now carry the
+        // same heading treatment. Confidence in particular was an inline
+        // "Confidence: Medium" line — the smallest, greyest text in the
+        // card — despite ADR 0045 treating it as something the user is
+        // entitled to weigh.
+        composeTestRule.onNodeWithText("Why it was flagged").assertExists()
+        composeTestRule.onNodeWithText("Evidence").assertExists()
+        composeTestRule.onNodeWithText("Recommendation").assertExists()
+        composeTestRule.onNodeWithText("Confidence").assertExists()
     }
 
     @Test
@@ -254,26 +262,30 @@ class SecurityCenterScreenTest {
             ),
         )
 
-        // Redesigned as a dashboard (Sprint 034, ScanSummaryCard,
-        // core:ui) — value and label are now separate text nodes in a
-        // stat grid, not one combined "Label: value" string.
+        // Sprint 041 rebuilt this card for hierarchy: three primary
+        // stats, a severity badge, and the remaining figures demoted to
+        // quiet single lines. Nothing the user could see before was
+        // removed — these assertions confirm exactly that, in the new
+        // shape.
         composeTestRule.onNodeWithText("Needs your attention").assertExists()
+
+        // Primary row.
         composeTestRule.onNodeWithText("42").assertExists()
         composeTestRule.onNodeWithText("Apps scanned").assertExists()
-        composeTestRule.onNodeWithText("3").assertExists()
-        composeTestRule.onNodeWithText("Trusted").assertExists()
-        // "Attention" itself is deliberately not asserted here - the
-        // threat card below the summary also renders a StatusChip with
-        // that same text (Severity.ATTENTION's label), and
-        // onNodeWithText expects exactly one match by default; "2" for
-        // Ignored and the other unambiguous labels below are sufficient
-        // to confirm the breakdown row rendered correctly.
-        composeTestRule.onNodeWithText("2").assertExists()
-        composeTestRule.onNodeWithText("Ignored").assertExists()
+        composeTestRule.onNodeWithText("Findings").assertExists()
         composeTestRule.onNodeWithText("1.5s").assertExists()
+        composeTestRule.onNodeWithText("Duration").assertExists()
+
+        // Highest severity, now rendered as a real badge. "Attention" is
+        // deliberately not asserted by text — the finding card below
+        // renders a StatusChip carrying that same label, and
+        // onNodeWithText expects exactly one match.
         composeTestRule.onNodeWithText("Highest severity").assertExists()
-        composeTestRule.onNodeWithText("Medium").assertExists()
-        composeTestRule.onNodeWithText("Avg. confidence").assertExists()
+
+        // Demoted, but still present and still accurate.
+        // The fixture threat is ATTENTION, so this is the real breakdown.
+        composeTestRule.onNodeWithText("0 informational \u00B7 1 attention \u00B7 0 high risk").assertExists()
+        composeTestRule.onNodeWithText("3 trusted \u00B7 2 ignored \u00B7 Medium confidence").assertExists()
     }
 
     @Test

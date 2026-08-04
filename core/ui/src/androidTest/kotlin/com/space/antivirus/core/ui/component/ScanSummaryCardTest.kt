@@ -1,5 +1,6 @@
 package com.space.antivirus.core.ui.component
 
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -28,7 +29,7 @@ class ScanSummaryCardTest {
         highRiskCount: Int = 0,
         ignoredCount: Int = 0,
         scanDurationLabel: String = "2.3s",
-        highestSeverityLabel: String = "None",
+        highestSeverity: Severity? = null,
         averageConfidenceLabel: String = "None",
     ) {
         composeTestRule.setContent {
@@ -44,7 +45,7 @@ class ScanSummaryCardTest {
                     highRiskCount = highRiskCount,
                     ignoredCount = ignoredCount,
                     scanDurationLabel = scanDurationLabel,
-                    highestSeverityLabel = highestSeverityLabel,
+                    highestSeverity = highestSeverity,
                     averageConfidenceLabel = averageConfidenceLabel,
                 )
             }
@@ -72,6 +73,13 @@ class ScanSummaryCardTest {
         composeTestRule.onNodeWithText("Last scan: Yesterday, 9:15 PM").assertExists()
     }
 
+    /**
+     * Sprint 041 rebuilt this card for hierarchy. The point of this test
+     * is unchanged and, if anything, more important now: every figure
+     * that was visible before must still be visible. Three of them moved
+     * from large stat columns to quiet secondary lines — moved, not
+     * dropped.
+     */
     @Test
     fun showsEveryStatValueAndItsLabel() {
         setCard(
@@ -83,53 +91,42 @@ class ScanSummaryCardTest {
             highRiskCount = 5,
             ignoredCount = 6,
             scanDurationLabel = "2.3s",
-            // Deliberately "Action Needed", not "Attention"/"High Risk" -
-            // this comes from RiskLevel.toDisplayLabel() upstream
-            // (SecurityCenterViewModel), a genuinely different label set
-            // from Severity's own ("Informational"/"Attention"/"High
-            // Risk", Part 3's relabeling) - using a real value here also
-            // avoids colliding with the breakdown row's own "Attention"/
-            // "High Risk" labels asserted below.
-            highestSeverityLabel = "Action Needed",
+            highestSeverity = Severity.ACTION_NEEDED,
             averageConfidenceLabel = "Low",
         )
 
+        // Primary row.
         composeTestRule.onNodeWithText("467").assertExists()
         composeTestRule.onNodeWithText("Apps scanned").assertExists()
         composeTestRule.onNodeWithText("42").assertExists()
         composeTestRule.onNodeWithText("Findings").assertExists()
-        composeTestRule.onNodeWithText("421").assertExists()
-        composeTestRule.onNodeWithText("Trusted").assertExists()
-        composeTestRule.onNodeWithText("3").assertExists()
-        composeTestRule.onNodeWithText("Info").assertExists()
-        composeTestRule.onNodeWithText("4").assertExists()
-        composeTestRule.onNodeWithText("Attention").assertExists()
-        composeTestRule.onNodeWithText("5").assertExists()
-        composeTestRule.onNodeWithText("High Risk").assertExists()
-        composeTestRule.onNodeWithText("6").assertExists()
-        composeTestRule.onNodeWithText("Ignored").assertExists()
         composeTestRule.onNodeWithText("2.3s").assertExists()
-        composeTestRule.onNodeWithText("Scan duration").assertExists()
-        composeTestRule.onNodeWithText("Action Needed").assertExists()
+        composeTestRule.onNodeWithText("Duration").assertExists()
+
+        // Highest severity, now a real badge carrying Severity's label.
         composeTestRule.onNodeWithText("Highest severity").assertExists()
-        composeTestRule.onNodeWithText("Low").assertExists()
-        composeTestRule.onNodeWithText("Avg. confidence").assertExists()
+        composeTestRule.onNodeWithText("High Risk").assertExists()
+
+        // Demoted but still present, and still accurate.
+        composeTestRule.onNodeWithText("3 informational \u00B7 4 attention \u00B7 5 high risk").assertExists()
+        composeTestRule.onNodeWithText("421 trusted \u00B7 6 ignored \u00B7 Low confidence").assertExists()
     }
 
+    /** "Highest severity: None" is noise on a clean result. */
     @Test
-    fun allStatsCanBeZero_withoutError() {
-        // Defensive coverage - a fresh install's first scan, or a scan
-        // that genuinely found and ignored/trusted nothing.
-        setCard(
-            appsScanned = 0,
-            findingsCount = 0,
-            trustedCount = 0,
-            infoCount = 0,
-            attentionCount = 0,
-            highRiskCount = 0,
-            ignoredCount = 0,
-        )
+    fun omitsTheHighestSeverityRow_whenThereIsNothingToRank() {
+        setCard(isProtected = true, findingsCount = 0, highestSeverity = null)
 
-        composeTestRule.onNodeWithText("All good!").assertExists()
+        composeTestRule.onNodeWithText("Highest severity").assertDoesNotExist()
+    }
+
+    /** The severity breakdown line is only meaningful once something was
+     *  found; three zeroes on a clean result is noise. */
+    @Test
+    fun omitsTheSeverityBreakdown_whenThereAreNoFindings() {
+        setCard(isProtected = true, findingsCount = 0)
+
+        composeTestRule.onNodeWithText("0 informational \u00B7 0 attention \u00B7 0 high risk")
+            .assertDoesNotExist()
     }
 }

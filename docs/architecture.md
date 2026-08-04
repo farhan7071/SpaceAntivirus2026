@@ -1836,6 +1836,67 @@ today, the rule Sprint 037 round 2 set by deleting `AppStatGroup`.
 Decimal units, matching Android's own Settings > Storage, so a "482 MB
 freed" claim is checkable against what the system itself reports.
 
+### Security Center & History UX polish (Sprint 041)
+
+A presentation-only sprint across `core:ui`, `feature:security` and
+`feature:history`. No analyzer, detection rule, repository, ViewModel or
+domain type changed.
+
+**Summary dashboard.** `ScanSummaryCard` rendered ten stats across three
+rows of identical visual weight, so "467 apps scanned" and "3 ignored"
+competed for the same attention. Rebuilt as: one status headline (tinted
+by outcome rather than always brand-primary), three primary numbers
+(apps scanned / findings / duration), highest severity as a real
+`StatusChip` in the app's own severity language, and the severity
+breakdown plus trusted/ignored/confidence demoted to quiet secondary
+lines. Nothing the user could previously see was removed. Separation is
+by spacing and type scale, not dividers.
+
+**Severity distinctness.** `Severity.ATTENTION` and
+`Severity.ACTION_NEEDED` had been sharing one warning triangle since
+Sprint 034, so the top two tiers of a three-tier scale were separated by
+colour alone — the weakest possible distinction, and the one that fails
+first for colour-vision deficiency. ACTION_NEEDED now uses a distinct
+glyph. Sprint 034's caution about icon availability (ADR 0031) applies
+to feature modules; `core:ui` has carried the extended icon set since
+Sprint 030.
+
+**The scale is still three tiers.** Sprint 041's brief listed
+"Suspicious" among the severities. It is not one, for the same reason it
+wasn't in Sprint 034: no analyzer and no `CumulativeRiskScorer` output
+computes a signal distinct from INFO / ATTENTION / ACTION_NEEDED, so a
+fourth badge would be a visual distinction with nothing real underneath.
+
+**Finding cards.** Evidence icons moved below the short summary and
+shrank (20dp -> 16dp, muted) — they had been sitting between the app
+name and the sentence explaining the finding, splitting the two things a
+user reads first. Threat category moved into the collapsed card beside
+them, and the duplicate "Threat Category: X" line that used to open the
+expanded section is gone. "View details" is now full-width.
+
+**Expanded details.** All four sections the brief names — why it was
+flagged, evidence, recommendation, confidence — now carry the same
+heading treatment. Confidence in particular was an inline "Confidence:
+Medium" line, the smallest and greyest text in the card, despite ADR
+0045 treating confidence as something the user is entitled to weigh.
+
+**History.** Each entry now leads with its outcome ("No threats found" /
+"3 finding(s)") with the timestamp supporting it, rather than a raw
+date/time headline with the result badged underneath — scrolling the
+list now means reading results, not timestamps. Metrics sit on one quiet
+line. Stopped using `AppCard` here, so `feature:settings` (its only
+other caller) is untouched.
+
+**`AppEmptyState` was a stub** — an untinted, unsized icon and an
+unstyled `Text` with no spacing between them — and every empty state in
+the app inherited that. It now has real typography, a tonal icon badge,
+an optional `title`, and an `EmptyStateTone`. The tone parameter exists
+because "No threats found" was rendering behind a warning triangle: a
+clean scan is good news, and dressing good news in the iconography of a
+problem is the low-grade version of the exaggeration ADR 0015 rules out.
+`fillMaxSize()` is kept unchanged so Home's Recent Activity, which is
+out of this sprint's scope, is unaffected in layout.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five
