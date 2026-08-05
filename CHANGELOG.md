@@ -6,6 +6,52 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 046 — Home screen polish
+
+Working from a real device screenshot rather than from the code alone,
+which turned up two things that were bugs rather than taste.
+
+### Fixed
+
+- **The Security Summary divider has never been visible.** It has been in
+  the code since Sprint 037, but `VerticalDivider` uses `fillMaxHeight()`
+  and inside a `Row` with no height constraint that resolves to zero — it
+  was rendering 0dp tall. `Modifier.height(IntrinsicSize.Min)` on the row
+  gives it something to measure against.
+- **The Background Protection line wrapped mid-phrase.** As one dot-joined
+  string it broke wherever the row ran out of width, on device after
+  "next scan". Split at the natural boundary into two lines.
+
+### Changed
+
+- **The hero said the same thing three times.** The supporting line, a
+  "Last scan: …" line, and a full-width result banner all reported the
+  same completed scan and the same count. That repetition, not spacing,
+  was the main source of the card's bulk. The outcome now appears once,
+  in a single quiet metadata row. Errors keep their banner — an error is
+  genuinely new information.
+- **Headline `displayLarge` → `headlineLarge`.** Sprint 037 applied
+  `displayLarge` because `Type.kt` reserves it for this exact headline,
+  which was right on paper. On device it wraps "Attention needed" onto
+  two lines and takes roughly a third of the card. It is still the
+  largest type on the screen by a wide margin.
+- Status label is now a filled pill; hero padding 16→20dp with a 12dp
+  internal rhythm; Quick Action padding 8→14dp (touch-target floor
+  unchanged); Recent Activity's three stacked lines become two, with
+  result and timestamp on one row.
+
+### Not done, deliberately
+
+- **No hero emblem and no carousel dots.** The concept shows both. The
+  dots imply a pager, which is new functionality in a polish sprint. The
+  emblem is the concept's most striking element, but "add decorative
+  graphics" is on this sprint's own Do-Not list — the two instructions
+  contradict, and the explicit written constraint wins. `SpaceBrandMark`
+  from Sprint 045 is available if you want it; that's a small follow-up,
+  not a guess to make here.
+- **Bottom navigation untouched**, per the brief. Sprint 045's
+  `secondaryContainer` fix already corrected its selected-state colour.
+
 ## Sprint 045 — Design system completion and brand mark
 
 ### Fixed

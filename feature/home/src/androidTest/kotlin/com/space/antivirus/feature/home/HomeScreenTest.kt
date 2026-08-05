@@ -58,6 +58,21 @@ class HomeScreenTest {
         trustedItemsCount = 0,
     )
 
+    /** Sprint 046. The hero's metadata row only renders once a scan has
+     *  actually run, so outcome assertions need a state that has one. */
+    private fun scannedState(
+        status: ProtectionStatus,
+        threatsFound: Int,
+    ) = HomeUiState.Loaded(
+        protectionStatus = status,
+        lastScanSummary = LastScanSummary(
+            scannedAtEpochMillis = 1_700_000_000_000L,
+            threatsFound = threatsFound,
+            isClean = threatsFound == 0,
+        ),
+        trustedItemsCount = 0,
+    )
+
     @Test
     fun loadingState_showsTheLoadingIndicator() {
         composeTestRule.setHomeScreen(uiState = HomeUiState.Loading)
@@ -197,27 +212,52 @@ class HomeScreenTest {
     }
 
     @Test
-    fun scanCompleted_clean_showsThePositiveResultBanner() {
+    fun scanCompleted_clean_reportsTheOutcomeOnce() {
         composeTestRule.setHomeScreen(
-            uiState = unknownStatusState,
+            uiState = scannedState(ProtectionStatus.PROTECTED, threatsFound = 0),
             scanState = ScanUiState.Completed(isClean = true, threatsFound = 0, itemsScanned = 10),
         )
 
-        composeTestRule.onNodeWithText("Scan complete — no threats found (10 apps checked).").assertExists()
+        // Sprint 046: the outcome moved from a full-width banner into the
+        // hero's metadata row. It is reported once now — the banner
+        // restated what the headline and supporting line already said,
+        // which is what made the card feel heavy.
+        composeTestRule.onNodeWithText("No threats found", substring = true).assertExists()
+        composeTestRule
+            .onNodeWithText("Scan complete — no threats found (10 apps checked).")
+            .assertDoesNotExist()
         // The button remains available so the user can scan again.
         composeTestRule.onNodeWithText("Scan Now").assertIsEnabled()
     }
 
+    /**
+     * Sprint 046. The banner is gone, but the count the user needs is
+     * not: it stays in the hero's supporting line, which is where it was
+     * always the actual message rather than a restatement.
+     */
     @Test
-    fun scanCompleted_withThreats_showsTheThreatCountAndPointsToSecurityCenter() {
+    fun scanCompleted_withThreats_stillReportsTheCountWithoutRestatingIt() {
         composeTestRule.setHomeScreen(
-            uiState = unknownStatusState,
+            uiState = scannedState(ProtectionStatus.NEEDS_ATTENTION, threatsFound = 2),
             scanState = ScanUiState.Completed(isClean = false, threatsFound = 2, itemsScanned = 10),
         )
 
-        composeTestRule.onNodeWithText(
-            "Scan complete — 2 item(s) found. See Security Center for details.",
-        ).assertExists()
+        composeTestRule.onNodeWithText("Attention needed").assertExists()
+        composeTestRule
+            .onNodeWithText("Scan complete — 2 item(s) found. See Security Center for details.")
+            .assertDoesNotExist()
+    }
+
+    /** An error is genuinely new information the rest of the card does
+     *  not carry, so it keeps its banner. */
+    @Test
+    fun scanError_stillShowsItsBanner() {
+        composeTestRule.setHomeScreen(
+            uiState = unknownStatusState,
+            scanState = ScanUiState.Error("A scan is already running."),
+        )
+
+        composeTestRule.onNodeWithText("A scan is already running.").assertExists()
     }
 
     @Test

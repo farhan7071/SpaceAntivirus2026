@@ -6,6 +6,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -340,8 +341,14 @@ private fun HeroSecurityCard(
             // from spacing.medium to spacing.small - a real, measured
             // reduction, not a cosmetic tweak, on top of removing the
             // large 56dp badge-beside-headline layout below.
-            modifier = Modifier.padding(spacing.medium),
-            verticalArrangement = Arrangement.spacedBy(spacing.small),
+            // Sprint 046: 16dp -> 20dp, and the internal rhythm from
+            // 8dp to 12dp. Sprint 037 tightened both to cut the card's
+            // height by a measured 20-25%, which was the right call
+            // against a card carrying three redundant text lines and a
+            // 56dp badge. With that redundancy gone the constraint goes
+            // with it, and the space is better spent on breathing room.
+            modifier = Modifier.padding(HERO_PADDING),
+            verticalArrangement = Arrangement.spacedBy(spacing.standard),
         ) {
             // Small, inline icon + status label row, matching both
             // reference images' actual layout (neither shows a large
@@ -356,12 +363,24 @@ private fun HeroSecurityCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Sprint 046: the same icon + label, now on a filled
+                // pill. As loose glyph-plus-text it read as a caption
+                // floating above the headline; contained, it reads as a
+                // status the card is reporting. Uses the status colour
+                // it already had at low alpha, so nothing new enters the
+                // palette.
+                Row(
+                    modifier = Modifier
+                        .clip(ShapeTokens.chip)
+                        .background(statusColor.copy(alpha = if (isDark) 0.22f else 0.16f))
+                        .padding(horizontal = spacing.small, vertical = spacing.tight),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Icon(
                         imageVector = statusIcon,
                         contentDescription = null,
                         tint = statusColor,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(HERO_STATUS_ICON_SIZE),
                     )
                     Text(
                         text = statusLabel,
@@ -398,9 +417,19 @@ private fun HeroSecurityCard(
             // clutter rather than reinforcement. The small icon in the
             // status-label row above already carries the icon role,
             // accessibly, without an additional decorative element.
+            // Sprint 046: displayLarge (45sp) down to headlineLarge
+            // (32sp). Sprint 037 applied displayLarge because Type.kt
+            // reserves it for this exact headline, and on paper that was
+            // right. On a real device it wraps "Attention needed" onto
+            // two lines and takes roughly a third of the card, which
+            // reads as shouting rather than as hierarchy. The card is
+            // still unmistakably the hero — it is the largest type on
+            // the screen by a wide margin — it just no longer has to
+            // wrap to prove it.
             Text(
                 text = headline,
-                style = MaterialTheme.typography.displayLarge,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = spacing.tight),
             )
             Text(
@@ -409,13 +438,15 @@ private fun HeroSecurityCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (lastScan != null) {
-                Text(
-                    text = "Last scan: ${formatScanTime(lastScan.scannedAtEpochMillis)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            // Sprint 046: one metadata row replaces two stacked lines.
+            // The card previously said the same thing three times — the
+            // supporting line, a "Last scan: ..." line, and the result
+            // banner below all reported the same completed scan and the
+            // same count. Repetition is the main reason the card felt
+            // heavy. Timestamp and outcome now sit together on one quiet
+            // row; the count stays in the supporting line above, where
+            // it is the actual message.
+            HeroMetadataRow(lastScan = lastScan, scanState = scanState)
 
             HeroScanAction(
                 scanState = scanState,
@@ -439,6 +470,44 @@ private fun formatScanTime(epochMillis: Long): String = remember(epochMillis) {
  * inside the one card already answering "am I protected?", not a
  * further scroll away.
  */
+/**
+ * Sprint 046 — one quiet line carrying when the last scan ran and how it
+ * ended.
+ *
+ * Replaces two stacked lines that between them repeated what the
+ * headline and supporting text had already said. Renders nothing at all
+ * before a first scan rather than showing a placeholder, and the outcome
+ * half is omitted while a scan is running, since there is no outcome yet.
+ */
+@Composable
+private fun HeroMetadataRow(lastScan: LastScanSummary?, scanState: ScanUiState) {
+    val spacing = LocalSpacing.current
+    if (lastScan == null) return
+
+    val outcome = when {
+        scanState is ScanUiState.Running -> null
+        scanState is ScanUiState.Completed && scanState.isClean -> "No threats found"
+        scanState is ScanUiState.Completed -> "Scan complete"
+        else -> null
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = IconTokens.history,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(HERO_METADATA_ICON_SIZE),
+        )
+        Text(
+            text = listOfNotNull(formatScanTime(lastScan.scannedAtEpochMillis), outcome)
+                .joinToString("  \u00B7  "),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = spacing.small),
+        )
+    }
+}
+
 @Composable
 private fun HeroScanAction(
     scanState: ScanUiState,
@@ -446,17 +515,14 @@ private fun HeroScanAction(
 ) {
     val spacing = LocalSpacing.current
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-        when (scanState) {
-            is ScanUiState.Completed -> HeroResultBanner(
-                message = if (scanState.isClean) {
-                    "Scan complete \u2014 no threats found (${scanState.itemsScanned} apps checked)."
-                } else {
-                    "Scan complete \u2014 ${scanState.threatsFound} item(s) found. " +
-                        "See Security Center for details."
-                },
-            )
-            is ScanUiState.Error -> HeroResultBanner(message = scanState.message)
-            else -> Unit
+        // Sprint 046: the Completed banner is gone. It restated the
+        // headline and the supporting line — three renderings of one
+        // fact stacked vertically — and was the single biggest source of
+        // the card's bulk. The outcome now appears once, in the metadata
+        // row. Errors keep their banner: an error is genuinely new
+        // information the rest of the card does not carry.
+        if (scanState is ScanUiState.Error) {
+            HeroResultBanner(message = scanState.message)
         }
 
         if (scanState is ScanUiState.Running) {
@@ -620,7 +686,11 @@ private fun ProtectionSection(protection: ProtectionState, onProtectionToggled: 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(spacing.medium),
+                    // Sprint 046: 16dp -> 20dp vertical. The row was
+                    // cramped chiefly because a 48dp badge and two lines
+                    // of text sat inside 16dp of padding, leaving the
+                    // text touching the card edges.
+                    .padding(horizontal = spacing.medium, vertical = HERO_PADDING),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
@@ -647,11 +717,13 @@ private fun ProtectionSection(protection: ProtectionState, onProtectionToggled: 
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                     )
-                    Text(
-                        text = protectionSupportingText(protection),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    protectionSupportingLines(protection).forEach { line ->
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 Switch(
                     checked = protection.isEnabled,
@@ -669,13 +741,24 @@ private fun ProtectionSection(protection: ProtectionState, onProtectionToggled: 
  * Falls back to saying less when there is no timestamp to derive from,
  * rather than inventing one.
  */
-private fun protectionSupportingText(protection: ProtectionState): String = when {
-    !protection.isEnabled -> "Tap to enable automatic scans"
-    protection.earliestNextScanEpochMillis != null ->
-        "Automatic scans on \u00B7 next scan around " +
+/**
+ * Sprint 046: two lines instead of one.
+ *
+ * As a single dot-joined string this wrapped wherever the row happened
+ * to run out of width — on a real device, mid-phrase, after "next scan"
+ * — which is the kind of ragged break that makes an otherwise fine card
+ * look unfinished. Split at the natural boundary, each half sits on its
+ * own line and the card gains a predictable height.
+ */
+private fun protectionSupportingLines(protection: ProtectionState): List<String> = when {
+    !protection.isEnabled -> listOf("Tap to enable automatic scans")
+    protection.earliestNextScanEpochMillis != null -> listOf(
+        "Automatic scans on",
+        "Next scan around " +
             DateFormat.getTimeInstance(DateFormat.SHORT)
-                .format(Date(protection.earliestNextScanEpochMillis!!))
-    else -> "Automatic scans on"
+                .format(Date(protection.earliestNextScanEpochMillis!!)),
+    )
+    else -> listOf("Automatic scans on")
 }
 
 @Composable
@@ -685,7 +768,20 @@ private fun SecuritySummarySection(lastScan: LastScanSummary?, trustedItemsCount
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
         AppSectionHeader(title = "Security Summary")
         Card(shape = ShapeTokens.card, elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card)) {
-            Row(modifier = Modifier.padding(vertical = spacing.medium)) {
+            // Sprint 046: the divider between these two metrics has been
+            // in the code since Sprint 037 and has never been visible on
+            // screen. VerticalDivider uses fillMaxHeight(), and inside a
+            // Row with no height constraint that resolves to zero — the
+            // divider was rendering at 0dp tall. IntrinsicSize.Min makes
+            // the Row adopt its tallest child's height, which is what
+            // fillMaxHeight() needs to measure against. Vertical padding
+            // also goes 16dp -> 20dp so the two columns get the
+            // breathing room the divider is meant to organise.
+            Row(
+                modifier = Modifier
+                    .height(IntrinsicSize.Min)
+                    .padding(vertical = HERO_PADDING),
+            ) {
                 if (lastScan != null) {
                     // Sprint 036.5: a subtle semantic accent, only when
                     // there's genuinely something to flag - a
@@ -849,12 +945,15 @@ private fun QuickActionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card),
     ) {
         Row(
-            // Sprint 037 (Design Review #3, "reduce card height...
-            // increase information density"): internal padding tightened
-            // from spacing.medium (16dp) to spacing.small (8dp) - a real
-            // reduction in the card's own footprint, not just a smaller
-            // icon inside the same amount of whitespace.
-            modifier = Modifier.padding(spacing.small),
+            // Sprint 046: 8dp -> 14dp. Sprint 037 tightened this to 8dp
+            // to increase information density, which was the right
+            // trade against a screen whose hero was consuming a third of
+            // the viewport. With the hero reduced, these four cards are
+            // the most-tapped controls on the screen and were the
+            // tightest thing on it — 8dp put text almost against the
+            // card edge. The 48dp touch-target floor below is unchanged;
+            // this is about how the card reads, not how it is hit.
+            modifier = Modifier.padding(QUICK_ACTION_PADDING),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Sprint 037 (Design Review #3, "reduce icon badge size"):
@@ -959,23 +1058,44 @@ private fun RecentActivitySection(lastScan: LastScanSummary?, lastCleanup: LastC
                             modifier = Modifier.size(24.dp),
                         )
                     }
-                    Column(modifier = Modifier.padding(start = spacing.medium)) {
-                        Text(
-                            text = "Full device scan completed",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = resultText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = activityColor,
-                            modifier = Modifier.padding(top = spacing.tight),
-                        )
-                        Text(
-                            text = formatScanTime(lastScan.scannedAtEpochMillis),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    // Sprint 046: three stacked lines become two. The
+                    // result and the timestamp are one fact about one
+                    // event, and stacking them made a single activity
+                    // entry as tall as the two-metric summary card above
+                    // it. On one row with a separator the entry reads as
+                    // a feed item rather than a paragraph. The result
+                    // keeps its accent colour; only the timestamp is
+                    // demoted, which is the correct hierarchy — the
+                    // count is the news, the time is context.
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = spacing.medium),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column {
+                            Text(
+                                text = "Full device scan completed",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = spacing.tight),
+                            ) {
+                                Text(
+                                    text = resultText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = activityColor,
+                                )
+                                Text(
+                                    text = "  \u00B7  " +
+                                        formatScanTime(lastScan.scannedAtEpochMillis),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1050,3 +1170,10 @@ private fun LastCleanupCard(lastCleanup: LastCleanupSummary) {
         }
     }
 }
+
+// Sprint 046 hero dimensions. Local constants, same convention as the
+// screen's other icon sizes — the SDS has no token layer for these.
+private val HERO_PADDING = 20.dp
+private val HERO_STATUS_ICON_SIZE = 16.dp
+private val HERO_METADATA_ICON_SIZE = 14.dp
+private val QUICK_ACTION_PADDING = 14.dp
