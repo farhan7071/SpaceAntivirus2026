@@ -27,6 +27,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.space.antivirus.core.ads.AdPlacement
+import com.space.antivirus.core.ads.AdsController
+import com.space.antivirus.core.ads.LocalAdsController
+import com.space.antivirus.core.ads.NoOpAdsController
+import com.space.antivirus.core.ads.ui.AdBanner
 import com.space.antivirus.core.designsystem.theme.Elevation
 import com.space.antivirus.core.designsystem.theme.IconTokens
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
@@ -70,16 +75,26 @@ import java.util.Date
 @Composable
 fun HistoryRoute(
     viewModel: HistoryViewModel = hiltViewModel(),
+    adsController: AdsController = LocalAdsController.current,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    HistoryScreen(uiState = uiState, onIgnoreClick = viewModel::onIgnoreClick)
+    HistoryScreen(
+        uiState = uiState,
+        onIgnoreClick = viewModel::onIgnoreClick,
+        adsController = adsController,
+    )
 }
 
 @Composable
-fun HistoryScreen(uiState: HistoryUiState, onIgnoreClick: (String) -> Unit, modifier: Modifier = Modifier) {
+fun HistoryScreen(
+    uiState: HistoryUiState,
+    onIgnoreClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    adsController: AdsController = NoOpAdsController(),
+) {
     when (uiState) {
         is HistoryUiState.Loading -> HistoryLoading(modifier)
-        is HistoryUiState.Loaded -> HistoryLoaded(uiState, onIgnoreClick, modifier)
+        is HistoryUiState.Loaded -> HistoryLoaded(uiState, onIgnoreClick, adsController, modifier)
         is HistoryUiState.Error -> HistoryError(uiState, modifier)
     }
 }
@@ -104,6 +119,7 @@ private fun HistoryError(state: HistoryUiState.Error, modifier: Modifier = Modif
 private fun HistoryLoaded(
     state: HistoryUiState.Loaded,
     onIgnoreClick: (String) -> Unit,
+    adsController: AdsController,
     modifier: Modifier = Modifier,
 ) {
     if (state.entries.isEmpty()) {
@@ -124,6 +140,20 @@ private fun HistoryLoaded(
         verticalArrangement = Arrangement.spacedBy(spacing.medium),
     ) {
         items(state.entries) { entry -> ScanHistoryEntryCard(entry, onIgnoreClick) }
+
+        // Sprint 044 — the app's only banner placement. History is
+        // passive, scrollable, reached deliberately, and carries nothing
+        // the user is acting on urgently. Placed BELOW the list, not
+        // above it: a banner between the user and their own scan results
+        // is the pattern that makes security apps feel like adware.
+        // Emits nothing at all when ads are not permitted, so the layout
+        // simply closes up rather than reserving an empty box.
+        item {
+            AdBanner(
+                placement = AdPlacement.HISTORY_BANNER,
+                adsController = adsController,
+            )
+        }
     }
 }
 

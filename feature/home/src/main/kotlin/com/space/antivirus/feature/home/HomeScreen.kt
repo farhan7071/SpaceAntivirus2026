@@ -94,6 +94,12 @@ fun HomeRoute(
     onNavigateToCleaner: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    /**
+     * Sprint 044. Fires after the scan result has been dismissed, never
+     * before — the app's only interstitial moment. Defaulted to a no-op
+     * so this screen has no ads dependency of its own.
+     */
+    onScanResultAcknowledged: () -> Unit = {},
 ) {
     val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val scanState by scanViewModel.uiState.collectAsStateWithLifecycle()
@@ -101,7 +107,13 @@ fun HomeRoute(
         uiState = uiState,
         scanState = scanState,
         onScanClick = scanViewModel::startScan,
-        onAcknowledgeScanResult = scanViewModel::acknowledgeResult,
+        onAcknowledgeScanResult = {
+            // Order matters: the result is cleared first, so the ad
+            // opens over a screen the user has finished with rather than
+            // over the finding they just asked to see.
+            scanViewModel.acknowledgeResult()
+            onScanResultAcknowledged()
+        },
         onProtectionToggled = homeViewModel::onProtectionToggled,
         onNavigateToSecurityCenter = onNavigateToSecurityCenter,
         onNavigateToCleaner = onNavigateToCleaner,

@@ -116,10 +116,28 @@ private fun AboutLoaded(appInfo: AppInfo?, modifier: Modifier = Modifier) {
         item { AppSectionHeader(title = "How Space Antivirus works") }
         item {
             SettingsRow(
-                title = "On-device only",
+                title = "Scanning is on-device only",
                 supportingText = "Scans run entirely on your phone. Nothing about your apps or " +
                     "files is uploaded, and there is no cloud lookup or signature database.",
                 icon = IconTokens.security,
+                control = SettingsRowControl.None,
+            )
+        }
+
+        // Sprint 044. Added the moment the ads SDK entered the project.
+        // The line above is about SCANNING and is still exactly true —
+        // but on a screen a user reads to decide whether this app is
+        // nosy, letting "nothing is uploaded" stand unqualified while an
+        // ad SDK collects device and advertising identifiers would be
+        // misleading by omission. The scanning claim is now scoped in
+        // its title, and this states the other half plainly.
+        item {
+            SettingsRow(
+                title = "Ads",
+                supportingText = "Space Antivirus shows ads to stay free. The ad provider " +
+                    "collects device and advertising identifiers \u2014 it never receives your " +
+                    "scan results, your file names, or the list of apps you have installed.",
+                icon = IconTokens.recommendation,
                 control = SettingsRowControl.None,
             )
         }

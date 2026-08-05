@@ -44,7 +44,7 @@ import com.space.antivirus.feature.settings.SettingsRoute
 /**
  * The full navigation skeleton required by Sprint 003 Task 4: Home,
  * Security Center, Clean, Settings, Onboarding, Premium, History,
- * Permissions (folded into Settings per Sprint 002.5 §5 IA — "Permissions"
+ * Permissions (folded into Settings per Sprint 002.5 section 5 IA — "Permissions"
  * is a screen reached from Settings, not a top-level destination),
  * Notifications, and Real-Time — every destination from Sprint 002.5's
  * screen inventory that isn't itself a sub-state of another screen.
@@ -56,12 +56,18 @@ import com.space.antivirus.feature.settings.SettingsRoute
  * not a 5th bottom-nav tab, see TopLevelDestination's own KDoc). Clean,
  * Settings, Premium, Notifications, and Real-Time remain placeholders
  * pending their own Phase C+ sprints. Deep-link handling for
- * notification tap-through (Sprint 002.75 §12) is a later addition once
+ * notification tap-through (Sprint 002.75 section 12) is a later addition once
  * real notifications exist.
  */
 @Composable
 fun SpaceAntivirusNavHost(
     navController: NavHostController = rememberNavController(),
+    /**
+     * Sprint 044. Invoked once the user has read and dismissed a scan
+     * result — the app's only interstitial moment. Defaulted to a no-op
+     * so previews and tests need no ads wiring.
+     */
+    onScanResultAcknowledged: () -> Unit = {},
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -90,6 +96,7 @@ fun SpaceAntivirusNavHost(
             }
             composable(HomeNavigationRoute) {
                 HomeRoute(
+                    onScanResultAcknowledged = onScanResultAcknowledged,
                     onNavigateToSecurityCenter = { navController.navigate(SecurityCenterNavigationRoute) },
                     onNavigateToCleaner = { navController.navigate(CleanNavigationRoute) },
                     onNavigateToHistory = { navController.navigate(HistoryNavigationRoute) },

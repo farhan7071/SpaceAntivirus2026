@@ -6,6 +6,57 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 044 — AdMob integration
+
+### Added
+
+- **`core:ads`** — the only module permitted to reference the Google
+  Mobile Ads SDK. `AdsController` (four methods, no SDK types),
+  `AdsGate` (pure-Kotlin policy, fully unit tested), `AdsConfig` (every
+  ID and flag in one file), `AdPlacement` (closed enum), `AdBanner`,
+  `NoOpAdsController`, and the `ConsentProvider` seam.
+- **One banner**, below the Scan History list.
+- **One interstitial**, after a manual scan result has been dismissed.
+- **`docs/ads.md`** — architecture, placement reasoning, initialisation
+  flow, and the release checklist.
+
+### Changed
+
+- The About screen's on-device claim is now scoped to scanning, and a new
+  row states the ads position plainly. Adding an ad SDK made the previous
+  unqualified wording misleading by omission.
+
+### Not done, deliberately
+
+- **No build currently serves ads.** `ConsentProvider` returns `UNKNOWN`
+  until the UMP SDK is integrated, and the gate refuses on unknown
+  consent. Failing closed means shipping early costs revenue rather than
+  a policy breach.
+- **Interstitials on opening the Cleaner and on viewing History** were
+  declined. Navigation-triggered interstitials are unexpected by
+  definition, and three triggers plus a banner is the clutter the brief
+  asked to avoid.
+- **No placement for onboarding, in-progress scans, Security Center
+  findings, or the Cleaner's deletion flow.** The enum is closed so these
+  cannot be added by accident.
+
+### Also
+
+- Removed section-sign (`§`) characters from the three `:app` files this
+  sprint touches. The 043A stabilization removed them from
+  `core:designsystem` after they broke that module's compilation; **53
+  remain across 35 other files** and are a latent repeat of the same
+  failure. Stripping them repo-wide is a mechanical, zero-risk follow-up
+  worth doing before it costs another debugging session.
+
+### Manual steps before release
+
+Real AdMob app ID and ad unit IDs (all currently Google's published test
+values), UMP consent integration, **Play Data Safety declaration** for
+the identifiers the SDK collects, a published privacy policy (still
+placeholder from 043A, now blocking), and verification of the
+`playServicesAds` version. Full list in `docs/ads.md`.
+
 ## Sprint 043A — Professional Settings foundation
 
 ### Added
@@ -47,6 +98,32 @@ as this project's detailed historical record (`docs/adr/`).
   The first two have never existed in this project; the third needs a
   Gradle plugin and generated artifact that aren't present, and a
   hand-written attribution list would go stale immediately.
+
+### Stabilization
+
+Applied after the initial patch, during real-device verification.
+
+- **Kotlin compiler failure in `core:designsystem`.** Section-sign
+  (`§`) characters used in KDoc cross-references inside the token files
+  (`Spacing.kt`, `Theme.kt`, `ShapeTokens.kt`, `Type.kt`,
+  `BrandColorTokens.kt`, `SemanticColorTokens.kt`) broke compilation of
+  the module. Replaced with plain-text references.
+
+  Worth recording because the *symptom* pointed somewhere else entirely:
+  the reported errors were unresolved references to `LocalSpacing` in six
+  `core:ui` files, three of which Sprint 043A never touched. `LocalSpacing`
+  was present and correctly provided in `Theme.kt` the whole time. When a
+  module fails to compile, every downstream file reports unresolved
+  references for every symbol it imports from it — so the first real error
+  was several screens up in the Gradle output, in a module nobody was
+  looking at. The rule this leaves behind: when a whole cluster of files
+  in one module loses visibility of another module's symbols at once,
+  suspect the upstream module, not the consuming files.
+
+- **Duplicate parameter declaration in `SettingsScreen`,** introduced
+  while merging the patch.
+
+- Build and on-device testing verified after both fixes.
 
 ### Needs your input before release
 

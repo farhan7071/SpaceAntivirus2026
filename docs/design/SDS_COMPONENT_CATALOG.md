@@ -842,6 +842,73 @@ header sits directly on the screen background.
 - **Don't** pass `actionText` without `onActionClick` expecting a
   non-interactive label — nothing will render.
 
+## Settings Rows
+
+### SettingsRow
+**File:** `core/ui/component/SettingsRow.kt`
+
+**Purpose**
+The single row anatomy every Settings screen is built from. Added in
+Sprint 043A, when Settings went from three cards to seven sections across
+five screens — one component means one set of spacing, one touch-target
+guarantee and one accessibility story instead of five that drift.
+
+**Anatomy**
+```
+┌──────────────────────────────────────────────────┐
+│ [icon]  Title                        [control]   │
+│         Supporting text                          │
+└──────────────────────────────────────────────────┘
+```
+
+**Variants** — the trailing control is a closed set, not a slot:
+- **None** — informational row.
+- **Navigate** — chevron; opens another screen.
+- **Toggle** — a Switch. The row is the click target.
+- **Selection** — a RadioButton within a single-choice list. The button
+  itself is non-interactive; the row handles the click.
+- **Value** — read-only current state of a setting owned by another
+  screen ("Scheduled Scan — Weekly").
+- **Action** — a distinct trailing button ("Remove" on an ignore-list
+  entry).
+
+**Why a closed enum rather than a `@Composable` trailing slot**
+A slot would be more flexible, and that is the objection. This project's
+standing discipline is that a control exists only when it changes real
+behavior — Sprint 043A cut three proposed toggles for backing nothing.
+Making "add a switch here" a deliberate act rather than a one-line
+convenience is the point.
+
+**Component States**
+`enabled = false` dims content to 38% and removes the row's click action.
+Used for rows whose setting is meaningful but currently inapplicable —
+Scheduled Scan while background protection is off, which still persists
+the choice for when it is switched on.
+
+**Accessibility Requirements**
+The row is the touch target, never the control inside it. A bare `Switch`
+is roughly a 32dp target, and TalkBack would announce "switch, on" with
+no indication of what it switches. The row therefore carries the role
+(`Switch` / `RadioButton` / `Button`), a merged label built from title
+plus supporting text, and the single click action; inner controls are
+cleared from the semantics tree so they are not announced twice.
+
+`Action` is the deliberate exception — it is a genuinely separate target
+with its own meaning, so the row does not merge its semantics and the
+button stays independently focusable.
+
+**Tokens consumed**
+`ShapeTokens.card`, `ShapeTokens.iconBadge`, `Elevation.card`,
+`LayoutTokens.minTouchTarget`, `Spacing`, `MaterialTheme.colorScheme`,
+`Type.kt` (`titleSmall` / `bodySmall`). No hardcoded colours; the three
+icon sizes are local constants, same convention as Home.
+
+**Do / Don't**
+- **Do** reach for this instead of composing a bespoke settings card.
+- **Don't** add a variant to `SettingsRowControl` to make a screen look
+  fuller. A control with nothing behind it is the thing this catalog's
+  own project rules exist to prevent.
+
 ## Planned Components
 
 Components requested or implied by the reference design that have no

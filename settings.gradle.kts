@@ -39,6 +39,7 @@ include(":core:securitydata")
 include(":core:trusteddata")
 include(":core:cleaningdata")
 include(":core:protection")
+include(":core:ads")
 include(":core:analysisengine")
 include(":core:workmanager")
 

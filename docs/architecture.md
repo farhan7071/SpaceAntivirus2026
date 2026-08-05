@@ -2010,6 +2010,32 @@ database, so both would have nothing behind them.
 `.invalid` TLD, so an unconfigured build cannot read as configured.
 Replace both constants before release.
 
+### Ads (Sprint 044)
+
+`core:ads` is the only module permitted to reference the Google Mobile
+Ads SDK. Everything outside it depends on `AdsController` — four methods,
+no SDK type in any signature — so the SDK can be upgraded, stubbed or
+removed without touching a feature module. `feature:history` is the one
+feature module depending on `core:ads`, because History carries the app's
+only banner.
+
+The policy lives in `AdsGate`: plain Kotlin, no Android types, fully unit
+tested. Consent, first-run grace period and frequency cap are decided
+there; `GoogleAdsController` is deliberately mechanical by comparison.
+
+Two placements, in a closed enum: a banner *below* the scan history list,
+and an interstitial after a manual scan result has been *dismissed*.
+Onboarding, in-progress scans, Security Center findings and the Cleaner's
+deletion flow have no placement and cannot get one by accident.
+
+`ConsentProvider` defaults to `UNKNOWN`, which blocks every ad, so no
+build currently serves anything. That failure direction is the point:
+serving personalised ads in the EEA or UK without a certified consent
+platform breaches Google's EU User Consent Policy, and a seam that failed
+open would put the app in breach the moment real unit IDs were pasted in.
+
+Full detail, including the release checklist, in `docs/ads.md`.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

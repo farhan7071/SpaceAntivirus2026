@@ -4,11 +4,12 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
+import com.space.antivirus.core.ads.AdsController
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
 /**
- * Composition root. Deliberately thin — per Sprint 002 §7's module
+ * Composition root. Deliberately thin — per Sprint 002 section 7's module
  * structure, :app is "a thin composition root," not where logic lives.
  *
  * Sprint 026.1 hotfix — real-device testing (Samsung Galaxy S9+,
@@ -66,6 +67,14 @@ class SpaceAntivirusApp : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    /**
+     * Sprint 044. Injected here because the composition root is the only
+     * place that runs exactly once per process, which is what SDK
+     * initialisation needs.
+     */
+    @Inject
+    lateinit var adsController: AdsController
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -78,5 +87,14 @@ class SpaceAntivirusApp : Application(), Configuration.Provider {
         // field injection before delegating to this onCreate() override,
         // for every API level this app supports.
         WorkManager.initialize(this, workManagerConfiguration)
+
+        // Sprint 044. Deliberately AFTER WorkManager: boot-triggered
+        // starts need WorkManager live promptly (see the note above),
+        // and nothing about ads is time-critical. The call itself does
+        // not block — it hands off to the SDK, which completes its own
+        // I/O on a background thread — and it returns immediately as a
+        // no-op in debug builds and whenever consent is unresolved,
+        // which is currently every build (see ConsentState).
+        adsController.initialize()
     }
 }

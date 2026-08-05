@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":core:trusteddata"))
     implementation(project(":core:cleaningdata"))
     implementation(project(":core:protection"))
+    implementation(project(":core:ads"))
     implementation(project(":core:analysisengine"))
     implementation(project(":core:workmanager"))
     implementation(project(":domain"))

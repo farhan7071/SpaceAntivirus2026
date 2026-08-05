@@ -48,6 +48,23 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules">
 
+        <!--
+          Sprint 044. The Mobile Ads SDK throws at initialisation if this
+          meta-data is absent, so it is required even in a build that
+          never serves an ad.
+
+          The value is Google's published SAMPLE app ID, which is the
+          correct default: it is permanently available, serves only test
+          ads, and generates no revenue and no invalid traffic. Shipping
+          a LIVE app ID in a debug build is what gets AdMob accounts
+          suspended, so the safe value is the default and the live value
+          is a deliberate release step. Replace with the real ZX Force
+          Soft app ID before release — see docs/ads.md.
+        -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
