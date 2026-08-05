@@ -6,7 +6,7 @@ import androidx.compose.ui.unit.dp
 /**
  * Space Design System v1.0, Part 4 — Spacing.
  *
- * 8dp base grid per Sprint 002.5 §19. 4dp reserved for tight icon/text
+ * 8dp base grid per Sprint 002.5 Section 19. 4dp reserved for tight icon/text
  * pairings only — everything else should use a multiple of 8.
  *
  * Sprint 035 added `standard` (12dp), `extraLarge2` (40dp), and

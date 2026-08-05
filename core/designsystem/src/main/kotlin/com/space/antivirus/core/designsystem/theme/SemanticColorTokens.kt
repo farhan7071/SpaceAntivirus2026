@@ -13,8 +13,8 @@ import androidx.compose.ui.graphics.Color
  * keeping them in one file made that distinction easy to lose.
  *
  * Semantic severity colors — mapped onto (not replacing) M3 roles, per
- * Sprint 002.75 §4: severity is communicated by icon + text label first,
- * color second. Only three tiers exist by design (Sprint 002.5 §17).
+ * Sprint 002.75 Section 4: severity is communicated by icon + text label first,
+ * color second. Only three tiers exist by design (Sprint 002.5 Section 17).
  *
  * Sprint 034: Safe added alongside the three severity colors, but
  * deliberately NOT a fourth severity tier — Severity (core:ui) still

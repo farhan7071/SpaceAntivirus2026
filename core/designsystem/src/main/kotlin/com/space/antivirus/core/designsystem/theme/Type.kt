@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.sp
 /**
  * Space Design System v1.0, Part 3 — Typography.
  *
- * M3 Expressive type scale, used per Sprint 002.5 §8's *restrained*
+ * M3 Expressive type scale, used per Sprint 002.5 Section 8's *restrained*
  * guidance: displayLarge is reserved for exactly the two "hero moments"
  * (status headline, scan-complete moment) — it is not used generically.
  *

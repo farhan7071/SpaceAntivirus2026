@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.dp
  * Space Design System v1.0, Part 5 — Shape.
  *
  * M3's own five-tier corner-radius scale — the raw values. Cards default
- * to "medium" (per Sprint 002.5 §8); the scan-progress hero element
+ * to "medium" (per Sprint 002.5 Section 8); the scan-progress hero element
  * animates across this scale via shape morphing rather than using a
  * fixed shape — implemented in feature:security, not here (this module
  * only defines the static scale).

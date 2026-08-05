@@ -95,7 +95,6 @@ private fun SettingsHub(
     state: SettingsUiState.Loaded,
     onBackgroundProtectionToggled: (Boolean) -> Unit,
     onDismissError: () -> Unit,
-    onDismissError: () -> Unit,
     onNavigateToScheduledScan: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToIgnoreList: () -> Unit,

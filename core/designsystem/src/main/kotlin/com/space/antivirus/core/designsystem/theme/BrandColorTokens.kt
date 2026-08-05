@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Color
  * BRAND PRIMARY — deliberately still deep blue-teal, not "Security
  * Green." Sprint 035's own reference mockup names Security Green as
  * the primary color, but this project's brand primary was already
- * chosen deliberately, with documented reasoning, in Sprint 002.5 §2:
+ * chosen deliberately, with documented reasoning, in Sprint 002.5 Section 2:
  * "deliberately not the red/black 'hacker aesthetic' most competitors
  * in Sprint 001's benchmark use." Every commercial competitor Sprint
  * 035's own brief names as inspiration — Bitdefender, Norton,

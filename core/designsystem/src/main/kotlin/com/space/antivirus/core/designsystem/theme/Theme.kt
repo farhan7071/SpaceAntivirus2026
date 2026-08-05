@@ -41,7 +41,7 @@ private val DarkColors = darkColorScheme(
  * App-wide theme root.
  *
  * Sprint 035 (SDS v1.0, Part 1 — Brand Identity): dynamicColor now
- * defaults to false, reversing Sprint 002.5 §8's original default. That
+ * defaults to false, reversing Sprint 002.5 Section 8's original default. That
  * default meant this app's actual on-screen colors — on more than half
  * the Android install base (API 31+) — were never the deliberately
  * chosen brand teal (Color.kt's own KDoc) at all, but whatever each
@@ -49,7 +49,7 @@ private val DarkColors = darkColorScheme(
  * identity is exactly the kind of thing this sprint asks to be
  * "professional... trustworthy... premium... memorable" and consistent
  * across users — dynamic, wallpaper-dependent color works directly
- * against every one of those, and against Sprint 002.5 §2's own
+ * against every one of those, and against Sprint 002.5 Section 2's own
  * documented reasoning for choosing a specific, differentiated brand
  * color in the first place. The parameter itself is untouched — a
  * caller can still explicitly opt back into dynamic color by passing
