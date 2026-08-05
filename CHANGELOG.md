@@ -6,6 +6,57 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 045 — Design system completion and brand mark
+
+### Fixed
+
+- **The Material 3 colour scheme was only two-thirds assigned.** Ten
+  roles were set; M3 defines roughly thirty, and every unassigned one
+  silently fell back to the Material *baseline* palette, which is purple.
+  Concretely, before this sprint:
+  - `onSurfaceVariant` — the colour of nearly every line of secondary
+    text in the app — was baseline `#49454F`, a purple-grey.
+  - `surfaceContainer` was baseline `#F3EDF7`. `NavigationBar` reads its
+    container from it, so the bottom bar was a lavender-tinted grey.
+  - `secondaryContainer` was baseline `#E8DEF8`. `NavigationBar` reads
+    its **selected indicator** from it, so the active tab wore a lavender
+    capsule under a teal icon.
+
+  All roles are now assigned from the same M3 tonal palette the original
+  ten came from (seed `#00696B`).
+
+- **The light theme's flatness has a specific cause, now fixed.** In dark
+  mode M3's elevation tint visibly lightens a raised surface, so a 2dp
+  card separates from its background for free. In light mode that tint is
+  nearly invisible and depth must come from a container colour that
+  differs from the background — which, with the `surfaceContainer` roles
+  unassigned, did not exist. Every card sat on an identically-coloured
+  field (`background` and `surface` were both `#FAFDFC`, a 1.00 contrast
+  ratio) with only a 2dp shadow. Defining the container roles gives cards
+  a real container, with no call-site changes.
+
+### Added
+
+- **`SpaceBrandMark`** — the shield-in-orbit identity, drawn as a Compose
+  vector rather than shipped as rasters: it scales to any density, tints
+  itself from the theme for light and dark, and adds nothing to the APK.
+  All geometry is proportional, so stroke weight is identical at 24dp and
+  120dp.
+- **Onboarding visuals** — the brand mark anchors each page, the headline
+  and body are centred with proper hierarchy, and "1 of 3" becomes a real
+  page indicator. The count is not lost: it moves into the indicator's
+  `contentDescription`, announced once rather than per dot.
+
+### Verified, not changed
+
+Contrast was computed across the palette rather than eyeballed. All
+severity badge combinations pass WCAG AA (5.05:1 to 12.37:1), body text
+is 16.76:1 light, and the new `onSurfaceVariant` is 8.18:1 on
+`surfaceContainer`. Only two hardcoded colours exist in the whole
+codebase (`Color.Black`/`Color.White` as badge foregrounds in
+`StatusChip` and `ScanResultBadge`), and both are correct — they are
+chosen per-theme against a computed severity fill.
+
 ## Sprint 044 — AdMob integration
 
 ### Added

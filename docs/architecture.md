@@ -2036,6 +2036,27 @@ open would put the app in breach the moment real unit IDs were pasted in.
 
 Full detail, including the release checklist, in `docs/ads.md`.
 
+### Design system completion (Sprint 045)
+
+The colour scheme now assigns every Material 3 role. Until Sprint 045
+only ten were set, and unassigned roles fall back to the Material
+baseline palette — which is purple. That was not cosmetic:
+`onSurfaceVariant` (most secondary text in the app), `surfaceContainer`
+(`NavigationBar`'s container) and `secondaryContainer` (`NavigationBar`'s
+selected-tab indicator) were all baseline lavender under a teal brand.
+
+It also explains the light theme reading flatter than the dark one. Dark
+mode gets depth from M3's elevation tint; light mode gets it from a
+container colour distinct from the background, and with the
+`surfaceContainer` roles unassigned there was none — `background` and
+`surface` were the same value. Cards separated only by a 2dp shadow.
+Assigning the container roles fixes this with no call-site changes.
+
+`core:designsystem/brand/SpaceBrandMark` is the shield-in-orbit identity,
+drawn with `Canvas` rather than shipped as raster assets: density-free,
+theme-tinted, zero APK cost, and proportional geometry so weight holds at
+any size.
+
 ## Navigation
 
 Four bottom-nav destinations (`TopLevelDestination` enum) plus five

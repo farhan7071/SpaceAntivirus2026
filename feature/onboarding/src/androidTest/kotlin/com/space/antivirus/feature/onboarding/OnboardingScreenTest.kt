@@ -3,6 +3,7 @@ package com.space.antivirus.feature.onboarding
 import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.google.common.truth.Truth.assertThat
@@ -100,5 +101,29 @@ class OnboardingScreenTest {
             setScreen(pageIndex = index)
             composeTestRule.onNodeWithText(page.body).assertExists()
         }
+    }
+
+    /**
+     * Sprint 045 replaced the "1 of 3" label with dots. The count is not
+     * lost — it moves into the indicator row's contentDescription, so a
+     * screen-reader user still hears the position a sighted user reads
+     * from the dots, announced once rather than per dot.
+     */
+    @Test
+    fun pageIndicator_announcesThePositionToScreenReaders() {
+        setScreen(pageIndex = 0)
+
+        composeTestRule
+            .onNodeWithContentDescription("Page 1 of ${OnboardingPages.size}")
+            .assertExists()
+    }
+
+    @Test
+    fun pageIndicator_announcesLaterPages() {
+        setScreen(pageIndex = 1)
+
+        composeTestRule
+            .onNodeWithContentDescription("Page 2 of ${OnboardingPages.size}")
+            .assertExists()
     }
 }
