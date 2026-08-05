@@ -39,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.space.antivirus.core.designsystem.brand.BrandMarkEmphasis
+import com.space.antivirus.core.designsystem.brand.SpaceBrandMark
 import com.space.antivirus.core.designsystem.theme.Elevation
 import com.space.antivirus.core.designsystem.theme.IconTokens
 import com.space.antivirus.core.designsystem.theme.LayoutTokens
@@ -390,8 +392,41 @@ private fun HeroSecurityCard(
                         modifier = Modifier.padding(start = spacing.tight),
                     )
                 }
-                if (showDismiss) {
-                    AppTextButton(text = "Dismiss", onClick = onAcknowledgeScanResult)
+                // Sprint 046.1 — the app's identity mark, in the one
+                // fixed position it holds on this screen.
+                //
+                // Placement is the whole decision. It sits at the far
+                // right of the status row, opposite the status pill, so
+                // the two never read as one compound badge: the pill
+                // says what the device's condition IS, the mark says
+                // whose app is saying so. Nearer the headline it would
+                // look like an illustration of the status rather than a
+                // signature on it.
+                //
+                // Its position does not move when Dismiss appears —
+                // Dismiss is inserted to its left. An identity mark that
+                // shifts around with state is not an identity mark.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (showDismiss) {
+                        AppTextButton(text = "Dismiss", onClick = onAcknowledgeScanResult)
+                    }
+                    SpaceBrandMark(
+                        size = HERO_BRAND_MARK_SIZE,
+                        // LOW, not FULL. The mark contains a shield with
+                        // a check in it; at full emphasis beside an
+                        // "Attention needed" headline it would make a
+                        // second, contradictory claim about the same
+                        // device.
+                        emphasis = BrandMarkEmphasis.LOW,
+                        // Deliberately null. This is branding, not
+                        // information: the status is already announced
+                        // by the pill and the headline, and inserting
+                        // "Space Antivirus logo" between them would tell
+                        // a screen-reader user something they cannot act
+                        // on in the middle of something they can.
+                        contentDescription = null,
+                        modifier = Modifier.padding(start = spacing.small),
+                    )
                 }
             }
 
@@ -1175,5 +1210,10 @@ private fun LastCleanupCard(lastCleanup: LastCleanupSummary) {
 // screen's other icon sizes — the SDS has no token layer for these.
 private val HERO_PADDING = 20.dp
 private val HERO_STATUS_ICON_SIZE = 16.dp
+
+// Sprint 046.1: 36dp, mid-range of the 32-40dp brief. At 32 the orbit
+// stroke starts to break up against the card tint; at 40 it begins to
+// balance the status pill rather than sit quietly opposite it.
+private val HERO_BRAND_MARK_SIZE = 36.dp
 private val HERO_METADATA_ICON_SIZE = 14.dp
 private val QUICK_ACTION_PADDING = 14.dp

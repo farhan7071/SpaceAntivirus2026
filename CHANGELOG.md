@@ -6,6 +6,29 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 046.1 — Brand mark in the Home hero
+
+`SpaceBrandMark` is now the application identity rather than onboarding
+artwork, so it takes a fixed place in the hero card.
+
+- **36dp**, at the far right of the status row — opposite the status
+  pill, so the two never read as one compound badge. The pill says what
+  the device's condition is; the mark says whose app is saying so.
+- **Position is fixed regardless of state.** Dismiss is inserted to the
+  mark's left rather than displacing it. An identity mark that moves
+  around with state is not an identity mark.
+- **`BrandMarkEmphasis.LOW`** (new). The mark contains a shield with a
+  check in it — at full emphasis, beside a live "Attention needed"
+  headline, it would be making a second and contradictory claim about the
+  same device. At roughly a third of the surrounding contrast it reads as
+  a signature rather than a verdict.
+- **`contentDescription = null`,** deliberately. The status is already
+  announced by the pill and the headline; inserting "Space Antivirus
+  logo" between them would tell a screen-reader user something they
+  cannot act on in the middle of something they can.
+- Theme-aware (tints from `colorScheme.primary`), no gradient, no
+  animation.
+
 ## Sprint 046 — Home screen polish
 
 Working from a real device screenshot rather than from the code alone,

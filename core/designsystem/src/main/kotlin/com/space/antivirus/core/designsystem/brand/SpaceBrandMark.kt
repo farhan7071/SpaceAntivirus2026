@@ -44,15 +44,19 @@ fun SpaceBrandMark(
     modifier: Modifier = Modifier,
     size: Dp = 96.dp,
     contentDescription: String? = null,
+    emphasis: BrandMarkEmphasis = BrandMarkEmphasis.FULL,
 ) {
     val isDark = isSystemInDarkTheme()
-    val shieldColor = MaterialTheme.colorScheme.primary
+    val shieldColor = MaterialTheme.colorScheme.primary.copy(alpha = emphasis.alpha)
     // The orbit sits behind the shield and must read as secondary to it.
     // Alpha rather than a second colour token: it stays correct against
     // any surface the mark is placed on, which a fixed tint would not.
-    val orbitColor = shieldColor.copy(alpha = if (isDark) 0.55f else 0.40f)
-    val glowColor = shieldColor.copy(alpha = if (isDark) 0.18f else 0.10f)
-    val checkColor = MaterialTheme.colorScheme.onPrimary
+    val orbitColor = shieldColor.copy(alpha = shieldColor.alpha * if (isDark) 0.55f else 0.40f)
+    val glowColor = shieldColor.copy(alpha = shieldColor.alpha * if (isDark) 0.18f else 0.10f)
+    // Follows the shield's own emphasis rather than staying opaque: at
+    // LOW the check would otherwise be the brightest thing in the mark,
+    // inverting the hierarchy the emphasis level is asking for.
+    val checkColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = emphasis.alpha)
 
     val semanticsModifier = contentDescription
         ?.let { description -> Modifier.semantics { this.contentDescription = description } }
@@ -133,3 +137,30 @@ private fun DrawScope.drawShield(color: Color, checkColor: Color) {
 private const val ORBIT_TILT_DEGREES = -20f
 private const val ORBIT_STROKE_FRACTION = 0.045f
 private const val CHECK_STROKE_FRACTION = 0.06f
+
+/**
+ * How loudly the mark should speak — Sprint 046.1.
+ *
+ * Added when the mark stopped being an onboarding illustration and became
+ * the application's identity, appearing alongside live status.
+ *
+ * The distinction matters because of what the mark contains: a shield
+ * with a check in it. At [FULL] that reads as an affirmative statement,
+ * which is correct on a splash or an onboarding page where the mark IS
+ * the content. Placed beside a live "Attention needed" headline it would
+ * be making a second, contradictory claim about the same device. At [LOW]
+ * it is a monochrome watermark at roughly a third of the surrounding
+ * contrast — recognisably the app's mark, the way Gmail's envelope sits
+ * in a toolbar without asserting anything about your inbox.
+ *
+ * A hierarchy control, not a decoration knob. A mark that competes with
+ * the status it sits beside is worse than no mark.
+ */
+enum class BrandMarkEmphasis(val alpha: Float) {
+
+    /** Splash, onboarding, About — the mark is the content. */
+    FULL(alpha = 1f),
+
+    /** Alongside live status. Present, never competing. */
+    LOW(alpha = 0.35f),
+}
