@@ -9,7 +9,9 @@ android {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
+    implementation(project(":domain"))
 
     // The ONLY module in this project that may reference the Google
     // Mobile Ads SDK. Everything outside core:ads talks to the
