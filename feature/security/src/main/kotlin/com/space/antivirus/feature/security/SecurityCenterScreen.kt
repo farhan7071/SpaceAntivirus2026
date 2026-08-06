@@ -2,10 +2,8 @@ package com.space.antivirus.feature.security
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
-import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -176,14 +174,7 @@ private fun SecurityCenterLoaded(
                     items(state.threats) { threat ->
                         ThreatCard(
                             threat = threat,
-                            onIgnoreClick = {
-                                // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
-                                Log.d(
-                                    "OverflowMenuDiag",
-                                    "Ignore: onIgnoreClick callback, package=${threat.packageName}",
-                                )
-                                onIgnoreClick(threat.packageName)
-                            },
+                            onIgnoreClick = { onIgnoreClick(threat.packageName) },
                             onOpenAppInfoClick = { openAppInfo(context, threat.packageName) },
                             onUninstallClick = { requestUninstall(context, threat.packageName) },
                         )
@@ -232,107 +223,42 @@ private fun RiskLevel.toSeverity(): Severity = when (this) {
 }
 
 private fun openAppInfo(context: Context, packageName: String) {
-    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
-    Log.d("OverflowMenuDiag", "OpenAppInfo: creating intent, package=$packageName")
     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
         data = Uri.fromParts("package", packageName, null)
     }
-    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
-    Log.d("OverflowMenuDiag", "OpenAppInfo: calling startActivity()")
     context.startActivity(intent)
 }
 
+/**
+ * Sprint 047 removed the Sprint 32.1/32.3/32.4 diagnostic instrumentation
+ * that surrounded this function, which its own comments marked "temporary,
+ * remove before release".
+ *
+ * **The fix it was investigating is kept in full** —
+ * `FLAG_ACTIVITY_NEW_TASK`, below, along with the reasoning for it. What
+ * is gone is the logging and the read-only `PackageManager` probes that
+ * existed only to feed it: `getApplicationInfo`, the deprecated
+ * `getInstallerPackageName`, and `resolveActivity`. Those ran on every
+ * uninstall tap in production, on the main thread, purely to produce
+ * Logcat output nobody was reading, and one of them was a deprecated API
+ * held in place by a `@Suppress`.
+ *
+ * The `startActivity` call is left unguarded, as it was before the
+ * diagnostics: it is a normal call that either works or throws, and
+ * swallowing the exception was a debugging affordance, not error
+ * handling.
+ */
 private fun requestUninstall(context: Context, packageName: String) {
-    // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release. Logs
-    // the actual runtime type of context, not just that it's non-null —
-    // if this ever prints something other than an Activity subclass, the
-    // FLAG_ACTIVITY_NEW_TASK fix below may not be the whole story, and
-    // that's worth knowing before assuming this fix is complete.
-    Log.d("OverflowMenuDiag", "Uninstall: context runtime type=${context::class.qualifiedName}")
-    Log.d("OverflowMenuDiag", "Uninstall: creating intent, package=$packageName")
     val intent = Intent(Intent.ACTION_DELETE).apply {
         data = Uri.fromParts("package", packageName, null)
-        // Best-reasoned fix, not a fully confirmed root cause the way
-        // the Ignore fix was — flagged explicitly as such. The reported
-        // symptom (startActivity() returns normally, no exception, but
-        // the system uninstall confirmation screen never appears) is a
-        // known, documented pattern when a foreground-launched Intent
-        // targets a separate task/activity (here, the system package
-        // installer, a different app entirely) without this flag —
-        // Android can silently decline to bring the new activity forward
-        // rather than throwing. This project's MainActivity is a plain,
-        // unwrapped ComponentActivity (verified directly, not assumed)
-        // so a missing task flag — not a wrapped or invalid Context — is
-        // the most likely explanation matching the exact symptom
-        // reported. If this alone doesn't resolve it, the context
-        // runtime type logged above is the next thing to check.
+        // Sprint 32.1. The reported symptom — startActivity() returning
+        // normally with no exception, but the system uninstall
+        // confirmation never appearing — is a documented pattern when a
+        // foreground-launched Intent targets a separate task (here the
+        // system package installer, a different app entirely) without
+        // this flag. Android can silently decline to bring the new
+        // activity forward rather than throwing.
         flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
-
-    // DIAGNOSTIC (Sprint 32.3) — temporary, remove before release. Added
-    // specifically to compare a working package against a failing one,
-    // per real-device testing that showed FLAG_ACTIVITY_NEW_TASK alone
-    // (Sprint 32.1) does not resolve this for every package. Every
-    // PackageManager call here is purely read-only diagnostic
-    // information gathering — none of it affects packageName, intent, or
-    // the existing startActivity() call below in any way, and each is
-    // independently try/caught so a failure gathering ONE diagnostic
-    // (e.g. the target package genuinely not being installed) can never
-    // prevent the real, unchanged uninstall flow underneath this logging
-    // from running exactly as it already does.
-    val packageManager = context.packageManager
-
-    try {
-        val appInfo = packageManager.getApplicationInfo(packageName, 0)
-        Log.d("OverflowMenuDiag", "Uninstall: getApplicationInfo() succeeded for package=$packageName")
-        Log.d(
-            "OverflowMenuDiag",
-            "Uninstall: applicationInfo.flags=${appInfo.flags} (0x${appInfo.flags.toString(16)})",
-        )
-        Log.d("OverflowMenuDiag", "Uninstall: applicationInfo.enabled=${appInfo.enabled}")
-        Log.d("OverflowMenuDiag", "Uninstall: applicationInfo.sourceDir=${appInfo.sourceDir}")
-    } catch (e: PackageManager.NameNotFoundException) {
-        Log.d(
-            "OverflowMenuDiag",
-            "Uninstall: getApplicationInfo() threw NameNotFoundException for package=$packageName",
-        )
-    }
-
-    try {
-        @Suppress("DEPRECATION")
-        val installerPackageName = packageManager.getInstallerPackageName(packageName)
-        Log.d("OverflowMenuDiag", "Uninstall: installer package=$installerPackageName")
-    } catch (e: IllegalArgumentException) {
-        Log.d("OverflowMenuDiag", "Uninstall: getInstallerPackageName() threw IllegalArgumentException")
-    }
-
-    val resolvedActivity = intent.resolveActivity(packageManager)
-    Log.d("OverflowMenuDiag", "Uninstall: intent.resolveActivity()=$resolvedActivity")
-
-    Log.d("OverflowMenuDiag", "Uninstall: complete intent URI=${intent.toUri(Intent.URI_INTENT_SCHEME)}")
-
-    // DIAGNOSTIC (Sprint 32.4) — temporary, remove before release. The
-    // existing startActivity() call itself was already known not to
-    // throw (Sprint 32.1's own diagnostic logging already confirmed the
-    // line after it always ran) — this makes that explicit and
-    // permanent-until-removed rather than inferred from "the next log
-    // line appeared." Catching the broad Exception type here, not a
-    // narrower one, is deliberate: the goal is visibility into whatever
-    // startActivity() actually does, not a guess at which specific
-    // exception type it might throw. Behavior is otherwise completely
-    // unchanged — nothing about the actual uninstall request changes
-    // based on which branch runs; both branches are pure logging.
-    Log.d("OverflowMenuDiag", "Uninstall: calling startActivity() (existing mechanism, not an ActivityResultLauncher)")
-    try {
-        context.startActivity(intent)
-        Log.d("OverflowMenuDiag", "Uninstall: startActivity returned normally")
-        // Tiny, deliberate addition: a distinct line immediately after,
-        // making the Logcat sequence unambiguous to read at a glance —
-        // "calling startActivity()" -> "startActivity returned
-        // normally" -> "Returned from startActivity()" -> whichever
-        // MainActivity lifecycle callbacks fire next (or don't).
-        Log.d("Uninstall", "Returned from startActivity()")
-    } catch (e: Exception) {
-        Log.e("OverflowMenuDiag", "Uninstall: startActivity failed", e)
-    }
+    context.startActivity(intent)
 }

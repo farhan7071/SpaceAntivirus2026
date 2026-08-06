@@ -53,17 +53,16 @@
           meta-data is absent, so it is required even in a build that
           never serves an ad.
 
-          The value is Google's published SAMPLE app ID, which is the
-          correct default: it is permanently available, serves only test
-          ads, and generates no revenue and no invalid traffic. Shipping
-          a LIVE app ID in a debug build is what gets AdMob accounts
-          suspended, so the safe value is the default and the live value
-          is a deliberate release step. Replace with the real ZX Force
-          Soft app ID before release — see docs/ads.md.
+          Sprint 047: the production Zx Force Soft app ID. The
+          invalid-traffic risk that made the sample ID the right default
+          in Sprint 044 is covered by AdsConfig.adsEnabled, which turns
+          ads off entirely in debug builds against the installed
+          package's real debuggable flag — a developer build requests
+          nothing at all rather than requesting a test ad.
         -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-1134409723930786~1612407758" />
 
         <activity
             android:name=".MainActivity"

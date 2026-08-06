@@ -6,6 +6,47 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 047 — Production release configuration
+
+### Changed
+
+- **Version** `2.0.0` (code 16) → **`2.0` (code 20)**.
+- **Production links** in `SupportLinks`: privacy policy, terms, feedback
+  address. The `.invalid` placeholders are gone, so
+  `arePolicyLinksConfigured` now returns true and the "Not published yet"
+  line disappears from the Settings hub on its own — it was written to do
+  exactly that. The check itself is kept: it costs nothing and would
+  catch a future edit that reintroduced a placeholder.
+- **Production AdMob** app ID (manifest) and banner + interstitial units
+  (`AdsConfig`).
+
+### Removed
+
+- **All diagnostic logging.** The Sprint 32.1/32.3/32.4 instrumentation
+  its own comments marked "temporary, remove before release" — 20 `Log.d`
+  calls across `SecurityCenterScreen`, `SecurityCenterViewModel`,
+  `ThreatSummaryCard`, `TrustedItemRepositoryImpl` and `MainActivity`'s
+  lifecycle overrides. Also removed with it: three read-only
+  `PackageManager` probes that ran on every uninstall tap purely to feed
+  Logcat, one of them a deprecated API held in place by a `@Suppress`.
+  **The `FLAG_ACTIVITY_NEW_TASK` fix they were investigating is kept in
+  full**, along with its reasoning.
+
+### Blocking, not fixable in code
+
+- **UMP consent.** The app serves **zero ads** in production until the
+  UMP SDK is integrated — production ad unit IDs did not change this.
+  `ConsentProvider` returns `UNKNOWN` and the gate refuses, by design.
+- **Play Data Safety declaration** must be updated for the identifiers
+  the Mobile Ads SDK collects.
+- **Release signing config** — none exists in the build.
+- **App icon** is still the template `ic_launcher_foreground`.
+
+### Supplied but not wired
+
+Native and App Open ad units. Neither has an implementation; adding one
+is a feature, not a configuration change.
+
 ## Sprint 046.2 — Alignment fixes and the Cleaner hero
 
 Worked from device screenshots.

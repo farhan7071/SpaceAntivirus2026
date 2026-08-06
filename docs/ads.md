@@ -94,19 +94,34 @@ rather than a policy violation.
 To enable ads: integrate the UMP SDK, implement `ConsentProvider` against
 it, and change one `@Binds` in `AdsModule`. Nothing else moves.
 
+## Production configuration (Sprint 047)
+
+App ID, banner unit and interstitial unit are now the live Zx Force Soft
+values. `AdsConfig.adsEnabled` keeps ads off entirely in debug builds,
+checked against the installed package's real debuggable flag — a
+developer build requests nothing at all, which is stronger protection
+against invalid traffic than the test units it replaces.
+
+**Two supplied ad units are deliberately not wired: Native and App
+Open.** Neither has an implementation, and adding one would be a feature,
+not a configuration change. App Open in particular is worth a decision
+rather than a default: it shows before a user reaches any content, which
+is the pattern Google's own placement guidance treats as disruptive, and
+in a security app the first thing a worried user sees would be an ad.
+
 ## Manual steps before release
 
-1. **AdMob app ID** — replace the sample value in
-   `app/src/main/AndroidManifest.xml`
-   (`com.google.android.gms.ads.APPLICATION_ID`). The current value is
-   Google's published sample ID: permanently available, test ads only, no
-   revenue, no invalid traffic. Shipping a *live* app ID in a debug build
-   is a common route to an account suspension, which is why the safe
-   value is the default.
-2. **Ad unit IDs** — replace `BANNER_AD_UNIT_ID` and
-   `INTERSTITIAL_AD_UNIT_ID` in `AdsConfig`. Both are currently Google's
-   published test units.
-3. **UMP consent** — see above. Until this is done the app serves nothing.
+1. ~~AdMob app ID~~ — done in Sprint 047.
+2. ~~Ad unit IDs~~ — done in Sprint 047.
+3. **UMP consent — STILL BLOCKING, and the most important item here.**
+   `ConsentProvider` is bound to `UnresolvedConsentProvider`, which
+   returns `UNKNOWN`, which the gate refuses. **The app will serve zero
+   ads in production until the UMP SDK is integrated.** Swapping in
+   production ad unit IDs did not change this and was never going to:
+   the block is by design, because serving personalised ads to an EEA or
+   UK user without a certified consent platform breaches Google's EU User
+   Consent Policy. Integrating UMP is one `@Binds` change in `AdsModule`
+   plus the SDK itself.
 4. **Play Data Safety declaration** — the Mobile Ads SDK collects device
    and advertising identifiers and approximate location. The Data Safety
    form must be updated to declare this before the next release, and the

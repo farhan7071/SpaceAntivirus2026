@@ -1,6 +1,5 @@
 package com.space.antivirus.feature.security
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.space.antivirus.core.model.RiskLevel
@@ -101,11 +100,6 @@ class SecurityCenterViewModel @Inject constructor(
             threats = threatSummaries,
             scanSummary = lastScan?.let { scanSummaryFor(it, threatSummaries, ignoredThreats.size) },
         )
-        // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
-        Log.d(
-            "OverflowMenuDiag",
-            "UI state refresh: threats=${loaded.threats.size}, protectionStatus=${loaded.protectionStatus}",
-        )
         loaded as SecurityCenterUiState
     }
         .catch { error ->
@@ -132,23 +126,14 @@ class SecurityCenterViewModel @Inject constructor(
      * point here, not a redesign.
      */
     fun onIgnoreClick(packageName: String) {
-        // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
-        Log.d("OverflowMenuDiag", "Ignore: ViewModel entry, package=$packageName")
         viewModelScope.launch {
-            // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release
-            Log.d("OverflowMenuDiag", "Ignore: invoking AddTrustedItemUseCase")
-            val result = addTrustedItem(
+            addTrustedItem(
                 AddTrustedItemParams(
                     identifier = packageName,
                     type = TrustedItemType.APPLICATION,
                     reason = "Ignored from Security Center",
                 ),
             )
-            // DIAGNOSTIC (Sprint 32.1) — temporary, remove before release. Logged
-            // here at the ViewModel call site, not inside AddTrustedItemUseCase
-            // itself — :domain is a pure-Kotlin/JVM module (no Android
-            // dependency, ADR 0005/0011) and cannot use android.util.Log.
-            Log.d("OverflowMenuDiag", "Ignore: AddTrustedItemUseCase result=$result")
         }
     }
 

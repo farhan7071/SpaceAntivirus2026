@@ -20,8 +20,10 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     applicationId = "com.space.antivirus.viruscleaner.mobilesecurity"
                     minSdk = 26
                     targetSdk = 36
-                    versionCode = 16
-                    versionName = "2.0.0"
+                    // Sprint 047: production release identity, from the
+                    // 2.0 release configuration document.
+                    versionCode = 20
+                    versionName = "2.0"
                     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                 }
 

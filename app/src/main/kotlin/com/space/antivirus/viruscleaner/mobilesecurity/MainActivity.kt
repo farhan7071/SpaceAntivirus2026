@@ -1,7 +1,6 @@
 package com.space.antivirus.viruscleaner.mobilesecurity
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -60,35 +59,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // DIAGNOSTIC (Sprint 32.4) — temporary, remove before release.
-    // Overriding this Activity's own lifecycle methods directly, rather
-    // than registering an Application.ActivityLifecycleCallbacks on
-    // SpaceAntivirusApp, deliberately — this app is single-Activity by
-    // design (this class's own KDoc above), so both approaches observe
-    // identical information here, and this avoids touching
-    // SpaceAntivirusApp.onCreate() at all, whose WorkManager/Hilt
-    // initialization ordering is already deliberately fragile and
-    // carefully reasoned (ADR 0040) — no diagnostic addition belongs
-    // anywhere near it if it doesn't have to be. Purpose: during an
-    // uninstall attempt, this answers whether the system Package
-    // Installer actually took foreground (onPause, likely onStop, then
-    // onResume only once the user returns) or immediately handed control
-    // back (onPause immediately followed by onResume, with little or no
-    // time and no onStop in between).
-    override fun onPause() {
-        Log.d("OverflowMenuDiag", "MainActivity.onPause()")
-        super.onPause()
-    }
-
-    override fun onStop() {
-        Log.d("OverflowMenuDiag", "MainActivity.onStop()")
-        super.onStop()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        Log.d("OverflowMenuDiag", "MainActivity.onResume()")
-    }
 }
 
 @Composable

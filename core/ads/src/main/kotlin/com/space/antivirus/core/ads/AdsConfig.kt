@@ -6,27 +6,28 @@ package com.space.antivirus.core.ads
  * One place so a release checklist has one thing to check, and so no ad
  * unit ID is ever typed into a feature module.
  *
- * **The IDs below are Google's official test units, and that is the
- * correct default.** They are documented, permanently-available demo
- * units published by Google specifically for development; they serve
- * real test ads and never generate revenue or invalid traffic. Shipping
- * with them costs nothing but revenue. Shipping *live* units in a debug
- * build, by contrast, generates invalid traffic against your own
- * account and is the single most common way developers get an AdMob
- * account suspended — so the safe value is the default and the live
- * value is the deliberate act, not the other way round.
+ * **Sprint 047: these are production units.** Sprint 044 shipped Google's
+ * test units as the default, on the reasoning that live IDs in a debug
+ * build generate invalid traffic against your own account and are a
+ * common route to an AdMob suspension.
  *
- * Replace [BANNER_AD_UNIT_ID], [INTERSTITIAL_AD_UNIT_ID] and the
- * manifest's APPLICATION_ID with your real units before release. See
- * `docs/ads.md` for the full release checklist.
+ * That risk is now handled by [adsEnabled] rather than by the ID itself:
+ * ads are off entirely in debug builds, checked against the installed
+ * package's real debuggable flag. A developer build therefore requests
+ * nothing at all, which is stronger protection than requesting a test ad
+ * would have been.
+ *
+ * Note that swapping these IDs does not by itself make ads appear. The
+ * consent gate still blocks everything — see `ConsentState` and
+ * `docs/ads.md`.
  */
 object AdsConfig {
 
-    /** Google's published test banner unit. */
-    const val BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
+    /** Production banner unit (Sprint 047, 2.0 release configuration). */
+    const val BANNER_AD_UNIT_ID = "ca-app-pub-1134409723930786/5346205412"
 
-    /** Google's published test interstitial unit. */
-    const val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
+    /** Production interstitial unit (Sprint 047). */
+    const val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-1134409723930786/7159864434"
 
     /**
      * Master switch. Ads are off in debug builds by default: an
