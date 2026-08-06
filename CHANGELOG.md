@@ -6,6 +6,40 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 048 — Brand identity unification
+
+The launcher icon is the finalised identity: a shield containing a teal
+planet with a white orbital ring. `SpaceBrandMark` drew a shield with a
+checkmark, so the app was showing two different marks for one product.
+
+### Changed
+
+- **`SpaceBrandMark` now draws the planet-orbit identity.** Still a
+  Canvas path, still theme-tinted, still no bitmap. The shield is wider
+  and taller than before, because it now has to contain something — at
+  the old proportions a planet plus ring would have been a smudge at
+  36dp. The ring is drawn flat over the planet rather than threaded
+  behind it: correct occlusion needs an offscreen layer and a clip per
+  half, and at 36dp the overlap is a pixel or two. The identity sheet's
+  own notification and monochrome variants draw it flat for the same
+  reason.
+- **About now shows the mark**, at `FULL` emphasis with the app and
+  developer name. It was the one screen named in the brief that had no
+  identity on it at all.
+
+Home and Onboarding needed no call-site changes — both already used
+`SpaceBrandMark`, so they pick up the new geometry automatically.
+
+### A side effect worth recording
+
+Losing the checkmark settles the tension Sprint 046.1 had to design
+around. A shield with a check in it asserts that the device is fine,
+which is why placing it beside a live "Attention needed" headline needed
+`BrandMarkEmphasis.LOW` to damp it. A planet asserts nothing — it is a
+logo, not a verdict. LOW is kept, because the mark should still sit
+quietly next to live status, but it is now a hierarchy choice rather than
+a correction for a contradictory claim.
+
 ## Sprint 047 — Production release configuration
 
 ### Changed

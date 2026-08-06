@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
@@ -11,7 +12,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.space.antivirus.core.designsystem.brand.SpaceBrandMark
 import com.space.antivirus.core.designsystem.theme.IconTokens
 import com.space.antivirus.core.designsystem.theme.LayoutTokens
 import com.space.antivirus.core.designsystem.theme.LocalSpacing
@@ -75,6 +79,39 @@ private fun AboutLoaded(appInfo: AppInfo?, modifier: Modifier = Modifier) {
         contentPadding = PaddingValues(vertical = spacing.medium),
         verticalArrangement = Arrangement.spacedBy(spacing.small),
     ) {
+        // Sprint 048. About had no brand mark at all — it was the one
+        // screen named in the identity brief that showed no identity.
+        // FULL emphasis, unlike the Home hero's LOW: here the mark IS
+        // the content, with nothing live for it to compete against.
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = spacing.large),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                SpaceBrandMark(
+                    size = ABOUT_BRAND_MARK_SIZE,
+                    // Named here rather than left null: this mark is the
+                    // heading of the screen, not decoration beside live
+                    // status, so a screen-reader user should be told what
+                    // they have landed on.
+                    contentDescription = "Space Antivirus",
+                )
+                Text(
+                    text = "Space Antivirus",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = spacing.medium),
+                )
+                Text(
+                    text = "by Zx Force Soft",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         item { AppSectionHeader(title = "Version") }
         item {
             SettingsRow(
@@ -153,3 +190,5 @@ private fun AboutLoaded(appInfo: AppInfo?, modifier: Modifier = Modifier) {
         }
     }
 }
+
+private val ABOUT_BRAND_MARK_SIZE = 88.dp

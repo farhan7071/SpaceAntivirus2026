@@ -10,7 +10,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -22,8 +21,8 @@ import androidx.compose.ui.unit.dp
 /**
  * The Space Antivirus mark — Sprint 045.
  *
- * A shield inside an orbit: the two halves of the name, in the brand's
- * own teal. Drawn rather than shipped as a raster asset so it scales to
+ * A shield containing a planet and its orbital ring — the finalised
+ * launcher icon, redrawn as a path. Drawn rather than shipped as a raster asset so it scales to
  * any density without a set of PNGs, re-tints itself for light and dark
  * from the theme rather than needing two files, and adds nothing to the
  * APK.
@@ -34,10 +33,10 @@ import androidx.compose.ui.unit.dp
  * including the stroke widths, which scale with the canvas instead of
  * going spindly at large sizes and muddy at small ones.
  *
- * The orbit is deliberately elliptical and tilted rather than a plain
- * ring. A concentric circle around a shield reads as a loading spinner,
- * which is the last thing a brand mark should suggest in an app that
- * also shows real progress indicators.
+ * The ring is elliptical and tilted rather than a plain circle. A
+ * concentric ring reads as a loading spinner, which is the last thing a
+ * brand mark should suggest in an app that also shows real progress
+ * indicators.
  */
 @Composable
 fun SpaceBrandMark(
@@ -51,12 +50,13 @@ fun SpaceBrandMark(
     // The orbit sits behind the shield and must read as secondary to it.
     // Alpha rather than a second colour token: it stays correct against
     // any surface the mark is placed on, which a fixed tint would not.
-    val orbitColor = shieldColor.copy(alpha = shieldColor.alpha * if (isDark) 0.55f else 0.40f)
     val glowColor = shieldColor.copy(alpha = shieldColor.alpha * if (isDark) 0.18f else 0.10f)
+    // Planet and ring, in the shield's contrasting colour — the same
+    // two-tone treatment as the identity sheet's monochrome variant.
     // Follows the shield's own emphasis rather than staying opaque: at
-    // LOW the check would otherwise be the brightest thing in the mark,
+    // LOW the detail would otherwise be the brightest thing in the mark,
     // inverting the hierarchy the emphasis level is asking for.
-    val checkColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = emphasis.alpha)
+    val detailColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = emphasis.alpha)
 
     val semanticsModifier = contentDescription
         ?.let { description -> Modifier.semantics { this.contentDescription = description } }
@@ -64,8 +64,7 @@ fun SpaceBrandMark(
 
     Canvas(modifier = modifier.size(size).then(semanticsModifier)) {
         drawGlow(glowColor)
-        drawOrbit(orbitColor)
-        drawShield(color = shieldColor, checkColor = checkColor)
+        drawShieldWithPlanet(shieldColor = shieldColor, detailColor = detailColor)
     }
 }
 
@@ -75,36 +74,38 @@ private fun DrawScope.drawGlow(color: Color) {
     drawCircle(color = color, radius = this.size.minDimension * 0.48f)
 }
 
-private fun DrawScope.drawOrbit(color: Color) {
-    val width = this.size.width
-    val height = this.size.height
-    val strokeWidth = width * ORBIT_STROKE_FRACTION
-
-    rotate(degrees = ORBIT_TILT_DEGREES) {
-        drawOval(
-            color = color,
-            topLeft = Offset(x = width * 0.02f, y = height * 0.30f),
-            size = Size(width = width * 0.96f, height = height * 0.40f),
-            style = Stroke(width = strokeWidth),
-        )
-    }
-}
-
 /**
- * A classic heater shield: flat shoulders, straight flanks, and a point.
- * Built as an explicit path rather than a rounded rectangle so the
- * silhouette is recognisable at 24dp, where a rounded rectangle would
- * just read as a rounded rectangle.
+ * The canonical mark: a heater shield containing a planet with an
+ * orbital ring — Sprint 048.
+ *
+ * **What changed and why.** Sprint 045 drew a shield with a checkmark,
+ * because at the time there was no finalised identity and a checkmark is
+ * the obvious security glyph. The launcher icon is now the shield with a
+ * planet and orbit, and two different marks for one app is worse than
+ * either mark on its own. The geometry below is the icon's, redrawn — no
+ * bitmap, still a Canvas path, still theme-tinted.
+ *
+ * Losing the checkmark also settles the tension Sprint 046.1 had to work
+ * around with `BrandMarkEmphasis.LOW`. A shield with a check in it
+ * asserts that the device is fine, which is why placing it beside a live
+ * "Attention needed" headline needed damping. A planet asserts nothing —
+ * it is a logo, not a verdict. LOW is kept because the mark should still
+ * sit quietly next to live status, but it is now a hierarchy choice
+ * rather than a correction for a contradictory claim.
+ *
+ * The shield is wider and taller than the checkmark version, because it
+ * now has to contain something: at the old 0.30-0.70 width a planet plus
+ * ring would have been a smudge at 36dp.
  */
-private fun DrawScope.drawShield(color: Color, checkColor: Color) {
+private fun DrawScope.drawShieldWithPlanet(shieldColor: Color, detailColor: Color) {
     val width = this.size.width
     val height = this.size.height
 
-    val left = width * 0.30f
-    val right = width * 0.70f
-    val top = height * 0.26f
-    val bottom = height * 0.78f
-    val shoulder = height * 0.52f
+    val left = width * 0.20f
+    val right = width * 0.80f
+    val top = height * 0.17f
+    val bottom = height * 0.86f
+    val shoulder = height * 0.55f
 
     val shield = Path().apply {
         moveTo(left, top)
@@ -112,31 +113,48 @@ private fun DrawScope.drawShield(color: Color, checkColor: Color) {
         lineTo(right, shoulder)
         // The flanks curve inward to the point rather than meeting it in
         // a straight V, which would read as an arrow.
-        quadraticTo(right, bottom - height * 0.06f, width * 0.5f, bottom)
-        quadraticTo(left, bottom - height * 0.06f, left, shoulder)
+        quadraticTo(right, bottom - height * 0.08f, width * 0.5f, bottom)
+        quadraticTo(left, bottom - height * 0.08f, left, shoulder)
         close()
     }
-    drawPath(path = shield, color = color)
+    drawPath(path = shield, color = shieldColor)
 
-    // Drawn in onPrimary on top of the shield rather than punched out of
-    // it with a clear blend mode: a clear blend needs its own offscreen
-    // layer to behave predictably, and one drawn stroke is both cheaper
-    // and correct against every surface this mark is placed on.
-    val check = Path().apply {
-        moveTo(width * 0.40f, height * 0.50f)
-        lineTo(width * 0.47f, height * 0.58f)
-        lineTo(width * 0.61f, height * 0.40f)
+    val planetCenter = Offset(x = width * 0.5f, y = height * 0.46f)
+    val planetRadius = width * PLANET_RADIUS_FRACTION
+    drawCircle(color = detailColor, radius = planetRadius, center = planetCenter)
+
+    // The ring is drawn fully over the planet rather than threaded behind
+    // it. Correct occlusion would need an offscreen layer and a clip per
+    // half, and at the sizes this mark is actually used — 36dp in the
+    // Home hero, 112dp on onboarding — the overlap is a pixel or two.
+    // The identity sheet's own notification and monochrome variants draw
+    // it flat for the same reason.
+    val ringStroke = width * ORBIT_STROKE_FRACTION
+    rotate(degrees = ORBIT_TILT_DEGREES, pivot = planetCenter) {
+        val ringWidth = planetRadius * 2.9f
+        val ringHeight = planetRadius * 1.05f
+        drawOval(
+            color = detailColor,
+            topLeft = Offset(
+                x = planetCenter.x - ringWidth / 2f,
+                y = planetCenter.y - ringHeight / 2f,
+            ),
+            size = Size(width = ringWidth, height = ringHeight),
+            style = Stroke(width = ringStroke),
+        )
+        // The bead on the ring. Small, and the one asymmetry that stops
+        // the mark reading as a generic planet glyph.
+        drawCircle(
+            color = detailColor,
+            radius = ringStroke * 1.6f,
+            center = Offset(x = planetCenter.x + ringWidth / 2f, y = planetCenter.y),
+        )
     }
-    drawPath(
-        path = check,
-        color = checkColor,
-        style = Stroke(width = width * CHECK_STROKE_FRACTION, cap = StrokeCap.Round),
-    )
 }
 
 private const val ORBIT_TILT_DEGREES = -20f
-private const val ORBIT_STROKE_FRACTION = 0.045f
-private const val CHECK_STROKE_FRACTION = 0.06f
+private const val ORBIT_STROKE_FRACTION = 0.038f
+private const val PLANET_RADIUS_FRACTION = 0.115f
 
 /**
  * How loudly the mark should speak — Sprint 046.1.
