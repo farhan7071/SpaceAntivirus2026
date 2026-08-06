@@ -1,5 +1,7 @@
 package com.space.antivirus.viruscleaner.mobilesecurity.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -8,6 +10,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -83,7 +89,7 @@ fun SpaceAntivirusNavHost(
         NavHost(
             navController = navController,
             startDestination = OnboardingNavigationRoute,
-            modifier = androidx.compose.ui.Modifier.padding(innerPadding),
+            modifier = Modifier.padding(innerPadding),
         ) {
             composable(OnboardingNavigationRoute) {
                 OnboardingRoute(
@@ -153,8 +159,39 @@ private fun SpaceAntivirusBottomBar(
                     }
                 },
                 icon = { Icon(imageVector = destination.icon, contentDescription = destination.label) },
-                label = { Text(destination.label) },
+                label = {
+                    // Sprint 046.2. "Security Center" is the only label
+                    // that wraps to two lines, which made its whole item
+                    // taller than the other three — NavigationBarItem
+                    // stacks icon above label, so that item's icon rode
+                    // visibly higher than its neighbours and the pair
+                    // stopped reading as one centred unit.
+                    //
+                    // Fixed by giving every label the same two-line box
+                    // and centring its text inside it, rather than by
+                    // shortening the word. All four items now have
+                    // identical content height, so all four icons sit on
+                    // one line, and each label is centred under its own
+                    // icon whether it takes one line or two.
+                    Box(
+                        modifier = Modifier.height(NAV_LABEL_HEIGHT),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = destination.label,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                        )
+                    }
+                },
             )
         }
     }
 }
+
+/**
+ * Two lines of the navigation bar's own label style. Fixed rather than
+ * measured: the point is that every item reserves the same height
+ * regardless of how many lines its own label needs.
+ */
+private val NAV_LABEL_HEIGHT = 32.dp

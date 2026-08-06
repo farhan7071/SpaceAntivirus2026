@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -403,7 +404,16 @@ private fun CleanResults(
                 itemCount = state.items.size,
             )
         }
-        item { AppSectionHeader(title = "Junk breakdown") }
+        // Sprint 046.2: the section header sits on the same 16dp
+        // rhythm as every card gap, so the hero and the breakdown read
+        // as one continuous stack. A larger gap above the header is what
+        // makes them two sections.
+        item {
+            AppSectionHeader(
+                title = "Junk breakdown",
+                modifier = Modifier.padding(top = spacing.small),
+            )
+        }
         items(groups.size) { index ->
             val group = groups[index]
             JunkCategoryCard(group = group, totalSizeBytes = state.totalSizeBytes)
@@ -433,19 +443,41 @@ private fun CleanResults(
 @Composable
 private fun ResultsHeroCard(totalSizeBytes: Long, itemCount: Int) {
     val spacing = LocalSpacing.current
+    val isDark = isSystemInDarkTheme()
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = ShapeTokens.heroCard,
-        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.floating),
+        // Sprint 046.2: Elevation.floating down to Elevation.card. At
+        // floating, in light theme, the shadow rendered as a thick grey
+        // ring around the card — a frame drawn around a frame, which is
+        // what made this read as a text container rather than a
+        // dashboard panel. The tint below now does the separating.
+        elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = HERO_TINT_ALPHA),
+            containerColor = MaterialTheme.colorScheme.primary
+                .copy(alpha = if (isDark) HERO_TINT_ALPHA else HERO_TINT_ALPHA_LIGHT),
         ),
     ) {
         Column(
-            modifier = Modifier.padding(spacing.medium),
-            verticalArrangement = Arrangement.spacedBy(spacing.small),
+            modifier = Modifier.padding(CLEAN_HERO_PADDING),
+            // Sprint 046.2: no uniform arrangement any more. Even spacing
+            // between four elements is exactly what made them feel
+            // equally important. Each gap below is now set individually
+            // to say how tightly that element belongs to the one above.
+            verticalArrangement = Arrangement.Top,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // 1. Badge — a contained pill, matching Home's hero, rather
+            //    than a loose icon and caption floating above the number.
+            Row(
+                modifier = Modifier
+                    .clip(ShapeTokens.chip)
+                    .background(
+                        MaterialTheme.colorScheme.primary
+                            .copy(alpha = if (isDark) 0.22f else 0.16f),
+                    )
+                    .padding(horizontal = spacing.small, vertical = spacing.tight),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Icon(
                     imageVector = IconTokens.cleaner,
                     contentDescription = null,
@@ -460,29 +492,47 @@ private fun ResultsHeroCard(totalSizeBytes: Long, itemCount: Int) {
                     modifier = Modifier.padding(start = spacing.tight),
                 )
             }
-            // displayMedium, not displayLarge: Type.kt's own KDoc reserves
-            // displayLarge for exactly two hero moments (Home's status
-            // headline and the scan-complete moment) and says it "is not
-            // used generically". A junk total is neither of those, so it
-            // takes the next step down rather than quietly widening that
-            // reservation to a third case.
+
+            // 2. The result — the one thing a user opens this screen to
+            //    find out. displayLarge, not displayMedium.
+            //
+            //    Type.kt reserves displayLarge for two named hero
+            //    moments and Sprint 038 read that as excluding this one.
+            //    On a real device that reading was wrong: the reclaimed
+            //    size IS this screen's hero moment, in the same sense
+            //    Home's status headline is Home's, and at displayMedium
+            //    it carried no more weight than the paragraph beneath
+            //    it. Home gave displayLarge up in Sprint 046 because a
+            //    two-line wrapping headline does not need it; a short
+            //    number does.
             Text(
                 text = formatSize(totalSizeBytes),
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.displayLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = spacing.medium),
             )
+
+            // 3. Subtitle — bound tightly to the number it qualifies,
+            //    so the two read as one statement.
             Text(
                 text = "across $itemCount file(s) that look reclaimable",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = spacing.tight),
             )
-            // Sprint 038's line here said nothing had been deleted and
-            // nothing would be. That was true then and is not now, so it
-            // is replaced rather than left standing as a stale promise.
+
+            // 4. Reassurance — demoted to labelSmall and pushed away by
+            //    the largest gap in the card. It is the least urgent
+            //    thing here and was previously set at nearly the same
+            //    weight as the subtitle, which is most of why everything
+            //    felt equally important.
             Text(
                 text = "These files are safe to remove. Your photos, documents and downloads " +
                     "are never touched.",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = spacing.medium),
             )
         }
     }
@@ -1250,4 +1300,10 @@ private val CATEGORY_BADGE_SIZE = 40.dp
 private val CATEGORY_ICON_SIZE = 22.dp
 private val STATUS_ICON_SIZE = 18.dp
 private const val HERO_TINT_ALPHA = 0.12f
+
+// Sprint 046.2: light theme needs less tint than dark to read as the same
+// strength of wash — at 0.12 over a near-white surface the panel almost
+// disappeared, and the shadow was doing all the separating.
+private const val HERO_TINT_ALPHA_LIGHT = 0.09f
+private val CLEAN_HERO_PADDING = 20.dp
 private const val BADGE_TINT_ALPHA = 0.12f

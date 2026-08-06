@@ -909,7 +909,14 @@ private fun QuickActionsSection(
     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
         AppSectionHeader(title = "Quick Actions")
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            // Sprint 046.2: IntrinsicSize.Min makes both cards in a row
+            // adopt the height of the taller one. Without it each card
+            // sized to its own content, so "Security Center / Real-time
+            // protection" came out taller than "Cleaner / Free up space"
+            // and the 2x2 grid had four subtly different card heights.
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(spacing.small),
         ) {
             QuickActionCard(
@@ -928,7 +935,14 @@ private fun QuickActionsSection(
             )
         }
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            // Sprint 046.2: IntrinsicSize.Min makes both cards in a row
+            // adopt the height of the taller one. Without it each card
+            // sized to its own content, so "Security Center / Real-time
+            // protection" came out taller than "Cleaner / Free up space"
+            // and the 2x2 grid had four subtly different card heights.
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(spacing.small),
         ) {
             QuickActionCard(
@@ -961,6 +975,10 @@ private fun QuickActionCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            // Sprint 046.2: fills the height its Row now hands it, so the
+            // shorter card's background matches the taller one instead of
+            // leaving a visible gap beneath it.
+            .fillMaxHeight()
             // LayoutTokens.minTouchTarget (48dp) - this sprint's own
             // Accessibility requirement, unchanged even as the visible
             // content inside shrinks (Design Review #3) - the touch

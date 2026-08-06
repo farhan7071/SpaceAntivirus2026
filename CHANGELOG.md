@@ -6,6 +6,46 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 046.2 — Alignment fixes and the Cleaner hero
+
+Worked from device screenshots.
+
+### Fixed
+
+- **Quick Action cards were four different heights.** Each card sized to
+  its own content, so "Security Center / Real-time protection" came out
+  taller than "Cleaner / Free up space". `IntrinsicSize.Min` on each row
+  plus `fillMaxHeight()` on the card makes both cards in a row adopt the
+  taller one's height.
+- **The Security Center nav item's icon rode higher than its
+  neighbours.** It is the only label that wraps to two lines, and
+  `NavigationBarItem` stacks icon above label — so that item's content
+  was taller and its icon shifted up. Every label now gets the same
+  two-line box with its text centred inside, so all four icons sit on one
+  line. Fixed by making the box uniform rather than by shortening the
+  word.
+
+### Changed — the Cleaner results hero
+
+It was a text container: four elements at near-equal weight, evenly
+spaced, inside a card whose `Elevation.floating` shadow rendered in light
+theme as a thick grey ring — a frame drawn around a frame.
+
+- **The reclaimed size is now the hero**, at `displayLarge`. Sprint 038
+  read `Type.kt`'s reservation as excluding this screen. On device that
+  reading was wrong: the size is what a user opens the Cleaner to find
+  out, and at `displayMedium` it carried no more weight than the
+  paragraph beneath it. Home gave `displayLarge` up in Sprint 046 because
+  a wrapping two-line headline did not need it; a short number does.
+- **A real hierarchy**: badge pill → size → tight subtitle → reassurance
+  demoted to `labelSmall` and pushed away by the largest gap in the card.
+  The uniform `spacedBy` is gone — even spacing between four elements is
+  precisely what made them feel equally important.
+- Elevation `floating` → `card`, with a light-theme-specific tint so the
+  panel separates by colour rather than by shadow.
+- More space above "Junk breakdown", so the hero and the breakdown read
+  as two sections rather than one continuous stack.
+
 ## Sprint 046.1 — Brand mark in the Home hero
 
 `SpaceBrandMark` is now the application identity rather than onboarding
