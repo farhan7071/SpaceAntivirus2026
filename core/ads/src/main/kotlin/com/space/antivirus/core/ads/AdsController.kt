@@ -18,14 +18,22 @@ import android.app.Activity
 interface AdsController {
 
     /**
-     * Initialises the underlying SDK. Safe to call more than once;
-     * subsequent calls are no-ops.
+     * Sprint 049. Runs the consent flow and, only if it comes back
+     * permitting ads, initialises the Mobile Ads SDK.
      *
-     * Deliberately fire-and-forget from the caller's perspective:
-     * initialisation performs disk and network I/O, and the composition
-     * root must not block on it.
+     * Replaces Sprint 044's `initialize()`, which the Application called
+     * unconditionally at startup. That ordering is not compliant: the EU
+     * User Consent Policy requires consent to be resolved *before* the
+     * ads SDK is initialised, not merely before an ad is requested.
+     *
+     * Takes an Activity because UMP needs one to present a form, which
+     * is also why this moved from the Application to MainActivity.
+     * Fire-and-forget: initialisation does disk and network I/O and the
+     * composition root must not block on it. Safe to call more than
+     * once — a configuration change recreating the Activity is the
+     * ordinary way that happens.
      */
-    fun initialize()
+    fun gatherConsentAndInitialize(activity: Activity)
 
     /** Whether ads may be shown at all in this build and consent state. */
     fun areAdsEnabled(): Boolean
@@ -66,7 +74,7 @@ interface AdsController {
  * `showInterstitial` never has to know whether ads exist in this build.
  */
 class NoOpAdsController : AdsController {
-    override fun initialize() = Unit
+    override fun gatherConsentAndInitialize(activity: Activity) = Unit
     override fun areAdsEnabled(): Boolean = false
     override fun preloadInterstitial(placement: AdPlacement) = Unit
     override fun showInterstitial(activity: Activity, placement: AdPlacement): Boolean = false

@@ -39,11 +39,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Sprint 049. Consent first, then — and only if it comes back
+        // permitting ads — the Mobile Ads SDK. This runs here rather
+        // than in the Application because UMP needs an Activity to
+        // present its form on, and because the policy governs
+        // initialisation itself, not just the ad request.
+        //
+        // Fire-and-forget: nothing below waits on it. A user whose
+        // consent is still being gathered, or refused, simply sees no
+        // ads, which is the correct outcome either way.
+        adsController.gatherConsentAndInitialize(this)
+
         // Loaded ahead of the placement rather than at request time: an
         // interstitial requested at the moment it is needed either
         // delays the user or, more likely, returns nothing. A no-op
-        // whenever the gate would refuse it anyway, so this costs a
-        // blocked user nothing.
+        // whenever the gate would refuse it anyway — including while
+        // consent is unresolved — so this costs a blocked user nothing.
         adsController.preloadInterstitial(AdPlacement.SCAN_COMPLETE_INTERSTITIAL)
 
         setContent {

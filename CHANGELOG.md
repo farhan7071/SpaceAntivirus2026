@@ -6,6 +6,52 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 049 — UMP consent integration
+
+The blocker flagged since Sprint 044. The app can serve ads in production
+for the first time.
+
+### Added
+
+- **`UmpConsentManager`**, replacing the placeholder `ConsentProvider`
+  that deliberately returned `UNKNOWN`. As Sprint 044 predicted, swapping
+  it in was one `@Binds` change — the seam did its job.
+
+### Changed
+
+- **Ads initialisation moved from `Application` to `MainActivity`, and
+  now happens only after consent permits it.** Sprint 044 initialised the
+  SDK at startup and gated the *requests*; that is not sufficient, since
+  the EU User Consent Policy governs initialisation itself. It also could
+  not have worked — UMP needs an Activity to present a form on, which an
+  Application does not have.
+
+### Notes
+
+- **`canRequestAds()` is the signal, not `ConsentStatus`.** Mapping
+  `OBTAINED` to yes and everything else to no is wrong both ways: a user
+  outside the EEA gets `NOT_REQUIRED` and may lawfully see ads, and
+  `OBTAINED` alone does not distinguish someone who accepted personalised
+  ads from someone who declined but remains eligible for
+  non-personalised.
+- **Consent is stored by UMP and nowhere else.** A second copy would go
+  stale the moment a user changed their decision.
+- **Every failure path stays fail-closed** — no network, a form that
+  will not load, a dismissed form — all leave `UNKNOWN`, which the gate
+  refuses.
+- **No `ConsentDebugSettings`.** Forcing a geography in code would be a
+  compliance hazard if it reached a release build; test devices are
+  registered in the AdMob console instead.
+
+### One compliance gap remains
+
+Where `privacyOptionsRequirementStatus` is `REQUIRED`, Google requires an
+ongoing way to change consent. `arePrivacyOptionsRequired()` and
+`showPrivacyOptionsForm()` are implemented and ready, but **no screen
+calls them** — this sprint's brief scoped UI changes out. The fix is one
+`SettingsRow` in the Settings hub's existing Privacy section. Real gap for
+EEA users, not a nicety. Full reasoning in ADR 0056.
+
 ## Sprint 048 — Brand identity unification
 
 The launcher icon is the finalised identity: a shield containing a teal

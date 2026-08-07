@@ -5,7 +5,7 @@ import com.space.antivirus.core.ads.AdsController
 import com.space.antivirus.core.ads.ConsentProvider
 import com.space.antivirus.core.ads.GoogleAdsController
 import com.space.antivirus.core.ads.SystemAdTimeSource
-import com.space.antivirus.core.ads.UnresolvedConsentProvider
+import com.space.antivirus.core.ads.UmpConsentManager
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -39,9 +39,9 @@ abstract class AdsModule {
     @Singleton
     abstract fun bindAdTimeSource(impl: SystemAdTimeSource): AdTimeSource
 
-    /** Swap this one binding for the UMP-backed implementation when
-     *  consent lands; nothing else changes. */
+    /** Sprint 049 swapped this one binding, exactly as Sprint 044 said
+     *  it would. Nothing else in the module changed. */
     @Binds
     @Singleton
-    abstract fun bindConsentProvider(impl: UnresolvedConsentProvider): ConsentProvider
+    abstract fun bindConsentProvider(impl: UmpConsentManager): ConsentProvider
 }

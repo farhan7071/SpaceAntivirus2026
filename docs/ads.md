@@ -80,19 +80,55 @@ failed load must not cost the user their next eligible moment.
 
 ## Consent — read this before shipping
 
-**No build currently serves ads.** `ConsentProvider` is bound to
-`UnresolvedConsentProvider`, which returns `ConsentState.UNKNOWN`, which
-the gate refuses.
+**Sprint 049 integrated the UMP SDK.** `ConsentProvider` is now bound to
+`UmpConsentManager`; the blocking placeholder is deleted. As Sprint 044
+predicted, it was one `@Binds` change — the seam did its job.
 
-That is deliberate, not unfinished. Serving personalised ads to a user in
-the EEA or UK without a Google-certified consent platform breaches
-Google's EU User Consent Policy. A seam that failed *open* would mean the
-app was in breach from the moment real ad unit IDs were pasted in. Failing
-closed means the worst case of shipping before UMP lands is no revenue
-rather than a policy violation.
+**Order of operations, which is the part the policy actually governs:**
 
-To enable ads: integrate the UMP SDK, implement `ConsentProvider` against
-it, and change one `@Binds` in `AdsModule`. Nothing else moves.
+1. `MainActivity.onCreate` calls `gatherConsentAndInitialize(this)`.
+2. UMP determines whether consent is required for this user's region,
+   presents Google's certified form if so, and persists the outcome in
+   its own storage.
+3. Only if `canRequestAds()` comes back true is `MobileAds.initialize`
+   called at all.
+
+Sprint 044 initialised the ads SDK in `Application.onCreate` and gated
+the *requests*. That is not sufficient: the EU User Consent Policy
+governs initialisation, not merely the request. It also could not have
+worked — UMP needs an Activity to present a form on, which an Application
+does not have.
+
+**`canRequestAds()` is the signal, not `ConsentStatus`.** Mapping
+`OBTAINED` to yes and everything else to no is wrong in both directions:
+a user outside the EEA gets `NOT_REQUIRED` and may lawfully see ads,
+while `OBTAINED` alone does not distinguish someone who accepted
+personalised ads from someone who declined them but remains eligible for
+non-personalised ones.
+
+**Every failure path is still fail-closed.** No network on first launch,
+a form that will not load, a dismissed form — all leave the state at
+`UNKNOWN`, which the gate refuses.
+
+### Testing the EEA path
+
+Register your device in the AdMob console under Privacy & messaging >
+Test devices, and set its geography there. `ConsentDebugSettings` is
+deliberately *not* used in this codebase: it forces a geography in code,
+and a forced geography that reached a release build would be a
+compliance hazard.
+
+### Still outstanding: the privacy options entry point
+
+Where `privacyOptionsRequirementStatus` is `REQUIRED`, Google requires an
+ongoing way for the user to change their consent decision.
+`UmpConsentManager.arePrivacyOptionsRequired()` and
+`showPrivacyOptionsForm()` are implemented and ready, but **no screen
+calls them yet** — Sprint 049's brief scoped UI changes out.
+
+This is a real compliance gap for EEA users, not a nicety. The fix is one
+`SettingsRow` in the Settings hub's existing Privacy section, shown when
+`arePrivacyOptionsRequired()` is true.
 
 ## Production configuration (Sprint 047)
 

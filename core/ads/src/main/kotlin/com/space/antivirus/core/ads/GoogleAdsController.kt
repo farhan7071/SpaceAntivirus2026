@@ -9,7 +9,6 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
-import com.space.antivirus.core.model.AppInfo
 import com.space.antivirus.domain.support.AppInfoProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicBoolean
@@ -25,18 +24,18 @@ import javax.inject.Singleton
  * report. That split is what makes the interesting behaviour testable
  * without an emulator.
  *
- * **Consent is read from [AdsGate]'s [ConsentState], which defaults to
- * UNKNOWN and therefore blocks ads.** Until the UMP SDK is integrated,
- * this controller will not serve anything. That is intentional — see
- * `ConsentState`'s own documentation for why failing closed is the only
- * safe default here.
+ * **Sprint 049: consent is real.** This depends on `UmpConsentManager`
+ * concretely rather than on the `ConsentProvider` interface, because it
+ * needs `gatherConsent` — running the flow — and not merely the current
+ * answer. Everything that only needs the answer, `AdsGate` included,
+ * still depends on the interface.
  */
 @Singleton
 class GoogleAdsController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val adsGate: AdsGate,
     private val appInfoProvider: AppInfoProvider,
-    private val consentProvider: ConsentProvider,
+    private val consentProvider: UmpConsentManager,
 ) : AdsController {
 
     private val initialized = AtomicBoolean(false)
@@ -46,18 +45,31 @@ class GoogleAdsController @Inject constructor(
     private val adsEnabledForBuild: Boolean
         get() = AdsConfig.adsEnabled(isDebugBuild = appInfoProvider.getAppInfo().isDebugBuild)
 
-    override fun initialize() {
+    override fun gatherConsentAndInitialize(activity: Activity) {
+        // A debug build asks for nothing and initialises nothing. There
+        // is no consent question to put to a developer whose build will
+        // never request an ad, and a form appearing on every debug
+        // launch would be noise.
         if (!adsEnabledForBuild) return
-        // compareAndSet, not a plain boolean: MobileAds.initialize is
-        // reachable from the composition root and from a preload call
-        // that may race it on a different thread.
-        if (!initialized.compareAndSet(false, true)) return
 
-        // The SDK performs disk and network I/O on this call and hands
-        // back its result on the main thread. Nothing here waits on it;
-        // ad requests made before it completes are queued by the SDK.
-        MobileAds.initialize(context) { }
-        adsGate.onAppStarted()
+        consentProvider.gatherConsent(activity) { canRequestAds ->
+            // Sprint 049: the SDK is initialised only once consent has
+            // actually come back permitting ads. Initialising first and
+            // gating requests afterwards — Sprint 044's shape — is not
+            // sufficient under the EU User Consent Policy, which governs
+            // initialisation, not just the request.
+            if (!canRequestAds) return@gatherConsent
+
+            // compareAndSet, not a plain boolean: this callback and a
+            // preload racing it can arrive on different threads.
+            if (!initialized.compareAndSet(false, true)) return@gatherConsent
+
+            // Performs disk and network I/O, and hands its result back
+            // on the main thread. Nothing waits on it; requests made
+            // before it completes are queued by the SDK.
+            MobileAds.initialize(context) { }
+            adsGate.onAppStarted()
+        }
     }
 
     override fun areAdsEnabled(): Boolean =
@@ -125,24 +137,13 @@ class GoogleAdsController @Inject constructor(
 }
 
 /**
- * Supplies the current consent position — Sprint 044.
+ * Supplies the current consent position.
  *
- * The seam the UMP SDK will eventually implement. The default binding
- * returns UNKNOWN, which blocks every ad.
+ * Sprint 044 introduced this as a seam with a deliberately blocking
+ * placeholder behind it. Sprint 049 put `UmpConsentManager` behind it
+ * instead and deleted the placeholder; the interface itself did not have
+ * to change, which was the point of having it.
  */
 interface ConsentProvider {
     fun currentConsent(): ConsentState
-}
-
-/**
- * The production binding until UMP is integrated.
- *
- * Returns UNKNOWN, so no ad is served by any build. This is not a stub
- * left half-finished — it is the correct, deliberate behaviour for an
- * app that has not yet asked for consent, and swapping it for a real UMP
- * implementation is a one-line change in the Hilt module.
- */
-@Singleton
-class UnresolvedConsentProvider @Inject constructor() : ConsentProvider {
-    override fun currentConsent(): ConsentState = ConsentState.UNKNOWN
 }

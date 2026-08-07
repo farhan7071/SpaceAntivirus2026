@@ -19,6 +19,11 @@ dependencies {
     // swapped, stubbed or removed without touching a feature module.
     implementation(libs.play.services.ads)
 
+    // Sprint 049. The certified consent platform. Stays inside core:ads
+    // for the same reason the ads SDK does: nothing outside this module
+    // sees a Google type.
+    implementation(libs.user.messaging.platform)
+
     implementation(libs.androidx.lifecycle.runtime.compose)
 
     testImplementation(libs.junit)
