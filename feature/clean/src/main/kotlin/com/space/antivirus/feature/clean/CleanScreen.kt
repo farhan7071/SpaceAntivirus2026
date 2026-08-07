@@ -6,8 +6,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.space.antivirus.core.designsystem.brand.heroBackdrop
 import com.space.antivirus.core.designsystem.theme.Elevation
 import com.space.antivirus.core.designsystem.theme.IconTokens
 import com.space.antivirus.core.designsystem.theme.LayoutTokens
@@ -453,13 +454,15 @@ private fun ResultsHeroCard(totalSizeBytes: Long, itemCount: Int) {
         // what made this read as a text container rather than a
         // dashboard panel. The tint below now does the separating.
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.card),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary
-                .copy(alpha = if (isDark) HERO_TINT_ALPHA else HERO_TINT_ALPHA_LIGHT),
-        ),
+        // Sprint 050: plain surface, with the tint moved into
+        // heroBackdrop() as a gradient — the same treatment as Home's
+        // hero, so the two read as one surface across screens.
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(
-            modifier = Modifier.padding(CLEAN_HERO_PADDING),
+            modifier = Modifier
+                .heroBackdrop()
+                .padding(CLEAN_HERO_PADDING),
             // Sprint 046.2: no uniform arrangement any more. Even spacing
             // between four elements is exactly what made them feel
             // equally important. Each gap below is now set individually
@@ -1301,9 +1304,5 @@ private val CATEGORY_ICON_SIZE = 22.dp
 private val STATUS_ICON_SIZE = 18.dp
 private const val HERO_TINT_ALPHA = 0.12f
 
-// Sprint 046.2: light theme needs less tint than dark to read as the same
-// strength of wash — at 0.12 over a near-white surface the panel almost
-// disappeared, and the shadow was doing all the separating.
-private const val HERO_TINT_ALPHA_LIGHT = 0.09f
 private val CLEAN_HERO_PADDING = 20.dp
 private const val BADGE_TINT_ALPHA = 0.12f

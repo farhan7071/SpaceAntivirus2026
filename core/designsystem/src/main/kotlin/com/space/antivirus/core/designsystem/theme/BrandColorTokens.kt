@@ -47,7 +47,22 @@ val md_theme_light_primary = Color(0xFF00696B)
 val md_theme_light_onPrimary = Color(0xFFFFFFFF)
 val md_theme_light_primaryContainer = Color(0xFF6FF6F5)
 val md_theme_light_onPrimaryContainer = Color(0xFF002020)
-val md_theme_light_background = Color(0xFFFAFDFC)
+// Sprint 050. Was #FAFDFC — the identical value as `surface`, a contrast
+// ratio of exactly 1.00. Sprint 045 gave cards a container colour, which
+// separated them from each other; this gives them a *field* to sit on.
+// A page whose background is the same colour as every card on it has no
+// depth available to it at any elevation, which is most of what "flat"
+// meant.
+//
+// Deliberately cooled rather than warmed. The brief asks for warmer
+// neutrals, and for a beige-leaning app that would be right — but this
+// palette is built on a teal seed, and a warm grey under teal cards
+// reads as dinginess rather than warmth. #F1F5F4 keeps the seed's own
+// hue and simply steps down in tone.
+//
+// Text contrast is unaffected: onSurface 15.61:1, onSurfaceVariant
+// 8.46:1 against this value.
+val md_theme_light_background = Color(0xFFF1F5F4)
 val md_theme_light_onBackground = Color(0xFF191C1C)
 val md_theme_light_surface = Color(0xFFFAFDFC)
 val md_theme_light_onSurface = Color(0xFF191C1C)

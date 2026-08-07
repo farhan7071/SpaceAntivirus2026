@@ -6,6 +6,64 @@ file starts with Sprint 026's real-device hotfix rather than
 retroactively documenting every prior sprint, since ADRs already serve
 as this project's detailed historical record (`docs/adr/`).
 
+## Sprint 050 — Light theme depth and hero backdrop
+
+Reference-driven visual work. The reference was read for technique, not
+copied.
+
+### Fixed
+
+- **The light background was the same colour as every card on it.**
+  `background` and `surface` were both `#FAFDFC` — a contrast ratio of
+  exactly 1.00. Sprint 045 gave cards a container colour, which separated
+  them from *each other*; this gives them a field to sit on. Background
+  is now `#F1F5F4`. Text contrast is unaffected (onSurface 15.61:1,
+  onSurfaceVariant 8.46:1).
+
+  Cooled rather than warmed, deliberately. The brief asks for warmer
+  neutrals, and for a beige-leaning app that would be right — but this
+  palette is built on a teal seed, and a warm grey under teal cards reads
+  as dinginess rather than warmth.
+
+### Added
+
+- **`Modifier.heroBackdrop()`** — a gradient wash, a soft radial bloom
+  behind the brand mark, and two clipped orbital arcs, all at 0.03–0.22
+  alpha. Applied to the Home and Cleaner heroes.
+
+  A `Modifier` rather than a `Box` component: a wrapper would have forced
+  every hero to re-indent its whole body, producing churn in three
+  screens and a diff that buries the change worth reviewing.
+
+  `accent` is a parameter because Home's hero is status-coloured — an
+  "Attention needed" card washes amber, a protected one green. Hardcoding
+  primary would have quietly cost that card its status meaning.
+  `UNKNOWN` stays neutral, so a never-scanned device gets no coloured
+  wash implying a verdict.
+
+### Not adopted from the reference, and why
+
+- **The feature lists.** Security Center's "Real-time Protection / Web
+  Protection / Device Security" and Scan Result's "No malware found /
+  Web protection is active" describe capabilities this app does not
+  have. Same for the Cleaner's "APK Files / Ad Junk / Residual Files" —
+  the four real categories are cache, temporary, log and leftover
+  installers.
+- **The circular scan ring**, which implies determinate progress the junk
+  scan cannot report without a counting pre-pass (ADR 0054).
+- **The palette.** Reference primary is `#0EA5A5`; ours is `#00696B`,
+  chosen in Sprint 002.5 to differentiate from competitors and reaffirmed
+  twice. Adopting it plus `#22C55E`/`#F59E0B` would replace a tonal
+  palette with hand-picked hexes.
+- **"Version 1.0.0" and "Open Source Licenses"** — we are 2.0, and the
+  licenses artifact does not exist.
+
+### Not done
+
+Motion. Identifying where motion improves perceived quality needs a
+device: every candidate in the brief is judged by how it feels, and
+adding transitions I cannot watch is how an app ends up feeling busy.
+
 ## Sprint 049 — UMP consent integration
 
 The blocker flagged since Sprint 044. The app can serve ads in production

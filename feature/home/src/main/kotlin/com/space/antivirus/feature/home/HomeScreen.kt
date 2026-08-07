@@ -41,6 +41,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.space.antivirus.core.designsystem.brand.BrandMarkEmphasis
 import com.space.antivirus.core.designsystem.brand.SpaceBrandMark
+import com.space.antivirus.core.designsystem.brand.heroBackdrop
 import com.space.antivirus.core.designsystem.theme.Elevation
 import com.space.antivirus.core.designsystem.theme.IconTokens
 import com.space.antivirus.core.designsystem.theme.LayoutTokens
@@ -294,9 +295,13 @@ private fun HeroSecurityCard(
         ProtectionStatus.NEEDS_ATTENTION -> if (isDark) SeverityColors.AttentionDark else SeverityColors.AttentionLight
         ProtectionStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val backgroundTint = when (status) {
-        ProtectionStatus.UNKNOWN -> MaterialTheme.colorScheme.surfaceVariant
-        else -> statusColor.copy(alpha = if (isDark) 0.20f else 0.14f)
+    // Sprint 050: the tint is no longer a flat container colour — it is
+    // the accent the backdrop gradient is built from. UNKNOWN stays
+    // neutral, so a device that has never been scanned does not get a
+    // coloured wash implying a verdict.
+    val backdropAccent = when (status) {
+        ProtectionStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> statusColor
     }
     val statusIcon = when (status) {
         ProtectionStatus.PROTECTED -> IconTokens.security
@@ -334,7 +339,12 @@ private fun HeroSecurityCard(
         modifier = modifier.fillMaxWidth(),
         shape = ShapeTokens.heroCard,
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.floating),
-        colors = CardDefaults.cardColors(containerColor = backgroundTint),
+        // Sprint 050: the container is the plain surface now, with the
+        // status tint moved into heroBackdrop() as a gradient. A flat
+        // alpha fill gave the card one uniform tone edge to edge, which
+        // is what made an otherwise well-proportioned hero read as a
+        // coloured rectangle rather than a panel.
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(
             // Sprint 037 (Design Review #1, "reduce height by ~20-25%"):
@@ -349,7 +359,9 @@ private fun HeroSecurityCard(
             // against a card carrying three redundant text lines and a
             // 56dp badge. With that redundancy gone the constraint goes
             // with it, and the space is better spent on breathing room.
-            modifier = Modifier.padding(HERO_PADDING),
+            modifier = Modifier
+                .heroBackdrop(accent = backdropAccent)
+                .padding(HERO_PADDING),
             verticalArrangement = Arrangement.spacedBy(spacing.standard),
         ) {
             // Small, inline icon + status label row, matching both
